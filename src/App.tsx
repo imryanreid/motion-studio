@@ -24,7 +24,7 @@ export default function App() {
     <ToolShell
       toolId={TOOL_ID}
       title="Motion Token Generator"
-      subtitle="Easing curves, springs and durations you can preview on real UI — and carry across CSS, Framer Motion and SwiftUI honestly."
+      subtitle="Easing curves, springs and durations you can preview on real UI — and export to CSS, Tailwind, Framer Motion and DTCG, with the gaps between them measured."
       actions={<ThemeToggle theme={theme} onToggle={toggleTheme} />}
     >
       <section className="mb-12">

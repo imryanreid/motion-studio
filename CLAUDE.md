@@ -11,8 +11,7 @@
 
 A single-page tool that generates motion tokens you can actually preview:
 cubic-bezier and spring easing, a named duration scale, deliberately asymmetric
-enter/exit pairs, and exports for CSS, Tailwind, Framer Motion, SwiftUI and
-DTCG — with the cross-platform differences stated rather than hidden.
+enter/exit pairs, and exports for CSS, Tailwind, Framer Motion and DTCG — with the cross-platform differences stated rather than hidden.
 
 Second tool in the **Studio Tools** family, after
 [Ramps Studio](../Ramps%20Studio). Public, open source (MIT), and a portfolio
@@ -80,11 +79,12 @@ every tool in this family, not a nice-to-have. `robots.txt` stays permissive,
 the JSON-LD stays accurate, and the page keeps rendering its full token set as
 plain text in the DOM. Don't move that behind an interaction.
 
-**3. Cross-platform honesty.** CSS, Framer Motion and SwiftUI parameterize
-springs differently and do not produce identical results from the same inputs.
-Where a value can't be faithfully represented on a target, the export UI must
-say so and show what the approximation costs. Shipping a quiet lie here would
-defeat the point of the tool.
+**3. Conversion honesty.** CSS cannot run spring physics — it approximates with
+a sampled `linear()`, while Framer Motion runs the real thing. The same token
+therefore behaves differently depending on which export you took. Where a value
+can't be faithfully represented, the export UI must say so and show what the
+approximation costs. Shipping a quiet lie here would defeat the point of the
+tool. Targets are web and Figma only; see §2 and §10.1 of `SPEC.md`.
 
 **4. There is no domain yet.** `index.html` deliberately carries no canonical,
 no `og:url` and `noindex`, and the tools manifest gives `motion` no `domain`.

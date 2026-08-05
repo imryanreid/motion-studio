@@ -6,7 +6,7 @@ Motion tokens are the least systematized part of most design systems, and the
 reason is that nobody can preview them honestly or carry them across platforms.
 This is meant to solve both: cubic-bezier and spring easing, a named duration
 scale, deliberately asymmetric enter/exit pairs, previews on real UI rather than
-a dot on a track, and exports for CSS, Tailwind, Framer Motion, SwiftUI and DTCG
+a dot on a track, and exports for CSS, Tailwind, Framer Motion and DTCG
 — with the cross-platform differences stated rather than hidden.
 
 **Status: scaffolded, not built.** The shared layer and page shell are in place.
