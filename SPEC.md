@@ -61,19 +61,37 @@ aliases, not copies.
 
 ```
 duration    instant · fast · base · slow · deliberate      5 values
-easing      subtle · standard · expressive                 3 curves,
+easing      subtle · standard · emphasized                 3 curves,
                                                            each a bezier OR a spring
 ```
 
-Durations default to a geometric-ish progression the user can retune. Defaults:
+**Durations are generated, not hand-entered.** From a base and a ratio, snapped
+to a grid, with any step pinnable — the same Auto-until-you-pin idiom Ramps uses
+for its accents, and the same snap-to-a-grid idea Shape uses for spacing.
 
-| Token        | Default | For                                           |
-| ------------ | ------- | --------------------------------------------- |
-| `instant`    | 80ms    | Feedback that must feel like cause and effect |
-| `fast`       | 140ms   | Small state changes, hovers, checkboxes       |
-| `base`       | 200ms   | The default for anything unspecified          |
-| `slow`       | 280ms   | Surfaces entering, larger travel              |
-| `deliberate` | 400ms   | Motion that is meant to be noticed            |
+```
+step(n) = round_to(snap,  base × ratio^n)      n ∈ {−2, −1, 0, 1, 2}
+```
+
+Defaults: `base 200ms`, `ratio 1.4`, `snap 10ms`.
+
+| Token        | Derived | Shipped             | For                                         |
+| ------------ | ------- | ------------------- | ------------------------------------------- |
+| `instant`    | 102ms   | **80ms** _(pinned)_ | Feedback that must read as cause and effect |
+| `fast`       | 143ms   | 140ms               | Small state changes, hovers, checkboxes     |
+| `base`       | 200ms   | 200ms               | The default for anything unspecified        |
+| `slow`       | 280ms   | 280ms               | Surfaces entering, larger travel            |
+| `deliberate` | 392ms   | 390ms               | Motion that is meant to be noticed          |
+
+**`instant` ships pinned, and that's the interesting part.** It is not a point on
+the same perceptual curve as the others — it's an anchor. Feedback meant to read
+as cause and effect needs to sit under roughly 100ms whatever the rest of the
+scale is doing, and the generated 102ms doesn't. Pretending it belongs on the
+curve would be the dishonest version, so it ships pinned and the UI says so.
+
+Any step can be pinned or released. Derived and pinned steps are marked
+differently, so the scale's system stays legible — the ratio is the lesson, the
+pin is the escape hatch.
 
 ### 3.2 Semantics — emphasis × direction
 
@@ -83,7 +101,7 @@ enter or exit.
 ```
 motion.subtle.enter      motion.subtle.exit
 motion.standard.enter    motion.standard.exit
-motion.expressive.enter  motion.expressive.exit
+motion.emphasized.enter  motion.emphasized.exit
 ```
 
 Each resolves to `{ duration, easing, delay? }`.
@@ -101,13 +119,13 @@ is the question people actually have:
 | `state`    | `subtle`     |
 | `dropdown` | `standard`   |
 | `tooltip`  | `standard`   |
-| `toast`    | `expressive` |
-| `drawer`   | `expressive` |
-| `modal`    | `expressive` |
+| `toast`    | `emphasized` |
+| `drawer`   | `emphasized` |
+| `modal`    | `emphasized` |
 
 **Aliases are references, never copies.** In every format that supports
-indirection they emit as references — `var(--motion-expressive-enter)` in CSS,
-`{motion.expressive.enter}` in DTCG. In formats that can't alias, they resolve
+indirection they emit as references — `var(--motion-emphasized-enter)` in CSS,
+`{motion.emphasized.enter}` in DTCG. In formats that can't alias, they resolve
 to the same literal _and the export states which primitive it came from_.
 
 This is not fussiness. Ramps has the same hazard in its Figma export, where a
@@ -117,6 +135,12 @@ is the same bug wearing different clothes.
 
 The purpose list is editable and its entries are droppable, so someone who finds
 it noise can export the six primitives alone.
+
+**Why this layer stays**, having been challenged: it gives a person and their
+agent a _shared vocabulary_. "Use the drawer motion" is unambiguous to both, in
+a way "use emphasized enter at 280ms" is not — and agents lean on that naming
+heavily. The six primitives are the system; the purposes are how people talk
+about it. Both earn their place.
 
 ---
 
@@ -333,7 +357,7 @@ rule.
 | ------------ | -------- | --------------------------------------------------------------------------- |
 | `subtle`     | `fast`   | Nearly linear, no overshoot. A state change you notice only if it's missing |
 | `standard`   | `base`   | Decelerating. The default for surfaces appearing                            |
-| `expressive` | `slow`   | Spring with visible settle, or a pronounced bezier                          |
+| `emphasized` | `slow`   | Spring with visible settle, or a pronounced bezier                          |
 
 ### 7.3 Stagger
 
@@ -377,10 +401,10 @@ it demonstrates.
 | Scenario   | Demonstrates                  | Why it earns a slot                                                                             |
 | ---------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
 | **List**   | `standard`, stagger           | The only place stagger and decay are visible. Stagger 0 is also the "card entering a list" case |
-| **Drawer** | `expressive`, distance        | Long travel — where easing differences are most legible and where §6 bites                      |
-| **Modal**  | `expressive`                  | Scale + fade together, on a surface that owns the screen                                        |
+| **Drawer** | `emphasized`, distance        | Long travel — where easing differences are most legible and where §6 bites                      |
+| **Modal**  | `emphasized`                  | Scale + fade together, on a surface that owns the screen                                        |
 | **Toggle** | `subtle`                      | Tiny travel. Proves that a curve tuned on a drawer is wrong here                                |
-| **Toast**  | `expressive` enter, fast exit | Short travel, high emphasis — where exit asymmetry is most obvious                              |
+| **Toast**  | `emphasized` enter, fast exit | Short travel, high emphasis — where exit asymmetry is most obvious                              |
 
 Each runs enter and exit, with a control to play either or both.
 
@@ -421,10 +445,10 @@ because `var()` resolves at use time, every shorthand follows automatically.
   --duration-base: 200ms;
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-expressive: linear(0, 0.31 12%, 1.04 34%, 0.98 56%, 1);
+  --ease-emphasized: linear(0, 0.31 12%, 1.04 34%, 0.98 56%, 1);
 
   --motion-standard-enter: var(--duration-base) var(--ease-standard);
-  --motion-modal-enter: var(--motion-expressive-enter); /* alias, not a copy */
+  --motion-modal-enter: var(--motion-emphasized-enter); /* alias, not a copy */
 }
 
 /* Always emitted. Not a checkbox. */
@@ -641,8 +665,9 @@ degrades to defaults rather than erroring, and `.` is the list separator because
 
 | Param          | Meaning                                                                                                    |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| `d`            | The five durations in ms, dot-separated — `80.140.200.280.400`                                             |
-| `es` `ed` `ex` | The subtle / standard / expressive easings. `b.<x1>.<y1>.<x2>.<y2>` (×100, integer) or `s.<k>.<c>.<m>.<v>` |
+| `d`            | Duration generator: base, ratio ×100, snap — `200.140.10`                                                  |
+| `dp`           | Pinned duration steps, `name:ms`, dot-separated — `instant:80`                                             |
+| `es` `ed` `em` | The subtle / standard / emphasized easings. `b.<x1>.<y1>.<x2>.<y2>` (×100, integer) or `s.<k>.<c>.<m>.<v>` |
 | `r`            | Exit/enter duration ratio ×100 — default `70`                                                              |
 | `sg`           | Stagger ms and decay ×100 — `40.85`                                                                        |
 | `dist`         | Distance rule: reference px, exponent ×100 — `160.50`                                                      |
@@ -714,20 +739,29 @@ Each step ends somewhere shippable.
 
 ---
 
-## 17. Open questions
+## 17. Decisions taken, and what stays open
 
-Not blocking the build; worth an answer before launch.
+Settled before the build. Recorded because the reasoning outlasts the answer:
 
-- **Does the purpose-alias layer earn its keep?** It's six extra names for six
-  values. If it reads as noise in the export, cut it — the primitives stand
-  alone.
-- **Should the duration scale be generated from a ratio** the way Ramps'
-  lightness curve is, rather than five independent values? A ratio is more
-  systematic and less tunable. Currently five free values.
-- **Is `expressive` the right third emphasis level**, or should it be
-  `emphasized` to match Material's vocabulary? Naming only, but names are the
-  API.
-- **Ramps has two overlapping JSON tabs** — `toFigma` (DTCG, structured, per
-  mode) and `toJson` (DTCG-shaped, plain strings). Defensible under "tabs are
-  destinations", but the family should settle it deliberately rather than
-  inherit it four more times.
+- **Purpose aliases stay.** They give a person and their agent a shared
+  vocabulary — §3.3.
+- **Durations are generated from base × ratio with per-step pinning**, not five
+  free values — §3.1. Four of the five defaults were already a geometric series
+  at ~1.4; only `instant` sits off it, for a stated reason.
+- **The third emphasis level is `emphasized`, not `expressive`.** Material
+  Design 3 pairs `emphasized` with `standard`, and `standard` was already
+  borrowed from Material — pairing it with Carbon's `expressive`, which belongs
+  with `productive`, mixed two systems' vocabularies. `emphasized` is also the
+  semantically correct word: `subtle → standard → emphasized` is an intensity
+  ladder, whereas `expressive` describes character.
+- **Ramps' two overlapping JSON tabs are fine.** Figma is a legitimately
+  separate destination, and Shape will want the same pair. Not an inconsistency
+  to resolve.
+
+Still open, neither blocking:
+
+- **Does the `-sm`/`-md`/`-lg` distance split survive real use?** It triples the
+  token count for travelling motions. If people ignore the buckets and reach for
+  the middle one, collapse it to a single value plus the documented formula.
+- **Should `motion.stagger` carry a hard cap as well as a decay?** They're two
+  answers to the same problem, and shipping both may be one too many.
