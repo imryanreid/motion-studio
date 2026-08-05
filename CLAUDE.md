@@ -92,6 +92,14 @@ When the domain is registered, all of those change together — plus
 `public/robots.txt`, `public/sitemap.xml`, and the manifest entry in **Ramps
 Studio** (then `pnpm sync`).
 
+## Pushing
+
+No custom domain yet, so pushes go straight to `main`. **That changes the moment
+a domain is live**: from then on this repo follows the family rule — branch, push,
+Vercel preview, Ryan looks, then merge. Add that rule to this file at the same
+time as the canonical tag, sitemap, robots and manifest entry (see §4 above), and
+copy the wording from Ramps Studio's `CLAUDE.md`.
+
 ## Ask before
 
 - Adding, removing, or upgrading any dependency.
