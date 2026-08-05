@@ -1,0 +1,10 @@
+# Motion Studio — not launched yet.
+#
+# The tool isn't built and the domain isn't registered, so there is nothing
+# here worth indexing and nothing at a stable address. This flips to the
+# family's permissive policy at launch, together with the canonical tag, the
+# sitemap, the noindex in index.html, and the manifest entry in Ramps Studio.
+# See "There is no domain yet" in CLAUDE.md.
+
+User-agent: *
+Disallow: /
