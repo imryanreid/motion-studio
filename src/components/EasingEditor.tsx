@@ -22,7 +22,16 @@ import { Label } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
 import { BEZIER_PRESETS, type Bezier } from "../lib/bezier"
 import { derive, overshoot, motionSettlingTime, type SpringConfig } from "../lib/spring"
-import { EMPHASIS_NAMES, type Easing, type Emphasis, type MotionState } from "../lib/tokens"
+import {
+  DURATION_NAMES,
+  EMPHASIS_NAMES,
+  resolveDurations,
+  purposesUsing,
+  type DurationName,
+  type Easing,
+  type Emphasis,
+  type MotionState,
+} from "../lib/tokens"
 
 const MODE_OPTIONS = [
   { id: "bezier" as const, label: "Bezier", title: "Four control points" },
@@ -80,13 +89,18 @@ export default function EasingEditor({
   selected,
   onSelect,
   onChange,
+  onPairChange,
 }: {
   state: MotionState
   selected: Emphasis
   onSelect: (e: Emphasis) => void
   onChange: (e: Emphasis, easing: Easing) => void
+  onPairChange: (e: Emphasis, d: DurationName) => void
 }) {
   const easing = state.easings[selected]
+  const durations = resolveDurations(state)
+  const pairedWith = state.durationFor[selected]
+  const used = purposesUsing(state, selected)
   const spring = easing.kind === "spring" ? easing.spring : null
   const d = spring ? derive(spring) : null
   const set = (next: Easing) => onChange(selected, next)
@@ -136,6 +150,34 @@ export default function EasingEditor({
             </span>
           </button>
         ))}
+      </div>
+
+      {/*
+        The duration this curve is paired with, on the panel where you're
+        working. The mapping used to be a hardcoded constant stated only in the
+        duration strip on the other side of the page — you could look at both
+        and never learn they were connected. Making it a choice explains it, and
+        lets `instant` and `deliberate` be reached at all.
+      */}
+      <div className="border-line flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2">
+        <label className="text-ash flex items-center gap-1.5 font-mono text-[11px]">
+          uses
+          <select
+            value={pairedWith}
+            onChange={(e) => onPairChange(selected, e.target.value as DurationName)}
+            aria-label={`Duration for ${selected}`}
+            className="border-line bg-paper text-ink hover:border-ink/30 cursor-pointer rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors"
+          >
+            {DURATION_NAMES.map((n) => (
+              <option key={n} value={n}>
+                {n} · {durations[n]}ms
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="text-ash font-mono text-[11px]">
+          {used.length ? `for ${used.join(", ")}` : "no purpose uses this yet"}
+        </span>
       </div>
 
       <div className="flex-1 p-4">

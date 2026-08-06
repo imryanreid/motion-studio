@@ -21,6 +21,7 @@ import {
   DEFAULT_STATE,
   DURATION_NAMES,
   EMPHASIS_NAMES,
+  PURPOSE_IDS,
   type DurationName,
   type Easing,
   type Emphasis,
@@ -102,6 +103,41 @@ const num = (raw: string | null, min: number, max: number): number | undefined =
   return Number.isFinite(v) && v >= min && v <= max ? v : undefined
 }
 
+// The two mapping tables travel as indices rather than names: five duration
+// names and three emphasis names would make a long, brittle string, and the
+// orders are already a public contract via the token names themselves.
+function encodeDurationFor(m: MotionState["durationFor"]): string {
+  return EMPHASIS_NAMES.map((e) => DURATION_NAMES.indexOf(m[e])).join(".")
+}
+
+function decodeDurationFor(raw: string | null): MotionState["durationFor"] | undefined {
+  if (!raw) return undefined
+  const parts = raw.split(".").map(Number)
+  if (parts.length !== EMPHASIS_NAMES.length) return undefined
+  if (parts.some((i) => !Number.isInteger(i) || i < 0 || i >= DURATION_NAMES.length)) {
+    return undefined
+  }
+  return Object.fromEntries(
+    EMPHASIS_NAMES.map((e, i) => [e, DURATION_NAMES[parts[i]]]),
+  ) as MotionState["durationFor"]
+}
+
+function encodePurposeEmphasis(m: MotionState["purposeEmphasis"]): string {
+  return PURPOSE_IDS.map((p) => EMPHASIS_NAMES.indexOf(m[p])).join(".")
+}
+
+function decodePurposeEmphasis(raw: string | null): MotionState["purposeEmphasis"] | undefined {
+  if (!raw) return undefined
+  const parts = raw.split(".").map(Number)
+  if (parts.length !== PURPOSE_IDS.length) return undefined
+  if (parts.some((i) => !Number.isInteger(i) || i < 0 || i >= EMPHASIS_NAMES.length)) {
+    return undefined
+  }
+  return Object.fromEntries(
+    PURPOSE_IDS.map((p, i) => [p, EMPHASIS_NAMES[parts[i]]]),
+  ) as MotionState["purposeEmphasis"]
+}
+
 /** Serialize to a compact query string, with no leading "?". */
 export function encodeState(s: MotionState): string {
   const p = new URLSearchParams()
@@ -110,6 +146,10 @@ export function encodeState(s: MotionState): string {
   // as "unspecified" and silently restore the default pin on `instant`.
   p.set("dp", encodePins(s.pins) || "-")
   for (const e of EMPHASIS_NAMES) p.set(EASING_PARAM[e], encodeEasing(s.easings[e]))
+  const df = encodeDurationFor(s.durationFor)
+  if (df !== encodeDurationFor(DEFAULT_STATE.durationFor)) p.set("pd", df)
+  const pe = encodePurposeEmphasis(s.purposeEmphasis)
+  if (pe !== encodePurposeEmphasis(DEFAULT_STATE.purposeEmphasis)) p.set("pe", pe)
   if (s.exitRatio !== DEFAULT_STATE.exitRatio) p.set("r", String(Math.round(s.exitRatio * B)))
   if (
     s.staggerMs !== DEFAULT_STATE.staggerMs ||
@@ -153,6 +193,11 @@ export function decodeState(search: string): Partial<MotionState> {
   // Fill the gaps from defaults so a link carrying one easing still works.
   if (anyEasing) out.easings = { ...DEFAULT_STATE.easings, ...easings }
 
+  const df = decodeDurationFor(p.get("pd"))
+  if (df) out.durationFor = df
+  const pe = decodePurposeEmphasis(p.get("pe"))
+  if (pe) out.purposeEmphasis = pe
+
   const r = num(p.get("r"), 10, 200)
   if (r !== undefined) out.exitRatio = r / B
 
@@ -178,6 +223,8 @@ export function resolveState(search: string): MotionState {
     ...decoded,
     pins: decoded.pins ?? DEFAULT_STATE.pins,
     easings: decoded.easings ?? DEFAULT_STATE.easings,
+    durationFor: decoded.durationFor ?? DEFAULT_STATE.durationFor,
+    purposeEmphasis: decoded.purposeEmphasis ?? DEFAULT_STATE.purposeEmphasis,
   }
 }
 

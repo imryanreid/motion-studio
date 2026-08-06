@@ -16,9 +16,8 @@ import { FieldLabel } from "../shared/components/Label"
 import { bezierToCss } from "../lib/bezier"
 import {
   DURATION_NAMES,
-  EMPHASIS_DURATION,
-  EMPHASIS_NAMES,
-  PURPOSES,
+  emphasisUsing,
+  purposes,
   isDerived,
   resolveDurations,
   resolveSemantics,
@@ -31,11 +30,6 @@ const describeEasing = (e: Easing) =>
   e.kind === "bezier"
     ? bezierToCss(e.bezier)
     : `spring(${e.spring.stiffness}, ${e.spring.damping}, ${e.spring.mass})`
-
-/** Which emphasis levels reach for a given duration. Empty is worth showing. */
-function usedBy(name: DurationName): string[] {
-  return EMPHASIS_NAMES.filter((e) => EMPHASIS_DURATION[e] === name)
-}
 
 /**
  * The duration scale, as a horizontal strip.
@@ -89,7 +83,7 @@ export function DurationStrip({
           {DURATION_NAMES.map((name) => {
             const ms = durations[name]
             const derived = isDerived(state, name)
-            const used = usedBy(name)
+            const used = emphasisUsing(state, name)
             return (
               <div
                 key={name}
@@ -159,6 +153,10 @@ export function DurationStrip({
           })}
         </div>
       </div>
+
+      <p className="text-ash mt-2 text-[11px] leading-snug">
+        Pinned steps keep their value when you change the base or ratio.
+      </p>
     </div>
   )
 }
@@ -232,9 +230,10 @@ export function SemanticTable({
                   </CopyText>
                 </td>
                 <td className="text-ash py-2 text-xs">
-                  {PURPOSES.filter((p) => p.aliasOf === t.emphasis)
+                  {purposes(state)
+                    .filter((p) => p.aliasOf === t.emphasis)
                     .map((p) => p.id)
-                    .join(", ")}
+                    .join(", ") || "—"}
                 </td>
               </tr>
             ))}

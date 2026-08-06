@@ -6,6 +6,10 @@
 // drawer, and you can't tell until it's in the
 // product.
 //
+// The scenarios are the purposes — one vocabulary,
+// so what you are watching is named the same thing
+// you'd reach for at a call site.
+//
 // Driven by a clock we own rather than by CSS
 // transitions, because a transition can't be seeked
 // and slow-motion is where easing differences
@@ -21,44 +25,14 @@ import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
 import { Label } from "../shared/components/Label"
 import {
+  PURPOSE_IDS,
   resolveSemantics,
   type Direction,
   type Emphasis,
   type MotionState,
+  type PurposeId,
 } from "../lib/tokens"
-import { childProgress, timelineTotal } from "../lib/preview"
-
-const SCENARIOS = [
-  { id: "list" as const, label: "List" },
-  { id: "drawer" as const, label: "Drawer" },
-  { id: "modal" as const, label: "Modal" },
-  { id: "toggle" as const, label: "Toggle" },
-  { id: "toast" as const, label: "Toast" },
-]
-type Scenario = (typeof SCENARIOS)[number]["id"]
-
-/** Which emphasis each scenario is demonstrating. */
-const SCENARIO_EMPHASIS: Record<Scenario, Emphasis> = {
-  list: "standard",
-  drawer: "emphasized",
-  modal: "emphasized",
-  toggle: "subtle",
-  toast: "emphasized",
-}
-
-/**
- * Where the preview jumps when you pick a curve to edit.
- *
- * Selecting an easing and watching nothing change is the confusion this fixes —
- * the causal link between the control and the artifact has to be physical. The
- * scenario stays switchable afterwards, because a curve tuned on a drawer being
- * wrong on a toggle is exactly what this tool should let you discover.
- */
-const EMPHASIS_SCENARIO: Record<Emphasis, Scenario> = {
-  subtle: "toggle",
-  standard: "list",
-  emphasized: "modal",
-}
+import { childProgress, timelineTotal, tick } from "../lib/preview"
 
 const SPEEDS = [
   { id: "1" as const, label: "1×" },
@@ -68,42 +42,33 @@ const SPEEDS = [
 
 const LIST_ITEMS = 5
 
+/** Only the list has per-child offsets. */
+const STAGGERS: PurposeId = "list"
+
 export default function Preview({
   state,
-  emphasis: selectedEmphasis,
+  editing,
   onStaggerChange,
 }: {
   state: MotionState
-  /** The curve currently open in the editor. Drives which scenario is shown. */
-  emphasis: Emphasis
+  /** The curve open in the editor. Marks affected scenarios; never moves you. */
+  editing: Emphasis
   onStaggerChange: (ms: number) => void
 }) {
-  const [scenario, setScenario] = useState<Scenario>(EMPHASIS_SCENARIO[selectedEmphasis])
+  const [purpose, setPurpose] = useState<PurposeId>("list")
   const [direction, setDirection] = useState<Direction>("enter")
   const [speed, setSpeed] = useState<"1" | "0.5" | "0.25">("1")
   const [playing, setPlaying] = useState(true)
+  const [loop, setLoop] = useState(true)
   const [elapsed, setElapsed] = useState(0)
 
-  // Follow the editor when the selected curve changes, then leave the choice
-  // alone so switching scenarios by hand sticks.
-  const lastEmphasis = useRef(selectedEmphasis)
-  useEffect(() => {
-    if (lastEmphasis.current !== selectedEmphasis) {
-      lastEmphasis.current = selectedEmphasis
-      setScenario(EMPHASIS_SCENARIO[selectedEmphasis])
-    }
-  }, [selectedEmphasis])
-
-  const emphasis = SCENARIO_EMPHASIS[scenario]
+  const emphasis = state.purposeEmphasis[purpose]
   const token = resolveSemantics(state).find((t) => t.id === `${emphasis}.${direction}`)!
-
-  // The list is the only scenario with per-child offsets, so it's the only one
-  // whose timeline runs past the token's own duration.
-  const staggered = scenario === "list"
+  const staggered = purpose === STAGGERS
   const total = timelineTotal(state, token, staggered ? LIST_ITEMS : 1)
 
   const raf = useRef<number | null>(null)
-  const start = useRef<number>(0)
+  const start = useRef(0)
 
   useEffect(() => {
     if (!playing) return
@@ -111,19 +76,30 @@ export default function Preview({
     let cancelled = false
     start.current = performance.now() - elapsed / rate
 
-    const tick = (now: number) => {
+    const frame = (now: number) => {
       if (cancelled) return
-      const next = (now - start.current) * rate
-      setElapsed(next >= total ? 0 : next)
-      raf.current = requestAnimationFrame(tick)
+      const r = tick(now, start.current, rate, total, loop)
+      start.current = r.originMs
+      setElapsed(r.elapsedMs)
+      if (!r.playing) {
+        setPlaying(false)
+        return
+      }
+      raf.current = requestAnimationFrame(frame)
     }
-    raf.current = requestAnimationFrame(tick)
+    raf.current = requestAnimationFrame(frame)
     return () => {
       cancelled = true
       if (raf.current) cancelAnimationFrame(raf.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- elapsed is the output, not an input
-  }, [playing, speed, total, scenario, direction])
+  }, [playing, speed, total, purpose, direction, loop])
+
+  const replay = () => {
+    setElapsed(0)
+    start.current = performance.now()
+    setPlaying(true)
+  }
 
   const progressAt = (index = 0) => childProgress(state, token, elapsed, index, staggered)
 
@@ -153,69 +129,101 @@ export default function Preview({
           />
           <button
             type="button"
-            onClick={() => setPlaying((p) => !p)}
-            title={playing ? "Pause" : "Play"}
-            aria-label={playing ? "Pause" : "Play"}
-            className="border-line text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+            onClick={() => setLoop((l) => !l)}
+            aria-pressed={loop}
+            title={loop ? "Looping — click to play once" : "Plays once — click to loop"}
+            className={cn(
+              "rounded-md border px-2 py-1 font-mono text-[10px] transition-colors",
+              loop
+                ? "border-ink/30 bg-ink/[0.05] text-ink"
+                : "border-line text-ash hover:text-ink",
+            )}
           >
-            {playing ? <Pause size={13} weight="fill" /> : <Play size={13} weight="fill" />}
+            loop
           </button>
           <button
             type="button"
-            onClick={() => {
-              setElapsed(0)
-              start.current = performance.now()
-              setPlaying(true)
-            }}
+            onClick={() => setPlaying((p) => !p)}
+            title={playing ? "Pause" : "Play"}
+            aria-label={playing ? "Pause" : "Play"}
+            className="border-line text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+          >
+            {playing ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" />}
+          </button>
+          <button
+            type="button"
+            onClick={replay}
             title="Replay"
             aria-label="Replay"
-            className="border-line text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+            className="border-line text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
           >
-            <ArrowClockwise size={13} weight="bold" />
+            <ArrowClockwise size={12} weight="bold" />
           </button>
         </div>
       </div>
 
       <div className="flex flex-1 flex-col">
         <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
-          <Segmented
-            ariaLabel="Scenario"
-            layoutId="preview-scenario"
-            size="sm"
-            value={scenario}
-            onChange={setScenario}
-            options={SCENARIOS}
-          />
-          <div className="flex items-center gap-3">
-            {staggered && (
-              <label className="text-ash flex items-center gap-1.5 font-mono text-[10px]">
-                stagger
-                <input
-                  type="range"
-                  min={0}
-                  max={160}
-                  step={5}
-                  value={state.staggerMs}
-                  onChange={(e) => onStaggerChange(Number(e.target.value))}
-                  className="accent-ink h-1 w-20"
-                  title="Per-child offset. Falls off sub-linearly so long lists stay bearable."
-                />
-                <span className="text-ink w-8">{state.staggerMs}ms</span>
-              </label>
-            )}
-            <span className="text-ash font-mono text-[10px]">
-              {emphasis}.{direction} · {token.durationMs}ms
-              {token.easing.kind === "spring" ? " settling" : ""}
-            </span>
+          {/*
+            Scenario tabs are the purposes. Selecting a curve in the editor
+            marks the ones it affects rather than jumping you somewhere else —
+            moving the view under you implied each curve belonged to one
+            element, which is the opposite of what this tool teaches.
+          */}
+          <div className="flex flex-wrap gap-0.5">
+            {PURPOSE_IDS.map((id) => {
+              const affected = state.purposeEmphasis[id] === editing
+              const active = id === purpose
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPurpose(id)}
+                  aria-pressed={active}
+                  title={`${id} — uses ${state.purposeEmphasis[id]}`}
+                  className={cn(
+                    "relative rounded px-2 py-1 font-mono text-[11px] transition-colors",
+                    active ? "bg-ink text-paper" : "text-ash hover:text-ink",
+                  )}
+                >
+                  {id}
+                  {affected && !active && (
+                    <span
+                      aria-hidden="true"
+                      className="bg-ink/40 absolute inset-x-2 -bottom-px h-0.5 rounded-full"
+                    />
+                  )}
+                </button>
+              )
+            })}
           </div>
+          <span className="text-ash font-mono text-[10px]">
+            {emphasis} · {token.durationMs}ms
+            {token.easing.kind === "spring" ? " settling" : ""}
+          </span>
         </div>
 
-        <div className="bg-ink/[0.02] relative flex min-h-[260px] flex-1 items-center justify-center overflow-hidden p-6">
-          <Stage scenario={scenario} progressAt={progressAt} />
+        <div className="bg-ink/[0.02] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
+          <Stage purpose={purpose} progressAt={progressAt} />
         </div>
 
-        {/* A read-only timeline for now — scrubbing is the next thing here. */}
         <div className="border-line flex items-center gap-3 border-t px-3 py-2">
+          {staggered && (
+            <label className="text-ash flex shrink-0 items-center gap-1.5 font-mono text-[10px]">
+              stagger
+              <input
+                type="range"
+                min={0}
+                max={160}
+                step={5}
+                value={state.staggerMs}
+                onChange={(e) => onStaggerChange(Number(e.target.value))}
+                className="accent-ink h-1 w-20"
+                title="Per-child offset. Falls off sub-linearly so long lists stay bearable."
+              />
+              <span className="text-ink w-9">{state.staggerMs}ms</span>
+            </label>
+          )}
           <div className="bg-ink/10 relative h-1 flex-1 overflow-hidden rounded-full">
             <div
               className="bg-ink absolute inset-y-0 left-0 rounded-full"
@@ -234,22 +242,24 @@ export default function Preview({
 const card = "bg-paper border-line rounded-md border shadow-sm"
 
 function Stage({
-  scenario,
+  purpose,
   progressAt,
 }: {
-  scenario: Scenario
+  purpose: PurposeId
   progressAt: (index?: number) => number
 }) {
-  if (scenario === "list") {
+  const p = progressAt()
+
+  if (purpose === "list") {
     return (
       <div className="flex w-full max-w-[320px] flex-col gap-2">
         {Array.from({ length: LIST_ITEMS }, (_, i) => {
-          const p = progressAt(i)
+          const v = progressAt(i)
           return (
             <div
               key={i}
               className={cn(card, "h-9")}
-              style={{ opacity: p, transform: `translateY(${(1 - p) * 14}px)` }}
+              style={{ opacity: v, transform: `translateY(${(1 - v) * 14}px)` }}
             />
           )
         })}
@@ -257,8 +267,7 @@ function Stage({
     )
   }
 
-  if (scenario === "drawer") {
-    const p = progressAt()
+  if (purpose === "drawer") {
     return (
       <div className="border-line relative h-full w-full overflow-hidden rounded-md border">
         <div
@@ -269,8 +278,7 @@ function Stage({
     )
   }
 
-  if (scenario === "modal") {
-    const p = progressAt()
+  if (purpose === "modal") {
     return (
       <div className="relative h-full w-full">
         <div className="absolute inset-0 rounded-md bg-black/40" style={{ opacity: p * 0.6 }} />
@@ -285,8 +293,7 @@ function Stage({
     )
   }
 
-  if (scenario === "toggle") {
-    const p = progressAt()
+  if (purpose === "state") {
     return (
       <div className="border-line flex h-8 w-14 items-center rounded-full border px-1">
         <div
@@ -297,8 +304,36 @@ function Stage({
     )
   }
 
+  if (purpose === "dropdown") {
+    return (
+      <div className="flex w-full max-w-[240px] flex-col items-start">
+        <div className={cn(card, "mb-1 h-8 w-28")} />
+        <div
+          className={cn(card, "h-24 w-40 origin-top")}
+          style={{
+            opacity: p,
+            transform: `scaleY(${0.85 + p * 0.15}) translateY(${(1 - p) * -6}px)`,
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (purpose === "tooltip") {
+    return (
+      <div className="relative flex flex-col items-center gap-2">
+        <div
+          className="bg-ink text-paper rounded px-2 py-1 font-mono text-[10px]"
+          style={{ opacity: p, transform: `scale(${0.92 + p * 0.08})` }}
+        >
+          tooltip
+        </div>
+        <div className={cn(card, "h-7 w-7")} />
+      </div>
+    )
+  }
+
   // toast
-  const p = progressAt()
   return (
     <div className="relative h-full w-full">
       <div

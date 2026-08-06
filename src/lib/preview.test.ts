@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { DEFAULT_STATE, resolveSemantics } from "./tokens.js"
-import { childProgress, timelineTotal, HOLD_MS } from "./preview.js"
+import { childProgress, timelineTotal, tick, HOLD_MS } from "./preview.js"
 
 const tokens = resolveSemantics(DEFAULT_STATE)
 const enter = tokens.find((t) => t.id === "standard.enter")!
@@ -74,5 +74,48 @@ describe("timelineTotal", () => {
   it("extends far enough for the last staggered child to finish", () => {
     const total = timelineTotal(DEFAULT_STATE, enter, 5)
     expect(childProgress(DEFAULT_STATE, enter, total - HOLD_MS, 4, true)).toBe(1)
+  })
+})
+
+describe("tick — the clock, and the loop that used to freeze", () => {
+  it("advances while inside the timeline", () => {
+    const r = tick(1500, 1000, 1, 1000, true)
+    expect(r.elapsedMs).toBe(500)
+    expect(r.originMs).toBe(1000)
+    expect(r.playing).toBe(true)
+  })
+
+  it("moves the origin when it wraps", () => {
+    // The bug: elapsed reset to 0 but the origin stayed, so the next frame was
+    // still past total and it pinned at 0 forever — played once, then froze.
+    const wrapped = tick(2100, 1000, 1, 1000, true)
+    expect(wrapped.elapsedMs).toBe(0)
+    expect(wrapped.originMs).toBe(2100)
+
+    // The frame after a wrap must make progress. With the old code it did not.
+    const next = tick(2116, wrapped.originMs, 1, 1000, true)
+    expect(next.elapsedMs).toBeGreaterThan(0)
+  })
+
+  it("keeps looping over many cycles", () => {
+    let origin = 0
+    let seen = 0
+    for (let now = 0; now <= 5000; now += 16) {
+      const r = tick(now, origin, 1, 1000, true)
+      origin = r.originMs
+      if (r.elapsedMs > 500) seen++
+    }
+    // Roughly five laps' worth of late-timeline frames, not one.
+    expect(seen).toBeGreaterThan(100)
+  })
+
+  it("stops at the end when looping is off", () => {
+    const r = tick(3000, 1000, 1, 1000, false)
+    expect(r.elapsedMs).toBe(1000)
+    expect(r.playing).toBe(false)
+  })
+
+  it("honours the playback rate", () => {
+    expect(tick(1400, 1000, 0.25, 1000, true).elapsedMs).toBe(100)
   })
 })

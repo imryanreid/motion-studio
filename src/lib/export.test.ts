@@ -5,7 +5,7 @@
 // what it lost.
 // ==============================================
 import { describe, it, expect } from "vitest"
-import { DEFAULT_STATE, resolveDurations, resolveSemantics, PURPOSES } from "./tokens.js"
+import { DEFAULT_STATE, resolveDurations, resolveSemantics, purposes } from "./tokens.js"
 import {
   toCss,
   toTailwind,
@@ -36,11 +36,11 @@ describe("CSS", () => {
     for (const t of resolveSemantics(DEFAULT_STATE)) {
       expect(css).toContain(`--motion-${t.id.replace(".", "-")}:`)
     }
-    for (const p of PURPOSES) expect(css).toContain(`--motion-${p.id}-enter:`)
+    for (const p of purposes(DEFAULT_STATE)) expect(css).toContain(`--motion-${p.id}-enter:`)
   })
 
   it("aliases purposes rather than copying values", () => {
-    for (const p of PURPOSES) {
+    for (const p of purposes(DEFAULT_STATE)) {
       expect(css).toContain(`--motion-${p.id}-enter: var(--motion-${p.aliasOf}-enter);`)
     }
   })
@@ -88,7 +88,8 @@ describe("Framer Motion", () => {
   })
 
   it("points purposes at the same objects", () => {
-    for (const p of PURPOSES) expect(js).toContain(`${p.id}: motion.${p.aliasOf},`)
+    for (const p of purposes(DEFAULT_STATE))
+      expect(js).toContain(`${p.id}: motion.${p.aliasOf},`)
   })
 
   it("says how reduced motion is handled in this runtime", () => {

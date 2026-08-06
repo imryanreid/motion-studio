@@ -16,7 +16,7 @@ import { derive, springValue, type SpringConfig } from "./spring.js"
 import {
   DURATION_NAMES,
   EMPHASIS_NAMES,
-  PURPOSES,
+  purposes,
   resolveDurations,
   resolveSemantics,
   type Easing,
@@ -67,7 +67,7 @@ export function toCss(s: MotionState): string {
   }
 
   lines.push("", "  /* Purposes — aliases, not copies */")
-  for (const p of PURPOSES) {
+  for (const p of purposes(s)) {
     for (const dir of ["enter", "exit"] as const) {
       lines.push(`  --motion-${p.id}-${dir}: var(--motion-${p.aliasOf}-${dir});`)
     }
@@ -148,7 +148,7 @@ export function toFramer(s: MotionState): string {
   lines.push("} as const", "")
   lines.push("// Aliases, pointing at the same objects.")
   lines.push("export const purpose = {")
-  for (const p of PURPOSES) lines.push(`  ${p.id}: motion.${p.aliasOf},`)
+  for (const p of purposes(s)) lines.push(`  ${p.id}: motion.${p.aliasOf},`)
   lines.push("} as const", "")
   lines.push(`export const stagger = ${(s.staggerMs / 1000).toFixed(3)}`)
   lines.push(`export const staggerDecay = ${s.staggerDecay}`)
@@ -208,7 +208,7 @@ export function toDtcg(s: MotionState): string {
   }
 
   const purpose: Record<string, unknown> = {}
-  for (const p of PURPOSES) {
+  for (const p of purposes(s)) {
     purpose[p.id] = {
       enter: { $type: "transition", $value: `{motion.${p.aliasOf}.enter}` },
       exit: { $type: "transition", $value: `{motion.${p.aliasOf}.exit}` },
@@ -333,7 +333,7 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
   }
 
   lines.push("", "## Purposes", "", "Aliases, not copies. Prefer these at call sites.", "")
-  for (const p of PURPOSES) lines.push(`- \`${p.id}\` → \`${p.aliasOf}\``)
+  for (const p of purposes(s)) lines.push(`- \`${p.id}\` → \`${p.aliasOf}\``)
 
   lines.push(
     "",

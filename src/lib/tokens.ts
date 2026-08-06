@@ -33,20 +33,61 @@ export const EMPHASIS_NAMES = ["subtle", "standard", "emphasized"] as const
 export type Emphasis = (typeof EMPHASIS_NAMES)[number]
 
 /**
- * Which duration each emphasis level reaches for.
+ * Which duration each emphasis level reaches for — a choice, not a constant.
  *
- * Exported so the UI can show the mapping — without it a duration row is a
- * number with no visible consequence. Note that `instant` and `deliberate`
- * currently aren't reached for by anything, so they ship in exports without
- * being referenced by a semantic token.
+ * It was hardcoded, which made the tie between the easing panel and the
+ * duration scale invisible: you could see both and never learn they were
+ * connected. It also froze `instant` and `deliberate` out of the system
+ * entirely, since nothing could point at them.
  */
-export const EMPHASIS_DURATION: Record<Emphasis, DurationName> = {
+export const DEFAULT_DURATION_FOR: Record<Emphasis, DurationName> = {
   subtle: "fast",
   standard: "base",
   emphasized: "slow",
 }
 
 export type Direction = "enter" | "exit"
+
+/**
+ * The purposes, which are also the preview scenarios.
+ *
+ * These were two separate vocabularies — generic scenario shapes on one side,
+ * purpose aliases on the other, overlapping but not aligned — so neither taught
+ * which motion to reach for. Merged, the preview answers "which do I use for a
+ * drawer?" directly, because the thing you are watching is named `drawer`.
+ *
+ * `travels` marks where distance is meaningful. A checkbox filling has none.
+ */
+export const PURPOSE_IDS = [
+  "state",
+  "dropdown",
+  "tooltip",
+  "list",
+  "drawer",
+  "modal",
+  "toast",
+] as const
+export type PurposeId = (typeof PURPOSE_IDS)[number]
+
+export const PURPOSE_TRAVELS: Record<PurposeId, boolean> = {
+  state: false,
+  dropdown: true,
+  tooltip: false,
+  list: true,
+  drawer: true,
+  modal: false,
+  toast: true,
+}
+
+export const DEFAULT_PURPOSE_EMPHASIS: Record<PurposeId, Emphasis> = {
+  state: "subtle",
+  dropdown: "standard",
+  tooltip: "standard",
+  list: "standard",
+  drawer: "emphasized",
+  modal: "emphasized",
+  toast: "emphasized",
+}
 
 export type Easing =
   { kind: "bezier"; bezier: Bezier } | { kind: "spring"; spring: SpringConfig }
@@ -61,6 +102,10 @@ export type MotionState = {
   /** Steps held at a fixed value instead of being derived. */
   pins: Partial<Record<DurationName, number>>
   easings: Record<Emphasis, Easing>
+  /** Which duration step each emphasis reaches for. */
+  durationFor: Record<Emphasis, DurationName>
+  /** Which emphasis each purpose uses. */
+  purposeEmphasis: Record<PurposeId, Emphasis>
   /** Exit duration as a fraction of enter. */
   exitRatio: number
   staggerMs: number
@@ -88,6 +133,8 @@ export const DEFAULT_STATE: MotionState = {
       spring: { stiffness: 210, damping: 20, mass: 1, velocity: 0 },
     },
   },
+  durationFor: DEFAULT_DURATION_FOR,
+  purposeEmphasis: DEFAULT_PURPOSE_EMPHASIS,
   exitRatio: 0.7,
   staggerMs: 40,
   staggerDecay: 0.85,
@@ -187,7 +234,7 @@ export function resolveSemantics(s: MotionState): SemanticToken[] {
   const out: SemanticToken[] = []
   for (const emphasis of EMPHASIS_NAMES) {
     const enterEasing = s.easings[emphasis]
-    const nominal = durations[EMPHASIS_DURATION[emphasis]]
+    const nominal = durations[s.durationFor[emphasis]]
 
     for (const direction of ["enter", "exit"] as Direction[]) {
       const easing = direction === "enter" ? enterEasing : deriveExitEasing(enterEasing)
@@ -202,24 +249,30 @@ export function resolveSemantics(s: MotionState): SemanticToken[] {
 }
 
 /**
- * Purposes are aliases, never copies.
+ * Purposes resolved against the current assignment.
  *
- * A thin naming layer over the six semantics, because "which one do I grab for
- * a drawer?" is the question people actually have — and because it gives a
- * person and their agent a shared vocabulary. "Use the drawer motion" is
- * unambiguous to both in a way "emphasized enter at 280ms" is not.
- *
- * `travels` marks the ones where distance is meaningful. A checkbox filling has
- * no distance; a drawer does.
+ * Aliases, never copies: in every format that supports indirection they emit as
+ * references, so a purpose can never drift into a second source of truth.
  */
-export const PURPOSES: { id: string; aliasOf: Emphasis; travels: boolean }[] = [
-  { id: "state", aliasOf: "subtle", travels: false },
-  { id: "dropdown", aliasOf: "standard", travels: true },
-  { id: "tooltip", aliasOf: "standard", travels: false },
-  { id: "toast", aliasOf: "emphasized", travels: true },
-  { id: "drawer", aliasOf: "emphasized", travels: true },
-  { id: "modal", aliasOf: "emphasized", travels: false },
-]
+export function purposes(
+  s: MotionState,
+): { id: PurposeId; aliasOf: Emphasis; travels: boolean }[] {
+  return PURPOSE_IDS.map((id) => ({
+    id,
+    aliasOf: s.purposeEmphasis[id],
+    travels: PURPOSE_TRAVELS[id],
+  }))
+}
+
+/** Which purposes are affected by a given emphasis — used to mark the preview. */
+export function purposesUsing(s: MotionState, emphasis: Emphasis): PurposeId[] {
+  return PURPOSE_IDS.filter((id) => s.purposeEmphasis[id] === emphasis)
+}
+
+/** Which emphases reach for a duration step. Empty is worth showing. */
+export function emphasisUsing(s: MotionState, name: DurationName): Emphasis[] {
+  return EMPHASIS_NAMES.filter((e) => s.durationFor[e] === name)
+}
 
 /** Progress 0→1 for any easing at a moment in ms. The one entry point. */
 export function easingProgress(easing: Easing, ms: number, durationMs: number): number {

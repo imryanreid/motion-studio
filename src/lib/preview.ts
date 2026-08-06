@@ -54,3 +54,28 @@ export function childProgress(
 
   return token.direction === "exit" ? 1 - raw : raw
 }
+
+/**
+ * One frame of the clock.
+ *
+ * Pure, because the bug it replaces was invisible in review and invisible in a
+ * screenshot: the loop reset `elapsed` to 0 without moving the clock origin, so
+ * the very next frame was still past `total` and it pinned at 0 forever. The
+ * preview played exactly once and then froze, which reads as "looping is off"
+ * rather than as a defect.
+ *
+ * Returns the new origin as well as the new elapsed, so wrapping is expressible
+ * — that is the whole point.
+ */
+export function tick(
+  nowMs: number,
+  originMs: number,
+  rate: number,
+  totalMs: number,
+  loop: boolean,
+): { elapsedMs: number; originMs: number; playing: boolean } {
+  const raw = (nowMs - originMs) * rate
+  if (raw < totalMs) return { elapsedMs: raw, originMs, playing: true }
+  if (!loop) return { elapsedMs: totalMs, originMs, playing: false }
+  return { elapsedMs: 0, originMs: nowMs, playing: true }
+}

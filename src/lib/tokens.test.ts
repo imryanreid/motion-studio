@@ -17,7 +17,9 @@ import {
   criticalDamping,
   isDerived,
   staggerDelay,
-  PURPOSES,
+  purposes,
+  PURPOSE_IDS,
+  emphasisUsing,
   type MotionState,
 } from "./tokens.js"
 import { encodeState, decodeState, resolveState, isDefaultState } from "./params.js"
@@ -133,13 +135,40 @@ describe("semantics and purposes", () => {
   })
 
   it("every purpose aliases a real emphasis", () => {
-    for (const p of PURPOSES) expect(EMPHASIS_NAMES).toContain(p.aliasOf)
+    for (const p of purposes(DEFAULT_STATE)) expect(EMPHASIS_NAMES).toContain(p.aliasOf)
   })
 
   it("only travelling purposes are marked as such", () => {
     // A checkbox filling has no distance; a drawer does.
-    expect(PURPOSES.find((p) => p.id === "state")!.travels).toBe(false)
-    expect(PURPOSES.find((p) => p.id === "drawer")!.travels).toBe(true)
+    const list = purposes(DEFAULT_STATE)
+    expect(list.find((p) => p.id === "state")!.travels).toBe(false)
+    expect(list.find((p) => p.id === "drawer")!.travels).toBe(true)
+  })
+
+  it("purposes are the preview scenarios — one vocabulary, not two", () => {
+    // These were separate lists that overlapped without aligning, so neither
+    // taught which motion to reach for.
+    expect(purposes(DEFAULT_STATE).map((p) => p.id)).toEqual([...PURPOSE_IDS])
+  })
+
+  it("repointing an emphasis moves which duration it uses", () => {
+    const repointed = {
+      ...DEFAULT_STATE,
+      durationFor: { ...DEFAULT_STATE.durationFor, subtle: "instant" as const },
+    }
+    const t = resolveSemantics(repointed).find((x) => x.id === "subtle.enter")!
+    expect(t.durationMs).toBe(resolveDurations(repointed).instant)
+    // …and `instant` stops reading as an orphan.
+    expect(emphasisUsing(repointed, "instant")).toContain("subtle")
+    expect(emphasisUsing(DEFAULT_STATE, "instant")).toEqual([])
+  })
+
+  it("repointing a purpose changes which semantics it aliases", () => {
+    const repointed = {
+      ...DEFAULT_STATE,
+      purposeEmphasis: { ...DEFAULT_STATE.purposeEmphasis, modal: "subtle" as const },
+    }
+    expect(purposes(repointed).find((p) => p.id === "modal")!.aliasOf).toBe("subtle")
   })
 
   it("a spring's duration comes from its settling time, not the scale", () => {
@@ -176,6 +205,24 @@ describe("URL state", () => {
     { name: "tuned exit", s: { ...DEFAULT_STATE, exitRatio: 0.5 } },
     { name: "tuned stagger", s: { ...DEFAULT_STATE, staggerMs: 25, staggerDecay: 0.7 } },
     { name: "tight tolerance", s: { ...DEFAULT_STATE, tolerance: 0.002 } },
+    {
+      name: "repointed pairing",
+      s: {
+        ...DEFAULT_STATE,
+        durationFor: { subtle: "instant", standard: "slow", emphasized: "deliberate" },
+      },
+    },
+    {
+      name: "repointed purposes",
+      s: {
+        ...DEFAULT_STATE,
+        purposeEmphasis: {
+          ...DEFAULT_STATE.purposeEmphasis,
+          modal: "subtle",
+          list: "emphasized",
+        },
+      },
+    },
     {
       name: "all springs",
       s: {

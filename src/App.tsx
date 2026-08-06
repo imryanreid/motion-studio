@@ -26,7 +26,7 @@ import Preview from "./components/Preview"
 import { DurationStrip, SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import { DEFAULT_STATE, type Emphasis, type MotionState } from "./lib/tokens"
+import { DEFAULT_STATE, type DurationName, type Emphasis, type MotionState } from "./lib/tokens"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
@@ -103,7 +103,7 @@ export default function App() {
     <ToolShell
       toolId={TOOL_ID}
       title="Motion Token Generator"
-      subtitle="Easing curves, springs and durations — previewed on real UI, and honest about what each export costs."
+      subtitle="Easing curves, springs and durations, previewed on real UI — and honest about what each export costs."
       actions={
         <>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
@@ -131,7 +131,7 @@ export default function App() {
         )
       }
       controls={
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-6">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-5">
           <NumberField
             label="Base"
             value={state.base}
@@ -148,7 +148,7 @@ export default function App() {
             min={1.05}
             max={3}
             step={0.05}
-            title="Multiplier between steps. 1.4 puts instant and deliberate two steps either side of base."
+            title="Multiplier between steps. Pinned steps ignore it."
             onChange={(ratio) => setState({ ...state, ratio })}
           />
           <NumberField
@@ -161,33 +161,30 @@ export default function App() {
             title="Generated values round to this."
             onChange={(snap) => setState({ ...state, snap })}
           />
-
-          {/*
-            The generated scale sits with the controls that generate it, rather
-            than as a summary of a section further down. The echo this replaces
-            was five unlabelled integers — you had to hover each one to learn
-            which was which, which is a puzzle rather than a readout.
-          */}
-          <div
-            aria-hidden="true"
-            className="bg-line mb-[38px] hidden h-px w-6 shrink-0 lg:block"
+          <NumberField
+            label="Exit"
+            value={Math.round(state.exitRatio * 100)}
+            min={20}
+            max={130}
+            step={5}
+            suffix="%"
+            title="Exit duration as a share of the entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
+            onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
           />
-          <DurationStrip state={state} onChange={setState} />
         </div>
       }
     >
       {/*
-        Preview and editor side by side, because they are one activity rather
-        than two. Editing a curve you can't watch is the confusion this layout
-        exists to fix; on narrow screens they stack with the preview first, for
-        the same reason.
+        Left is what you touch, right is what comes out. The split is the answer
+        to "which of these am I supposed to be changing?" — spatial and
+        permanent, rather than something to infer per control. Generated things
+        deliberately wear no input chrome.
+
+        Only the output you watch *while* tweaking lives here. The semantic
+        table and the agent block are read afterwards, so they stay full width
+        below rather than being squeezed into half.
       */}
-      <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <Preview
-          state={state}
-          emphasis={emphasis}
-          onStaggerChange={(staggerMs) => setState({ ...state, staggerMs })}
-        />
+      <div className="mb-12 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         <EasingEditor
           state={state}
           selected={emphasis}
@@ -195,7 +192,25 @@ export default function App() {
           onChange={(e, easing) =>
             setState({ ...state, easings: { ...state.easings, [e]: easing } })
           }
+          onPairChange={(e, d) =>
+            setState({ ...state, durationFor: { ...state.durationFor, [e]: d } })
+          }
         />
+        {/*
+          Preview first. It is the hero and the thing that explains the tool, so
+          nothing generated goes above it. The strip used to sit here, on the
+          grounds that a generated scale belongs next to the inputs that
+          generate it — but the easing panel's "uses base · 200ms" control now
+          carries that tie directly, which frees the strip to drop below.
+        */}
+        <div className="flex flex-col gap-4">
+          <Preview
+            state={state}
+            editing={emphasis}
+            onStaggerChange={(staggerMs) => setState({ ...state, staggerMs })}
+          />
+          <DurationStrip state={state} onChange={setState} />
+        </div>
       </div>
 
       <SemanticTable state={state} onChange={setState} />
