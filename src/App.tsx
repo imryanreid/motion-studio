@@ -75,6 +75,48 @@ function NumberField({
   )
 }
 
+/** A labelled slider, for the rules that shape every token. */
+function Slider({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  suffix,
+  title,
+}: {
+  label: string
+  value: number
+  onChange: (n: number) => void
+  min: number
+  max: number
+  step: number
+  suffix: string
+  title: string
+}) {
+  return (
+    <label className="flex items-center gap-2" title={title}>
+      <span className="text-ash font-mono text-[11px] tracking-[0.16em] uppercase">
+        {label}
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="accent-ink h-1 w-24"
+      />
+      <span className="text-ink w-12 font-mono text-xs">
+        {value}
+        {suffix}
+      </span>
+    </label>
+  )
+}
+
 export default function App() {
   const { theme, toggle: toggleTheme } = useTheme()
   const [state, setState] = useState<MotionState>(() =>
@@ -130,90 +172,99 @@ export default function App() {
           </ExportModal>
         )
       }
-      controls={
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-5">
-          <NumberField
-            label="Base"
-            value={state.base}
-            min={20}
-            max={2000}
-            step={10}
-            suffix="ms"
-            title="The middle of the scale. Every other duration is derived from it."
-            onChange={(base) => setState({ ...state, base })}
-          />
-          <NumberField
-            label="Ratio"
-            value={state.ratio}
-            min={1.05}
-            max={3}
-            step={0.05}
-            title="Multiplier between steps. Pinned steps ignore it."
-            onChange={(ratio) => setState({ ...state, ratio })}
-          />
-          <NumberField
-            label="Snap"
-            value={state.snap}
-            min={1}
-            max={100}
-            step={1}
-            suffix="ms"
-            title="Generated values round to this."
-            onChange={(snap) => setState({ ...state, snap })}
-          />
-          <NumberField
-            label="Exit"
-            value={Math.round(state.exitRatio * 100)}
-            min={20}
-            max={130}
-            step={5}
-            suffix="%"
-            title="Exit duration as a share of the entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
-            onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
-          />
-        </div>
-      }
     >
       {/*
-        Left is what you touch, right is what comes out. The split is the answer
-        to "which of these am I supposed to be changing?" — spatial and
-        permanent, rather than something to infer per control. Generated things
-        deliberately wear no input chrome.
+        Left is the system, right is the demonstration.
+        
+        Not "edit vs output" — that split left the duration scale homeless,
+        since it is generated but belongs with the inputs that generate it.
+        Framed this way the answer to "what can I change that affects the
+        animation?" is simply everything on the left, and the right panel is
+        purely about watching. Two controls moved to make it true: stagger was
+        in the preview, and exit was duplicated in the band and the table.
 
-        Only the output you watch *while* tweaking lives here. The semantic
-        table and the agent block are read afterwards, so they stay full width
-        below rather than being squeezed into half.
+        One bordered surface on the left rather than three floating panels, so
+        it reads as a single instrument.
       */}
-      <div className="mb-12 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <EasingEditor
-          state={state}
-          selected={emphasis}
-          onSelect={setEmphasis}
-          onChange={(e, easing) =>
-            setState({ ...state, easings: { ...state.easings, [e]: easing } })
-          }
-          onPairChange={(e, d) =>
-            setState({ ...state, durationFor: { ...state.durationFor, [e]: d } })
-          }
-        />
-        {/*
-          Preview first. It is the hero and the thing that explains the tool, so
-          nothing generated goes above it. The strip used to sit here, on the
-          grounds that a generated scale belongs next to the inputs that
-          generate it — but the easing panel's "uses base · 200ms" control now
-          carries that tie directly, which frees the strip to drop below.
-        */}
-        <div className="flex flex-col gap-4">
-          <Preview
+      <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="border-line flex flex-col overflow-hidden rounded-lg border">
+          <div className="border-line border-b p-4">
+            <div className="mb-4 flex flex-wrap items-end gap-x-5 gap-y-4">
+              <NumberField
+                label="Base"
+                value={state.base}
+                min={20}
+                max={2000}
+                step={10}
+                suffix="ms"
+                title="The middle of the scale. Every other duration is derived from it."
+                onChange={(base) => setState({ ...state, base })}
+              />
+              <NumberField
+                label="Ratio"
+                value={state.ratio}
+                min={1.05}
+                max={3}
+                step={0.05}
+                title="Multiplier between steps. Pinned steps ignore it."
+                onChange={(ratio) => setState({ ...state, ratio })}
+              />
+              <NumberField
+                label="Snap"
+                value={state.snap}
+                min={1}
+                max={100}
+                step={1}
+                suffix="ms"
+                title="Generated values round to this."
+                onChange={(snap) => setState({ ...state, snap })}
+              />
+            </div>
+            <DurationStrip state={state} onChange={setState} />
+          </div>
+
+          <EasingEditor
             state={state}
-            editing={emphasis}
-            onStaggerChange={(staggerMs) => setState({ ...state, staggerMs })}
+            selected={emphasis}
+            onSelect={setEmphasis}
+            onChange={(e, easing) =>
+              setState({ ...state, easings: { ...state.easings, [e]: easing } })
+            }
+            onPairChange={(e, d) =>
+              setState({ ...state, durationFor: { ...state.durationFor, [e]: d } })
+            }
           />
-          <DurationStrip state={state} onChange={setState} />
+
+          {/* Rules that shape every token, so they belong with the system
+              rather than beside whichever output happens to show them. */}
+          <div className="border-line mt-auto flex flex-wrap items-center gap-x-6 gap-y-3 border-t p-4">
+            <Slider
+              label="Exit"
+              value={Math.round(state.exitRatio * 100)}
+              min={20}
+              max={130}
+              step={5}
+              suffix="%"
+              title="Exit duration as a share of the entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
+              onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
+            />
+            <Slider
+              label="Stagger"
+              value={state.staggerMs}
+              min={0}
+              max={160}
+              step={5}
+              suffix="ms"
+              title="Per-child offset in a list. Falls off sub-linearly so long lists stay bearable."
+              onChange={(staggerMs) => setState({ ...state, staggerMs })}
+            />
+          </div>
         </div>
+
+        <Preview state={state} editing={emphasis} />
       </div>
 
-      <SemanticTable state={state} onChange={setState} />
+      <SemanticTable state={state} />
       <AgentData state={state} url={shareHref} />
     </ToolShell>
   )

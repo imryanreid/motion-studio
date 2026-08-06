@@ -59,14 +59,19 @@ export function DurationStrip({
   }
 
   return (
-    <div className="min-w-0 flex-1">
+    /*
+      Indented and hung off a rule, because these are downstream: the row above
+      produces them. A flat sibling reads as another thing to set, which is the
+      opposite of true — the only thing you author here is a pin.
+    */
+    <div className="border-line min-w-0 border-l pl-4">
       <FieldLabel
         aside={
           <span
             className="text-ash font-mono text-[10px]"
             title="Each step is the base multiplied by the ratio, rounded to the snap. Pin a step to hold it while the ratio moves the others."
           >
-            {state.base}ms × {state.ratio}
+            generated
           </span>
         }
       >
@@ -79,7 +84,7 @@ export function DurationStrip({
         row and with the semantic token table.
       */}
       <div className="overflow-x-auto pb-1">
-        <div className="border-line grid min-w-[620px] grid-cols-5 overflow-hidden rounded-md border">
+        <div className="border-line grid min-w-[540px] grid-cols-5 overflow-hidden rounded-md border">
           {DURATION_NAMES.map((name) => {
             const ms = durations[name]
             const derived = isDerived(state, name)
@@ -161,38 +166,14 @@ export function DurationStrip({
   )
 }
 
-export function SemanticTable({
-  state,
-  onChange,
-}: {
-  state: MotionState
-  onChange: (s: MotionState) => void
-}) {
+export function SemanticTable({ state }: { state: MotionState }) {
   const semantics = resolveSemantics(state)
 
   return (
     <section className="mb-12">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-semibold tracking-tight">Semantic motion</h2>
-        {/* The exit ratio governs this table and nothing else, so it lives here
-            rather than in the global band. */}
-        <label
-          className="text-ash flex items-center gap-2 font-mono text-[11px]"
-          title="Exit duration as a share of the entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
-        >
-          exit
-          <input
-            type="range"
-            min={20}
-            max={130}
-            step={5}
-            value={Math.round(state.exitRatio * 100)}
-            onChange={(e) => onChange({ ...state, exitRatio: Number(e.target.value) / 100 })}
-            className="accent-ink h-1 w-24"
-          />
-          <span className="text-ink w-9">{Math.round(state.exitRatio * 100)}%</span>
-        </label>
-      </div>
+      <h2 className="font-display mb-4 text-xl font-semibold tracking-tight">
+        Semantic motion
+      </h2>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-sm">

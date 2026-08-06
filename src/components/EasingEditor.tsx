@@ -106,7 +106,7 @@ export default function EasingEditor({
   const set = (next: Easing) => onChange(selected, next)
 
   return (
-    <section className="border-line flex flex-col rounded-lg border">
+    <section className="flex flex-col">
       <div className="border-line flex items-center justify-between gap-2 border-b px-4 py-2.5">
         <Label as="h2">Easing</Label>
         <Segmented

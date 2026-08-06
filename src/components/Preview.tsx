@@ -18,6 +18,13 @@
 // Consequence, stated rather than hidden: this shows
 // the true curve. The CSS export is an approximation
 // of it, and the export panel says by how much.
+//
+// Every control in here changes what you are WATCHING
+// — mode, speed, loop, which scenario. Nothing in here
+// changes a token. Anything that would is on the left,
+// which is the whole point of the split: stagger used
+// to live here and had to move, because it is part of
+// the system rather than part of the view.
 // ==============================================
 import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
@@ -69,12 +76,10 @@ const STAGGERS: PurposeId = "list"
 export default function Preview({
   state,
   editing,
-  onStaggerChange,
 }: {
   state: MotionState
   /** The curve open in the editor. Marks affected scenarios; never moves you. */
   editing: Emphasis
-  onStaggerChange: (ms: number) => void
 }) {
   const [purpose, setPurpose] = useState<PurposeId>("list")
   const [mode, setMode] = useState<Mode>("both")
@@ -248,22 +253,6 @@ export default function Preview({
         </div>
 
         <div className="border-line flex items-center gap-3 border-t px-3 py-2">
-          {staggered && (
-            <label className="text-ash flex shrink-0 items-center gap-1.5 font-mono text-[10px]">
-              stagger
-              <input
-                type="range"
-                min={0}
-                max={160}
-                step={5}
-                value={state.staggerMs}
-                onChange={(e) => onStaggerChange(Number(e.target.value))}
-                className="accent-ink h-1 w-20"
-                title="Per-child offset. Falls off sub-linearly so long lists stay bearable."
-              />
-              <span className="text-ink w-9">{state.staggerMs}ms</span>
-            </label>
-          )}
           <div className="bg-ink/10 relative h-1 flex-1 overflow-hidden rounded-full">
             <div
               className="bg-ink absolute inset-y-0 left-0 rounded-full"
