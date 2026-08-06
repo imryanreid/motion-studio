@@ -33,7 +33,16 @@ import { SITE_URL } from "./lib/site"
 /** Which entry in the shared tools manifest is this repo. */
 const TOOL_ID = "motion"
 
-/** A compact numeric control for the scale inputs. */
+/**
+ * A compact numeric control.
+ *
+ * Holds a draft string while you're typing rather than round-tripping every
+ * keystroke through a number. `Number("")` is 0, not NaN, so clearing the field
+ * used to commit a 0 — and then typing 1000 over it produced "01000", with a
+ * leading zero that wouldn't go away. Same pattern Ramps uses for its colour
+ * fields: follow the outside value at rest, hold the draft while focused,
+ * commit on blur or Enter.
+ */
 function NumberField({
   label,
   value,
@@ -53,19 +62,38 @@ function NumberField({
   suffix?: string
   title?: string
 }) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const commit = (raw: string) => {
+    setDraft(null)
+    const n = Number(raw)
+    if (raw.trim() === "" || !Number.isFinite(n)) return // leave the value alone
+    const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n))
+    onChange(clamped)
+  }
+
   return (
     <div title={title}>
       <FieldLabel>{label}</FieldLabel>
       <div className="border-line bg-paper focus-within:border-ink/30 flex h-9 items-center rounded-md border px-2.5 font-mono text-xs transition-colors">
         <input
           type="number"
-          value={value}
+          value={draft ?? String(value)}
           step={step}
           min={min}
           max={max}
           onChange={(e) => {
+            setDraft(e.target.value)
+            // Commit live while it's a usable number, so the preview keeps up —
+            // but never let an empty or half-typed field write a value.
             const n = Number(e.target.value)
-            if (Number.isFinite(n)) onChange(n)
+            if (e.target.value.trim() !== "" && Number.isFinite(n)) {
+              onChange(Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n)))
+            }
+          }}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur()
           }}
           className="text-ink w-16 bg-transparent outline-none"
         />
@@ -187,41 +215,71 @@ export default function App() {
         it reads as a single instrument.
       */}
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="border-line flex flex-col overflow-hidden rounded-lg border">
-          <div className="border-line border-b p-4">
-            <div className="mb-4 flex flex-wrap items-end gap-x-5 gap-y-4">
-              <NumberField
-                label="Base"
-                value={state.base}
+        <div className="flex flex-col gap-4">
+          <section className="border-line overflow-hidden rounded-lg border">
+            <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+              <FieldLabel>Timing</FieldLabel>
+              <span className="text-ash font-mono text-[10px]">applies to every token</span>
+            </div>
+
+            <div className="p-4">
+              <div className="mb-4 flex flex-wrap items-end gap-x-5 gap-y-4">
+                <NumberField
+                  label="Base"
+                  value={state.base}
+                  min={20}
+                  max={2000}
+                  step={10}
+                  suffix="ms"
+                  title="The middle of the scale. Every other duration is derived from it."
+                  onChange={(base) => setState({ ...state, base })}
+                />
+                <NumberField
+                  label="Ratio"
+                  value={state.ratio}
+                  min={1.05}
+                  max={3}
+                  step={0.05}
+                  title="Multiplier between steps. Pinned steps ignore it."
+                  onChange={(ratio) => setState({ ...state, ratio })}
+                />
+                <NumberField
+                  label="Snap"
+                  value={state.snap}
+                  min={1}
+                  max={100}
+                  step={1}
+                  suffix="ms"
+                  title="Generated values round to this."
+                  onChange={(snap) => setState({ ...state, snap })}
+                />
+              </div>
+              <DurationStrip state={state} onChange={setState} />
+            </div>
+
+            <div className="border-line flex flex-wrap items-center gap-x-6 gap-y-3 border-t p-4">
+              <Slider
+                label="Exit"
+                value={Math.round(state.exitRatio * 100)}
                 min={20}
-                max={2000}
-                step={10}
-                suffix="ms"
-                title="The middle of the scale. Every other duration is derived from it."
-                onChange={(base) => setState({ ...state, base })}
+                max={130}
+                step={5}
+                suffix="%"
+                title="Exit duration as a share of the entrance, for every emphasis. Exits should be quicker — lingering on something you've finished with reads as lag."
+                onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
               />
-              <NumberField
-                label="Ratio"
-                value={state.ratio}
-                min={1.05}
-                max={3}
-                step={0.05}
-                title="Multiplier between steps. Pinned steps ignore it."
-                onChange={(ratio) => setState({ ...state, ratio })}
-              />
-              <NumberField
-                label="Snap"
-                value={state.snap}
-                min={1}
-                max={100}
-                step={1}
+              <Slider
+                label="Stagger"
+                value={state.staggerMs}
+                min={0}
+                max={160}
+                step={5}
                 suffix="ms"
-                title="Generated values round to this."
-                onChange={(snap) => setState({ ...state, snap })}
+                title="Per-child offset in a list. Falls off sub-linearly so long lists stay bearable."
+                onChange={(staggerMs) => setState({ ...state, staggerMs })}
               />
             </div>
-            <DurationStrip state={state} onChange={setState} />
-          </div>
+          </section>
 
           <EasingEditor
             state={state}
@@ -234,31 +292,6 @@ export default function App() {
               setState({ ...state, durationFor: { ...state.durationFor, [e]: d } })
             }
           />
-
-          {/* Rules that shape every token, so they belong with the system
-              rather than beside whichever output happens to show them. */}
-          <div className="border-line mt-auto flex flex-wrap items-center gap-x-6 gap-y-3 border-t p-4">
-            <Slider
-              label="Exit"
-              value={Math.round(state.exitRatio * 100)}
-              min={20}
-              max={130}
-              step={5}
-              suffix="%"
-              title="Exit duration as a share of the entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
-              onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
-            />
-            <Slider
-              label="Stagger"
-              value={state.staggerMs}
-              min={0}
-              max={160}
-              step={5}
-              suffix="ms"
-              title="Per-child offset in a list. Falls off sub-linearly so long lists stay bearable."
-              onChange={(staggerMs) => setState({ ...state, staggerMs })}
-            />
-          </div>
         </div>
 
         <Preview state={state} editing={emphasis} />

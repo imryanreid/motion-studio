@@ -106,62 +106,28 @@ export default function EasingEditor({
   const set = (next: Easing) => onChange(selected, next)
 
   return (
-    <section className="flex flex-col">
-      <div className="border-line flex items-center justify-between gap-2 border-b px-4 py-2.5">
+    <section className="border-line flex flex-col overflow-hidden rounded-lg border">
+      {/*
+        The emphasis selector sits in the header, so the block reads as "this is
+        per-type" against the Timing block's "this applies to everything".
+        Bezier-or-spring moved down beside the duration: it is a choice about
+        *this* curve, and in the header it looked like a setting for the section.
+      */}
+      <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
         <Label as="h2">Easing</Label>
         <Segmented
-          ariaLabel={`${selected} easing type`}
-          layoutId="easing-mode"
+          ariaLabel="Which curve to edit"
+          layoutId="easing-emphasis"
           size="sm"
-          value={easing.kind}
-          onChange={(kind) =>
-            set(
-              kind === "spring"
-                ? { kind: "spring", spring: DEFAULT_SPRING }
-                : { kind: "bezier", bezier: DEFAULT_BEZIER },
-            )
-          }
-          options={MODE_OPTIONS}
+          value={selected}
+          onChange={onSelect}
+          options={EMPHASIS_NAMES.map((e) => ({ id: e, label: e }))}
         />
       </div>
 
-      {/* All three shapes stay comparable; one at a time opens for editing. */}
-      <div className="border-line grid grid-cols-3 border-b">
-        {EMPHASIS_NAMES.map((e) => (
-          <button
-            key={e}
-            type="button"
-            onClick={() => onSelect(e)}
-            aria-pressed={e === selected}
-            title={`Edit the ${e} curve`}
-            className={cn(
-              "border-line flex flex-col items-center gap-1 border-r px-2 py-2 transition-colors last:border-r-0",
-              e === selected ? "bg-ink/[0.05]" : "hover:bg-ink/[0.02]",
-            )}
-          >
-            <CurvePlot easing={state.easings[e]} className="h-9 w-full" />
-            <span
-              className={cn(
-                "font-mono text-[10px] tracking-wide uppercase",
-                e === selected ? "text-ink" : "text-ash",
-              )}
-            >
-              {e}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/*
-        The duration this curve is paired with, on the panel where you're
-        working. The mapping used to be a hardcoded constant stated only in the
-        duration strip on the other side of the page — you could look at both
-        and never learn they were connected. Making it a choice explains it, and
-        lets `instant` and `deliberate` be reached at all.
-      */}
-      <div className="border-line flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2">
-        <label className="text-ash flex items-center gap-1.5 font-mono text-[11px]">
-          uses
+      <div className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2">
+        <label className="text-ash flex items-center gap-2 font-mono text-[11px]">
+          <span className="tracking-[0.16em] uppercase">Duration</span>
           <select
             value={pairedWith}
             onChange={(e) => onPairChange(selected, e.target.value as DurationName)}
@@ -175,6 +141,22 @@ export default function EasingEditor({
             ))}
           </select>
         </label>
+
+        <Segmented
+          ariaLabel={`${selected} curve type`}
+          layoutId="easing-mode"
+          size="sm"
+          value={easing.kind}
+          onChange={(kind) =>
+            set(
+              kind === "spring"
+                ? { kind: "spring", spring: DEFAULT_SPRING }
+                : { kind: "bezier", bezier: DEFAULT_BEZIER },
+            )
+          }
+          options={MODE_OPTIONS}
+        />
+
         <span className="text-ash font-mono text-[11px]">
           {used.length ? `for ${used.join(", ")}` : "no purpose uses this yet"}
         </span>
