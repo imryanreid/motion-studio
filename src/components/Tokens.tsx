@@ -40,6 +40,17 @@ const describeEasing = (e: Easing) =>
  * that generate it, which in turn is what lets the redundant "Generates" echo
  * go away: the generator and the generated are simply adjacent.
  */
+/**
+ * The generated duration scale.
+ *
+ * Filled rather than bordered, and carrying no input chrome, because that is
+ * the family's signal for "this is output". It replaces four separate ways of
+ * saying the same thing — an indent, a left rule, a "generated" label and a
+ * caption — none of which said it as directly as simply not looking editable.
+ *
+ * The only thing you author here is a pin, so that is the only affordance, and
+ * it stays hidden until you hover the cell it belongs to.
+ */
 export function DurationStrip({
   state,
   onChange,
@@ -59,121 +70,100 @@ export function DurationStrip({
   }
 
   return (
-    /*
-      Indented and hung off a rule, because these are downstream: the row above
-      produces them. A flat sibling reads as another thing to set, which is the
-      opposite of true — the only thing you author here is a pin.
-    */
-    <div className="border-line min-w-0 border-l pl-4">
-      <FieldLabel
-        aside={
-          <span
-            className="text-ash font-mono text-[10px]"
-            title="Each step is the base multiplied by the ratio, rounded to the snap. Pin a step to hold it while the ratio moves the others."
-          >
-            generated
-          </span>
-        }
-      >
-        Durations
-      </FieldLabel>
-
-      {/*
-        Below ~620px five columns crush to ~78px and the labels collide, so the
-        strip scrolls instead — the same thing Ramps does with an 11-step ramp
-        row and with the semantic token table.
-      */}
-      <div className="overflow-x-auto pb-1">
-        <div className="border-line grid min-w-[540px] grid-cols-5 overflow-hidden rounded-md border">
-          {DURATION_NAMES.map((name) => {
-            const ms = durations[name]
-            const derived = isDerived(state, name)
-            const used = emphasisUsing(state, name)
-            return (
-              <div
-                key={name}
-                onMouseEnter={() => setHovered(name)}
-                onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
-                className="border-line relative flex flex-col gap-1 border-r px-2.5 py-2 last:border-r-0"
-              >
-                <div className="flex items-baseline justify-between gap-1">
-                  <span className="text-ash font-mono text-[10px] tracking-wide">{name}</span>
-                  <button
-                    type="button"
-                    onClick={() => togglePin(name)}
-                    title={
-                      derived
-                        ? `Pin at ${ms}ms — holds this value while the ratio moves the others`
-                        : `Release back onto the generated curve`
-                    }
-                    aria-label={derived ? `Pin ${name}` : `Release ${name}`}
-                    className={cn(
-                      "shrink-0 transition-colors",
-                      derived ? "text-line hover:text-ash" : "text-ink",
-                    )}
-                  >
-                    {derived ? <PushPin size={11} /> : <PushPin size={11} weight="fill" />}
-                  </button>
-                </div>
-
-                <span className="text-ink font-mono text-sm">{ms}ms</span>
-
-                {/*
-                Relative length, and on hover a marker crosses it at exactly
-                this duration — a number is not a feel. The global
-                reduced-motion rule in tokens.css already flattens this.
-              */}
-                <div className="bg-ink/[0.06] relative h-1 overflow-hidden rounded-full">
-                  <div
-                    className={cn("h-full rounded-full", derived ? "bg-ink/50" : "bg-ink")}
-                    style={{ width: `${(ms / longest) * 100}%` }}
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="bg-paper absolute top-0 bottom-0 w-1 rounded-full transition-transform ease-[cubic-bezier(0.2,0,0,1)]"
-                    style={{
-                      left: 0,
-                      transitionDuration: `${ms}ms`,
-                      transform: hovered === name ? "translateX(1000%)" : "none",
-                      opacity: hovered === name ? 1 : 0,
-                    }}
-                  />
-                </div>
-
-                <span
-                  className={cn(
-                    "font-mono text-[10px]",
-                    used.length ? "text-ash" : "text-line",
-                  )}
+    <div className="overflow-x-auto">
+      <div className="bg-ink/[0.03] divide-line/60 grid min-w-[460px] grid-cols-5 divide-x rounded-md">
+        {DURATION_NAMES.map((name) => {
+          const ms = durations[name]
+          const derived = isDerived(state, name)
+          // Dimmed rather than labelled: nothing reaches for this step, so it
+          // ships in exports with no token referencing it.
+          const unused = emphasisUsing(state, name).length === 0
+          return (
+            <div
+              key={name}
+              onMouseEnter={() => setHovered(name)}
+              onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
+              className={cn("flex flex-col gap-1 px-2.5 py-2", unused && "opacity-45")}
+              title={
+                unused
+                  ? `${name} — no emphasis uses this, so nothing references it`
+                  : `${name} — used by ${emphasisUsing(state, name).join(", ")}`
+              }
+            >
+              <div className="flex items-baseline justify-between gap-1">
+                <span className="text-ash font-mono text-[10px] tracking-wide">{name}</span>
+                <button
+                  type="button"
+                  onClick={() => togglePin(name)}
                   title={
-                    used.length
-                      ? `${used.join(", ")} reaches for this duration`
-                      : "No semantic token uses this — it ships in exports with nothing referencing it"
+                    derived
+                      ? `Pin at ${ms}ms — keeps this value when you change the base or ratio`
+                      : "Release back onto the generated curve"
                   }
+                  aria-label={derived ? `Pin ${name}` : `Release ${name}`}
+                  className={cn(
+                    "shrink-0 transition-opacity",
+                    derived
+                      ? cn(
+                          "text-ash hover:text-ink opacity-0 focus-visible:opacity-100",
+                          hovered === name && "opacity-100",
+                        )
+                      : "text-ink opacity-100",
+                  )}
                 >
-                  {used.length ? used.join(", ") : "unused"}
-                </span>
+                  <PushPin size={11} weight={derived ? "regular" : "fill"} />
+                </button>
               </div>
-            )
-          })}
-        </div>
-      </div>
 
-      <p className="text-ash mt-2 text-[11px] leading-snug">
-        Pinned steps keep their value when you change the base or ratio.
-      </p>
+              <span className="text-ink font-mono text-sm">{ms}ms</span>
+
+              {/* Relative length, and on hover a marker crosses at exactly this
+                  duration — a number is not a feel. */}
+              <div className="bg-ink/[0.07] relative h-1 overflow-hidden rounded-full">
+                <div
+                  className="bg-ink/70 h-full rounded-full"
+                  style={{ width: `${(ms / longest) * 100}%` }}
+                />
+                <div
+                  aria-hidden="true"
+                  className="bg-paper absolute top-0 bottom-0 w-1 rounded-full transition-transform ease-[cubic-bezier(0.2,0,0,1)]"
+                  style={{
+                    left: 0,
+                    transitionDuration: `${ms}ms`,
+                    transform: hovered === name ? "translateX(1000%)" : "none",
+                    opacity: hovered === name ? 1 : 0,
+                  }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-export function SemanticTable({ state }: { state: MotionState }) {
+export function SemanticTable({
+  state,
+  children,
+}: {
+  state: MotionState
+  /** The machine-readable block — part of the output, so it lives here. */
+  children?: React.ReactNode
+}) {
   const semantics = resolveSemantics(state)
 
   return (
     <section className="mb-12">
-      <h2 className="font-display mb-4 text-xl font-semibold tracking-tight">
-        Semantic motion
-      </h2>
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="font-display text-xl font-semibold tracking-tight">Output</h2>
+        <span className="text-ash font-mono text-[11px]">
+          six tokens · what exports and what an agent reads
+        </span>
+      </div>
+      <p className="text-ash mb-4 max-w-[62ch] text-xs leading-relaxed">
+        Every emphasis ships, in both directions. This is the whole set.
+      </p>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-sm">
@@ -228,6 +218,8 @@ export function SemanticTable({ state }: { state: MotionState }) {
         entrance introduces something; an exit removes something you've already finished with,
         and lingering on it reads as lag.
       </p>
+
+      {children}
     </section>
   )
 }

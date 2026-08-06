@@ -19,7 +19,7 @@ import ThemeToggle from "./shared/components/ThemeToggle"
 import ResetButton from "./shared/components/ResetButton"
 import ShareButton from "./shared/components/ShareButton"
 import ExportModal from "./shared/components/ExportModal"
-import { FieldLabel } from "./shared/components/Label"
+import { FieldLabel, PanelTitle } from "./shared/components/Label"
 import { useTheme } from "./shared/theme"
 import EasingEditor from "./components/EasingEditor"
 import Preview from "./components/Preview"
@@ -218,12 +218,12 @@ export default function App() {
         <div className="flex flex-col gap-4">
           <section className="border-line overflow-hidden rounded-lg border">
             <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
-              <FieldLabel>Timing</FieldLabel>
+              <PanelTitle>Timing</PanelTitle>
               <span className="text-ash font-mono text-[10px]">applies to every token</span>
             </div>
 
-            <div className="p-4">
-              <div className="mb-4 flex flex-wrap items-end gap-x-5 gap-y-4">
+            <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
                 <NumberField
                   label="Base"
                   value={state.base}
@@ -297,8 +297,9 @@ export default function App() {
         <Preview state={state} editing={emphasis} />
       </div>
 
-      <SemanticTable state={state} />
-      <AgentData state={state} url={shareHref} />
+      <SemanticTable state={state}>
+        <AgentData state={state} url={shareHref} />
+      </SemanticTable>
     </ToolShell>
   )
 }

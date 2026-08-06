@@ -18,7 +18,7 @@
 import { Warning } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
-import { Label } from "../shared/components/Label"
+import { PanelTitle } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
 import { BEZIER_PRESETS, type Bezier } from "../lib/bezier"
 import { derive, overshoot, motionSettlingTime, type SpringConfig } from "../lib/spring"
@@ -114,15 +114,36 @@ export default function EasingEditor({
         *this* curve, and in the header it looked like a setting for the section.
       */}
       <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
-        <Label as="h2">Easing</Label>
-        <Segmented
-          ariaLabel="Which curve to edit"
-          layoutId="easing-emphasis"
-          size="sm"
-          value={selected}
-          onChange={onSelect}
-          options={EMPHASIS_NAMES.map((e) => ({ id: e, label: e }))}
-        />
+        <PanelTitle>Easing</PanelTitle>
+        {/*
+          Tabs, not a segmented pill. A pill reads as one setting with three
+          values — "pick subtle OR standard" — when in fact all three ship and
+          you are looking at one of them. Tabs say "three things, viewing one",
+          which is what is actually true.
+        */}
+        <div className="flex items-center gap-1">
+          <span className="text-ash mr-1 font-mono text-[10px]">editing</span>
+          {EMPHASIS_NAMES.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onSelect(e)}
+              aria-pressed={e === selected}
+              className={cn(
+                "relative px-1.5 py-1 font-mono text-[11px] transition-colors",
+                e === selected ? "text-ink" : "text-ash hover:text-ink",
+              )}
+            >
+              {e}
+              {e === selected && (
+                <span
+                  aria-hidden="true"
+                  className="bg-ink absolute inset-x-1 -bottom-[9px] h-0.5 rounded-full"
+                />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2">

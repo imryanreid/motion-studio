@@ -30,7 +30,7 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
-import { Label } from "../shared/components/Label"
+import { PanelTitle } from "../shared/components/Label"
 import {
   PURPOSE_IDS,
   resolveSemantics,
@@ -151,7 +151,7 @@ export default function Preview({
   return (
     <section className="border-line flex flex-col overflow-hidden rounded-lg border">
       <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
-        <Label as="h2">Preview</Label>
+        <PanelTitle>Preview</PanelTitle>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
             ariaLabel="What to play"

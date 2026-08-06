@@ -32,7 +32,7 @@ export default function AgentData({ state, url }: { state: MotionState; url: str
         : toAgentMarkdown(state, url)
 
   return (
-    <section className="mb-12" aria-label="Machine-readable motion tokens for agents">
+    <div className="mt-6" aria-label="Machine-readable motion tokens for agents">
       <details className="group border-line rounded-lg border">
         <summary className="text-ash hover:text-ink cursor-pointer list-none px-4 py-3 font-mono text-xs transition-colors">
           <span className="inline-flex items-center gap-1.5">
@@ -68,6 +68,6 @@ export default function AgentData({ state, url }: { state: MotionState; url: str
           </pre>
         </div>
       </details>
-    </section>
+    </div>
   )
 }
