@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest"
 import { DEFAULT_STATE, resolveSemantics } from "./tokens.js"
-import { childProgress, timelineTotal, tick, HOLD_MS } from "./preview.js"
+import {
+  childProgress,
+  timelineTotal,
+  sequenceTotal,
+  sequenceProgress,
+  tick,
+  LEAD_MS,
+  DWELL_MS,
+  HOLD_MS,
+} from "./preview.js"
 
 const tokens = resolveSemantics(DEFAULT_STATE)
 const enter = tokens.find((t) => t.id === "standard.enter")!
@@ -67,8 +76,20 @@ describe("childProgress", () => {
 })
 
 describe("timelineTotal", () => {
-  it("covers the token plus a hold", () => {
-    expect(timelineTotal(DEFAULT_STATE, enter, 1)).toBe(enter.durationMs + HOLD_MS)
+  it("covers a lead, the token, and a tail", () => {
+    expect(timelineTotal(DEFAULT_STATE, enter, 1)).toBe(LEAD_MS + enter.durationMs + HOLD_MS)
+  })
+
+  it("pauses keep their real length as playback slows", () => {
+    // At ¼× a 350ms hold would otherwise stretch to 1.4s of dead air, exactly
+    // when you're trying to watch something repeatedly.
+    const full = timelineTotal(DEFAULT_STATE, enter, 1, 1)
+    const quarter = timelineTotal(DEFAULT_STATE, enter, 1, 0.25)
+    const pauseAtFull = full - enter.durationMs
+    const pauseAtQuarter = quarter - enter.durationMs
+    expect(pauseAtQuarter).toBeCloseTo(pauseAtFull * 0.25, 6)
+    // In real time both are the same wait: animation-ms divided by rate.
+    expect(pauseAtQuarter / 0.25).toBeCloseTo(pauseAtFull, 6)
   })
 
   it("extends far enough for the last staggered child to finish", () => {
@@ -117,5 +138,43 @@ describe("tick — the clock, and the loop that used to freeze", () => {
 
   it("honours the playback rate", () => {
     expect(tick(1400, 1000, 0.25, 1000, true).elapsedMs).toBe(100)
+  })
+})
+
+describe("sequenceProgress — enter, dwell, exit", () => {
+  it("starts hidden through the lead-in", () => {
+    // The point of the lead: you need to see the rest state to have anything to
+    // compare the motion against.
+    expect(sequenceProgress(DEFAULT_STATE, enter, exit, 0)).toBe(0)
+    expect(sequenceProgress(DEFAULT_STATE, enter, exit, LEAD_MS - 1)).toBe(0)
+  })
+
+  it("arrives, holds, then leaves", () => {
+    const arrival = LEAD_MS + enter.durationMs
+    expect(sequenceProgress(DEFAULT_STATE, enter, exit, arrival)).toBe(1)
+    expect(sequenceProgress(DEFAULT_STATE, enter, exit, arrival + DWELL_MS / 2)).toBe(1)
+    // Just after the dwell it has started to go.
+    const leaving = arrival + DWELL_MS + exit.durationMs / 2
+    const v = sequenceProgress(DEFAULT_STATE, enter, exit, leaving)
+    expect(v).toBeGreaterThan(0)
+    expect(v).toBeLessThan(1)
+  })
+
+  it("ends gone", () => {
+    const end = LEAD_MS + enter.durationMs + DWELL_MS + exit.durationMs
+    expect(sequenceProgress(DEFAULT_STATE, enter, exit, end)).toBe(0)
+  })
+
+  it("spends less time leaving than arriving — the rule the tool teaches", () => {
+    // Measurable rather than felt: the exit phase is shorter than the entrance.
+    expect(exit.durationMs).toBeLessThan(enter.durationMs)
+    const total = sequenceTotal(DEFAULT_STATE, enter, exit, 1)
+    expect(total).toBe(LEAD_MS + enter.durationMs + DWELL_MS + exit.durationMs + HOLD_MS)
+  })
+
+  it("covers every staggered child before it ends", () => {
+    const total = sequenceTotal(DEFAULT_STATE, enter, exit, 5)
+    const lastFrame = total - HOLD_MS
+    expect(sequenceProgress(DEFAULT_STATE, enter, exit, lastFrame, 4, true, 1, 5)).toBe(0)
   })
 })

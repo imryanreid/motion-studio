@@ -12,8 +12,37 @@
 // ==============================================
 import { easingProgress, staggerDelay, type MotionState, type SemanticToken } from "./tokens.js"
 
-/** A beat of stillness at the end so a loop doesn't read as a stutter. */
+/**
+ * Beats of stillness around the motion.
+ *
+ * The tail stops a loop reading as a stutter. The lead matters more and was
+ * missing: without a moment at rest before it moves, there is no "before" to
+ * compare the motion against — the loop restarts and something is already
+ * travelling.
+ *
+ * `DWELL_MS` is how long the thing stays on screen in "both" mode, between the
+ * entrance and the exit.
+ *
+ * None of these are tokens. They are about watching, not about the system, so
+ * they never reach the URL or an export.
+ */
+export const LEAD_MS = 250
+export const DWELL_MS = 700
 export const HOLD_MS = 350
+
+/**
+ * Pauses hold their real-world length whatever the playback rate.
+ *
+ * Elapsed time is measured in animation-milliseconds, which run slower than
+ * real ones at ½× and ¼×. Scaling the pauses along with the motion would turn a
+ * 350ms hold into 1.4 seconds of dead air at ¼× — precisely when you are trying
+ * to watch something over and over. Multiplying by the rate cancels that out.
+ */
+const pauses = (rate: number) => ({
+  lead: LEAD_MS * rate,
+  dwell: DWELL_MS * rate,
+  tail: HOLD_MS * rate,
+})
 
 /**
  * How long the whole timeline runs.
@@ -25,9 +54,65 @@ export function timelineTotal(
   state: MotionState,
   token: SemanticToken,
   childCount: number,
+  rate = 1,
 ): number {
+  const { lead, tail } = pauses(rate)
+  return lead + phaseSpan(state, token, childCount) + tail
+}
+
+/** How long one direction takes, including the last staggered child. */
+function phaseSpan(state: MotionState, token: SemanticToken, childCount: number): number {
   const lastChildDelay = childCount > 1 ? staggerDelay(state, childCount - 1) : 0
-  return token.durationMs + lastChildDelay + HOLD_MS
+  return token.durationMs + lastChildDelay
+}
+
+/**
+ * Enter, then a beat, then exit — the whole life of the element.
+ *
+ * Worth its own mode rather than a convenience: the rule this tool teaches is
+ * that exits are faster and flatter, and toggling between two directions makes
+ * you compare from memory, which is exactly what a preview is supposed to
+ * replace.
+ */
+export function sequenceTotal(
+  state: MotionState,
+  enter: SemanticToken,
+  exit: SemanticToken,
+  childCount: number,
+  rate = 1,
+): number {
+  const { lead, dwell, tail } = pauses(rate)
+  return (
+    lead +
+    phaseSpan(state, enter, childCount) +
+    dwell +
+    phaseSpan(state, exit, childCount) +
+    tail
+  )
+}
+
+/** Progress through an enter → dwell → exit sequence. */
+export function sequenceProgress(
+  state: MotionState,
+  enter: SemanticToken,
+  exit: SemanticToken,
+  elapsedMs: number,
+  index = 0,
+  staggered = false,
+  rate = 1,
+  childCount = 1,
+): number {
+  const { lead, dwell } = pauses(rate)
+  const enterSpan = phaseSpan(state, enter, childCount)
+
+  const afterLead = elapsedMs - lead
+  if (afterLead <= 0) return 0
+  if (afterLead < enterSpan) return childProgress(state, enter, afterLead, index, staggered)
+
+  const afterEnter = afterLead - enterSpan
+  if (afterEnter < dwell) return 1
+
+  return childProgress(state, exit, afterEnter - dwell, index, staggered)
 }
 
 /**

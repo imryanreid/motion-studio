@@ -27,12 +27,18 @@ import { Label } from "../shared/components/Label"
 import {
   PURPOSE_IDS,
   resolveSemantics,
-  type Direction,
   type Emphasis,
   type MotionState,
   type PurposeId,
 } from "../lib/tokens"
-import { childProgress, timelineTotal, tick } from "../lib/preview"
+import {
+  LEAD_MS,
+  childProgress,
+  sequenceProgress,
+  sequenceTotal,
+  timelineTotal,
+  tick,
+} from "../lib/preview"
 
 const SPEEDS = [
   { id: "1" as const, label: "1×" },
@@ -41,6 +47,21 @@ const SPEEDS = [
 ]
 
 const LIST_ITEMS = 5
+
+/**
+ * Both is the default.
+ *
+ * The rule this tool teaches is that exits are faster and flatter than
+ * entrances. Toggling between two directions makes you compare from memory,
+ * which is the thing a preview is supposed to replace — so the whole life of
+ * the element is what you see first.
+ */
+const MODES = [
+  { id: "both" as const, label: "Both" },
+  { id: "enter" as const, label: "Enter" },
+  { id: "exit" as const, label: "Exit" },
+]
+type Mode = (typeof MODES)[number]["id"]
 
 /** Only the list has per-child offsets. */
 const STAGGERS: PurposeId = "list"
@@ -56,23 +77,30 @@ export default function Preview({
   onStaggerChange: (ms: number) => void
 }) {
   const [purpose, setPurpose] = useState<PurposeId>("list")
-  const [direction, setDirection] = useState<Direction>("enter")
+  const [mode, setMode] = useState<Mode>("both")
   const [speed, setSpeed] = useState<"1" | "0.5" | "0.25">("1")
   const [playing, setPlaying] = useState(true)
   const [loop, setLoop] = useState(true)
   const [elapsed, setElapsed] = useState(0)
 
   const emphasis = state.purposeEmphasis[purpose]
-  const token = resolveSemantics(state).find((t) => t.id === `${emphasis}.${direction}`)!
+  const semantics = resolveSemantics(state)
+  const enterToken = semantics.find((t) => t.id === `${emphasis}.enter`)!
+  const exitToken = semantics.find((t) => t.id === `${emphasis}.exit`)!
+  const token = mode === "exit" ? exitToken : enterToken
   const staggered = purpose === STAGGERS
-  const total = timelineTotal(state, token, staggered ? LIST_ITEMS : 1)
+  const children = staggered ? LIST_ITEMS : 1
+  const rate = Number(speed)
+  const total =
+    mode === "both"
+      ? sequenceTotal(state, enterToken, exitToken, children, rate)
+      : timelineTotal(state, token, children, rate)
 
   const raf = useRef<number | null>(null)
   const start = useRef(0)
 
   useEffect(() => {
     if (!playing) return
-    const rate = Number(speed)
     let cancelled = false
     start.current = performance.now() - elapsed / rate
 
@@ -93,7 +121,7 @@ export default function Preview({
       if (raf.current) cancelAnimationFrame(raf.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- elapsed is the output, not an input
-  }, [playing, speed, total, purpose, direction, loop])
+  }, [playing, speed, total, purpose, mode, loop])
 
   const replay = () => {
     setElapsed(0)
@@ -101,7 +129,19 @@ export default function Preview({
     setPlaying(true)
   }
 
-  const progressAt = (index = 0) => childProgress(state, token, elapsed, index, staggered)
+  const progressAt = (index = 0) =>
+    mode === "both"
+      ? sequenceProgress(
+          state,
+          enterToken,
+          exitToken,
+          elapsed,
+          index,
+          staggered,
+          rate,
+          children,
+        )
+      : childProgress(state, token, Math.max(0, elapsed - LEAD_MS * rate), index, staggered)
 
   return (
     <section className="border-line flex flex-col overflow-hidden rounded-lg border">
@@ -109,15 +149,12 @@ export default function Preview({
         <Label as="h2">Preview</Label>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
-            ariaLabel="Direction"
-            layoutId="preview-direction"
+            ariaLabel="What to play"
+            layoutId="preview-mode"
             size="sm"
-            value={direction}
-            onChange={setDirection}
-            options={[
-              { id: "enter" as Direction, label: "Enter" },
-              { id: "exit" as Direction, label: "Exit" },
-            ]}
+            value={mode}
+            onChange={setMode}
+            options={MODES}
           />
           <Segmented
             ariaLabel="Playback speed"
@@ -198,7 +235,10 @@ export default function Preview({
             })}
           </div>
           <span className="text-ash font-mono text-[10px]">
-            {emphasis} · {token.durationMs}ms
+            {emphasis} ·{" "}
+            {mode === "both"
+              ? `${enterToken.durationMs}ms in / ${exitToken.durationMs}ms out`
+              : `${token.durationMs}ms`}
             {token.easing.kind === "spring" ? " settling" : ""}
           </span>
         </div>
