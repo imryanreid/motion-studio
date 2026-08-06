@@ -23,17 +23,10 @@ import { FieldLabel } from "./shared/components/Label"
 import { useTheme } from "./shared/theme"
 import EasingEditor from "./components/EasingEditor"
 import Preview from "./components/Preview"
-import { DurationScale, SemanticTable } from "./components/Tokens"
+import { DurationStrip, SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import {
-  DEFAULT_STATE,
-  resolveDurations,
-  isDerived,
-  DURATION_NAMES,
-  type Emphasis,
-  type MotionState,
-} from "./lib/tokens"
+import { DEFAULT_STATE, type Emphasis, type MotionState } from "./lib/tokens"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
@@ -170,34 +163,16 @@ export default function App() {
           />
 
           {/*
-            The generated scale, echoed next to the controls that generate it.
-            Borrowed from the way Ramps ties Derivation to the accent swatch it
-            produces: showing the causal link beats explaining it. The hairline
-            is the same device Ramps uses between Accent and Derivation.
+            The generated scale sits with the controls that generate it, rather
+            than as a summary of a section further down. The echo this replaces
+            was five unlabelled integers — you had to hover each one to learn
+            which was which, which is a puzzle rather than a readout.
           */}
           <div
             aria-hidden="true"
-            className="bg-line mb-[17px] hidden h-px w-6 shrink-0 sm:block"
+            className="bg-line mb-[38px] hidden h-px w-6 shrink-0 lg:block"
           />
-          <div className="min-w-0">
-            <FieldLabel>Generates</FieldLabel>
-            <div className="border-line bg-paper flex h-9 items-center gap-2 rounded-md border px-3 font-mono text-xs">
-              {DURATION_NAMES.map((n) => (
-                <span
-                  key={n}
-                  title={`${n} — ${isDerived(state, n) ? "derived from the ratio" : "pinned, holding its value"}`}
-                  className={
-                    isDerived(state, n)
-                      ? "text-ink"
-                      : "text-ash underline decoration-dotted underline-offset-4"
-                  }
-                >
-                  {resolveDurations(state)[n]}
-                </span>
-              ))}
-              <span className="text-ash">ms</span>
-            </div>
-          </div>
+          <DurationStrip state={state} onChange={setState} />
         </div>
       }
     >
@@ -223,7 +198,6 @@ export default function App() {
         />
       </div>
 
-      <DurationScale state={state} onChange={setState} />
       <SemanticTable state={state} onChange={setState} />
       <AgentData state={state} url={shareHref} />
     </ToolShell>
