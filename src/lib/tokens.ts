@@ -128,9 +128,15 @@ export function mirrorBezier(b: Bezier): Bezier {
   })
 }
 
-/** Damping that puts a spring exactly at critical — no bounce, quickest arrival. */
+/**
+ * Damping that puts a spring exactly at critical — no bounce, quickest arrival.
+ *
+ * Rounded, because this value is emitted verbatim into every export and
+ * `spring(210, 28.982753492378876, 1)` is not something anyone should have to
+ * paste. Two decimals keeps ζ within a thousandth of 1.
+ */
 export function criticalDamping(s: SpringConfig): number {
-  return 2 * Math.sqrt(s.stiffness * s.mass)
+  return Number((2 * Math.sqrt(s.stiffness * s.mass)).toFixed(2))
 }
 
 /**
