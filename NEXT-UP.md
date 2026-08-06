@@ -8,33 +8,42 @@
 
 ## Current state
 
-**Scaffolded, not built.** The shared layer is synced from Ramps Studio and the
-page shell renders in light and dark. `pnpm build`, `pnpm test` and
-`pnpm sync:check` are clean. `src/App.tsx` is a placeholder.
+**Rough version live** at https://motion-studio-silk.vercel.app — still
+`noindex` with `robots.txt` disallowed, because there is no domain yet.
 
-## Next
+Working: the five-duration generated scale with per-step pinning, three easings
+each editable as a bezier (draggable) or a spring (parameters), six semantic
+tokens with derived exits, five preview scenarios, the full export panel (CSS,
+Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes, the
+machine-readable block, and URL state. 161 tests.
 
-[`SPEC.md`](SPEC.md) is written and awaiting approval. Its §16 is the build
-order; step 1 is extracting `ExportPanel` into `src/shared` **in Ramps Studio**,
-which is a prerequisite for anything here.
+## Deferred from the first pass
 
-Two decisions the spec locks in that are worth knowing without reading it:
+Called out rather than quietly dropped:
 
-- **Targets are web and Figma only.** No SwiftUI or Compose emitters anywhere in
-  the family. The conversion maths still ships in the agent block so an agent
-  asked to port a spring gets the formulas instead of guessing.
-- **§10 is family-level** and governs every tool's export panel, not just this
-  one.
+1. **Scrubbing.** The timeline is read-only; the clock exists and is seekable,
+   so this is wiring a drag to it.
+2. **A/B compare**, including the "true spring vs the linear() you'd ship" mode
+   that SPEC §8.3 calls the honesty thesis made visible.
+3. **The `-sm`/`-md`/`-lg` distance buckets** (§6.2). The rule is documented in
+   the agent markdown; the tokens aren't generated yet.
+4. **Agent surfaces** — `middleware.ts`, `api/render`, `api/tokens`, `llms.txt`,
+   JSON-LD. The on-page block exists; the no-JavaScript path does not, so this
+   tool is not yet agent-readable the way Ramps is. Highest-value next item.
+5. **Purpose aliases aren't editable or droppable** in the UI, though the model
+   supports it.
 
 ## Blockers / open questions
 
-- **No domain.** `motion.studio` isn't registered, so `index.html` carries no
-  canonical and is `noindex`, and the manifest entry in Ramps Studio has no
-  `domain` and renders as "soon". All of those flip together when it exists.
-- **No `api/` yet.** The family standard is `middleware.ts` + `api/render` +
-  `api/palette` + `api/og` so agents that don't run JavaScript can read a share
-  link. Port them once there's a token set worth serving.
-- **No repo or Vercel project yet.** Local git only.
+- **No domain.** `motion.studio` is taken. When one is chosen, flip together:
+  `index.html` canonical + `og:url` + robots meta, `public/robots.txt`,
+  `public/sitemap.xml`, `src/lib/site.ts`, and the manifest entry in **Ramps
+  Studio** (then `pnpm sync`).
+- **The preview animation has not been observed running.** The browser pane used
+  during the build throttles `requestAnimationFrame` while hidden, so `elapsed`
+  stayed at 0 in every check. The timeline maths is unit-tested in
+  `lib/preview.ts`, but nobody has watched it move — worth a human eyeballing
+  before anything is built on top of it.
 
 ## Session log
 
