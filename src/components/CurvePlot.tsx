@@ -16,10 +16,13 @@ import { clampBezier, bezierValue, type Bezier } from "../lib/bezier"
 import { springValue, motionSettlingTime } from "../lib/spring"
 import type { Easing } from "../lib/tokens"
 
-const W = 220
-const H = 150
+// Deliberately wide. A near-square viewBox scaled to the column width made the
+// plot 500px tall and pushed everything else off screen; 2:1 keeps the curve
+// readable at a height that leaves room for the rest of the page.
+const W = 300
+const H = 112
 /** Room above and below the box so overshoot has somewhere to go. */
-const PAD = 26
+const PAD = 22
 
 const toX = (t: number) => t * W
 const toY = (v: number) => PAD + (1 - v) * H

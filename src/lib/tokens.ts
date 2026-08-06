@@ -32,8 +32,15 @@ const DURATION_STEPS: Record<DurationName, number> = {
 export const EMPHASIS_NAMES = ["subtle", "standard", "emphasized"] as const
 export type Emphasis = (typeof EMPHASIS_NAMES)[number]
 
-/** Which duration each emphasis level reaches for. */
-const EMPHASIS_DURATION: Record<Emphasis, DurationName> = {
+/**
+ * Which duration each emphasis level reaches for.
+ *
+ * Exported so the UI can show the mapping — without it a duration row is a
+ * number with no visible consequence. Note that `instant` and `deliberate`
+ * currently aren't reached for by anything, so they ship in exports without
+ * being referenced by a semantic token.
+ */
+export const EMPHASIS_DURATION: Record<Emphasis, DurationName> = {
   subtle: "fast",
   standard: "base",
   emphasized: "slow",

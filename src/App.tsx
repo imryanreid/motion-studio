@@ -21,12 +21,19 @@ import ShareButton from "./shared/components/ShareButton"
 import ExportModal from "./shared/components/ExportModal"
 import { FieldLabel } from "./shared/components/Label"
 import { useTheme } from "./shared/theme"
-import EasingCard from "./components/EasingCard"
+import EasingEditor from "./components/EasingEditor"
 import Preview from "./components/Preview"
 import { DurationScale, SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import { DEFAULT_STATE, EMPHASIS_NAMES, type MotionState } from "./lib/tokens"
+import {
+  DEFAULT_STATE,
+  resolveDurations,
+  isDerived,
+  DURATION_NAMES,
+  type Emphasis,
+  type MotionState,
+} from "./lib/tokens"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
@@ -42,6 +49,7 @@ function NumberField({
   min,
   max,
   suffix,
+  title,
 }: {
   label: string
   value: number
@@ -50,9 +58,10 @@ function NumberField({
   min?: number
   max?: number
   suffix?: string
+  title?: string
 }) {
   return (
-    <div>
+    <div title={title}>
       <FieldLabel>{label}</FieldLabel>
       <div className="border-line bg-paper focus-within:border-ink/30 flex h-9 items-center rounded-md border px-2.5 font-mono text-xs transition-colors">
         <input
@@ -79,6 +88,8 @@ export default function App() {
     resolveState(typeof window === "undefined" ? "" : window.location.search),
   )
   const [exportOpen, setExportOpen] = useState(false)
+  // Which curve is open in the editor. Also drives the preview scenario.
+  const [emphasis, setEmphasis] = useState<Emphasis>("standard")
 
   // What reset threw away, kept just long enough to offer it back.
   const undoSnapshot = useRef<MotionState | null>(null)
@@ -127,7 +138,7 @@ export default function App() {
         )
       }
       controls={
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-6">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-6">
           <NumberField
             label="Base"
             value={state.base}
@@ -135,6 +146,7 @@ export default function App() {
             max={2000}
             step={10}
             suffix="ms"
+            title="The middle of the scale. Every other duration is derived from it."
             onChange={(base) => setState({ ...state, base })}
           />
           <NumberField
@@ -143,6 +155,7 @@ export default function App() {
             min={1.05}
             max={3}
             step={0.05}
+            title="Multiplier between steps. 1.4 puts instant and deliberate two steps either side of base."
             onChange={(ratio) => setState({ ...state, ratio })}
           />
           <NumberField
@@ -152,48 +165,66 @@ export default function App() {
             max={100}
             step={1}
             suffix="ms"
+            title="Generated values round to this."
             onChange={(snap) => setState({ ...state, snap })}
           />
-          <NumberField
-            label="Exit"
-            value={Math.round(state.exitRatio * 100)}
-            min={10}
-            max={150}
-            step={5}
-            suffix="%"
-            onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
+
+          {/*
+            The generated scale, echoed next to the controls that generate it.
+            Borrowed from the way Ramps ties Derivation to the accent swatch it
+            produces: showing the causal link beats explaining it. The hairline
+            is the same device Ramps uses between Accent and Derivation.
+          */}
+          <div
+            aria-hidden="true"
+            className="bg-line mb-[17px] hidden h-px w-6 shrink-0 sm:block"
           />
-          <NumberField
-            label="Stagger"
-            value={state.staggerMs}
-            min={0}
-            max={300}
-            step={5}
-            suffix="ms"
-            onChange={(staggerMs) => setState({ ...state, staggerMs })}
-          />
+          <div className="min-w-0">
+            <FieldLabel>Generates</FieldLabel>
+            <div className="border-line bg-paper flex h-9 items-center gap-2 rounded-md border px-3 font-mono text-xs">
+              {DURATION_NAMES.map((n) => (
+                <span
+                  key={n}
+                  title={`${n} — ${isDerived(state, n) ? "derived from the ratio" : "pinned, holding its value"}`}
+                  className={
+                    isDerived(state, n)
+                      ? "text-ink"
+                      : "text-ash underline decoration-dotted underline-offset-4"
+                  }
+                >
+                  {resolveDurations(state)[n]}
+                </span>
+              ))}
+              <span className="text-ash">ms</span>
+            </div>
+          </div>
         </div>
       }
     >
-      <section className="mb-12">
-        <h2 className="font-display mb-4 text-xl font-semibold tracking-tight">Easings</h2>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {EMPHASIS_NAMES.map((emphasis) => (
-            <EasingCard
-              key={emphasis}
-              emphasis={emphasis}
-              easing={state.easings[emphasis]}
-              onChange={(easing) =>
-                setState({ ...state, easings: { ...state.easings, [emphasis]: easing } })
-              }
-            />
-          ))}
-        </div>
-      </section>
+      {/*
+        Preview and editor side by side, because they are one activity rather
+        than two. Editing a curve you can't watch is the confusion this layout
+        exists to fix; on narrow screens they stack with the preview first, for
+        the same reason.
+      */}
+      <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <Preview
+          state={state}
+          emphasis={emphasis}
+          onStaggerChange={(staggerMs) => setState({ ...state, staggerMs })}
+        />
+        <EasingEditor
+          state={state}
+          selected={emphasis}
+          onSelect={setEmphasis}
+          onChange={(e, easing) =>
+            setState({ ...state, easings: { ...state.easings, [e]: easing } })
+          }
+        />
+      </div>
 
-      <Preview state={state} />
       <DurationScale state={state} onChange={setState} />
-      <SemanticTable state={state} />
+      <SemanticTable state={state} onChange={setState} />
       <AgentData state={state} url={shareHref} />
     </ToolShell>
   )

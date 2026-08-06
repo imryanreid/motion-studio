@@ -19,7 +19,13 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
-import { resolveSemantics, type Direction, type MotionState } from "../lib/tokens"
+import { Label } from "../shared/components/Label"
+import {
+  resolveSemantics,
+  type Direction,
+  type Emphasis,
+  type MotionState,
+} from "../lib/tokens"
 import { childProgress, timelineTotal } from "../lib/preview"
 
 const SCENARIOS = [
@@ -32,12 +38,26 @@ const SCENARIOS = [
 type Scenario = (typeof SCENARIOS)[number]["id"]
 
 /** Which emphasis each scenario is demonstrating. */
-const SCENARIO_EMPHASIS: Record<Scenario, "subtle" | "standard" | "emphasized"> = {
+const SCENARIO_EMPHASIS: Record<Scenario, Emphasis> = {
   list: "standard",
   drawer: "emphasized",
   modal: "emphasized",
   toggle: "subtle",
   toast: "emphasized",
+}
+
+/**
+ * Where the preview jumps when you pick a curve to edit.
+ *
+ * Selecting an easing and watching nothing change is the confusion this fixes —
+ * the causal link between the control and the artifact has to be physical. The
+ * scenario stays switchable afterwards, because a curve tuned on a drawer being
+ * wrong on a toggle is exactly what this tool should let you discover.
+ */
+const EMPHASIS_SCENARIO: Record<Emphasis, Scenario> = {
+  subtle: "toggle",
+  standard: "list",
+  emphasized: "modal",
 }
 
 const SPEEDS = [
@@ -48,12 +68,31 @@ const SPEEDS = [
 
 const LIST_ITEMS = 5
 
-export default function Preview({ state }: { state: MotionState }) {
-  const [scenario, setScenario] = useState<Scenario>("list")
+export default function Preview({
+  state,
+  emphasis: selectedEmphasis,
+  onStaggerChange,
+}: {
+  state: MotionState
+  /** The curve currently open in the editor. Drives which scenario is shown. */
+  emphasis: Emphasis
+  onStaggerChange: (ms: number) => void
+}) {
+  const [scenario, setScenario] = useState<Scenario>(EMPHASIS_SCENARIO[selectedEmphasis])
   const [direction, setDirection] = useState<Direction>("enter")
   const [speed, setSpeed] = useState<"1" | "0.5" | "0.25">("1")
   const [playing, setPlaying] = useState(true)
   const [elapsed, setElapsed] = useState(0)
+
+  // Follow the editor when the selected curve changes, then leave the choice
+  // alone so switching scenarios by hand sticks.
+  const lastEmphasis = useRef(selectedEmphasis)
+  useEffect(() => {
+    if (lastEmphasis.current !== selectedEmphasis) {
+      lastEmphasis.current = selectedEmphasis
+      setScenario(EMPHASIS_SCENARIO[selectedEmphasis])
+    }
+  }, [selectedEmphasis])
 
   const emphasis = SCENARIO_EMPHASIS[scenario]
   const token = resolveSemantics(state).find((t) => t.id === `${emphasis}.${direction}`)!
@@ -89,9 +128,9 @@ export default function Preview({ state }: { state: MotionState }) {
   const progressAt = (index = 0) => childProgress(state, token, elapsed, index, staggered)
 
   return (
-    <section className="mb-12">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-semibold tracking-tight">Preview</h2>
+    <section className="border-line flex flex-col overflow-hidden rounded-lg border">
+      <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+        <Label as="h2">Preview</Label>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
             ariaLabel="Direction"
@@ -137,7 +176,7 @@ export default function Preview({ state }: { state: MotionState }) {
         </div>
       </div>
 
-      <div className="border-line overflow-hidden rounded-lg border">
+      <div className="flex flex-1 flex-col">
         <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
           <Segmented
             ariaLabel="Scenario"
@@ -147,13 +186,31 @@ export default function Preview({ state }: { state: MotionState }) {
             onChange={setScenario}
             options={SCENARIOS}
           />
-          <span className="text-ash font-mono text-[10px]">
-            {emphasis}.{direction} · {token.durationMs}ms
-            {token.easing.kind === "spring" ? " settling" : ""}
-          </span>
+          <div className="flex items-center gap-3">
+            {staggered && (
+              <label className="text-ash flex items-center gap-1.5 font-mono text-[10px]">
+                stagger
+                <input
+                  type="range"
+                  min={0}
+                  max={160}
+                  step={5}
+                  value={state.staggerMs}
+                  onChange={(e) => onStaggerChange(Number(e.target.value))}
+                  className="accent-ink h-1 w-20"
+                  title="Per-child offset. Falls off sub-linearly so long lists stay bearable."
+                />
+                <span className="text-ink w-8">{state.staggerMs}ms</span>
+              </label>
+            )}
+            <span className="text-ash font-mono text-[10px]">
+              {emphasis}.{direction} · {token.durationMs}ms
+              {token.easing.kind === "spring" ? " settling" : ""}
+            </span>
+          </div>
         </div>
 
-        <div className="bg-ink/[0.02] relative flex h-[260px] items-center justify-center overflow-hidden p-6">
+        <div className="bg-ink/[0.02] relative flex min-h-[260px] flex-1 items-center justify-center overflow-hidden p-6">
           <Stage scenario={scenario} progressAt={progressAt} />
         </div>
 

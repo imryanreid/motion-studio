@@ -17,6 +17,20 @@ tokens with derived exits, five preview scenarios, the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes, the
 machine-readable block, and URL state. 161 tests.
 
+## Layout, second pass
+
+The first pass copied Ramps' layout but assigned the wrong thing to "output".
+Ramps' artifact is the swatch grid — static, always on screen, updating as you
+fiddle. Motion's artifact is motion, which only exists in time, so the preview
+_is_ the artifact surface. Putting it below 700px of easing cards showed the
+controls and hid the thing they controlled.
+
+Now: scale band → preview and easing editor side by side above the fold →
+durations → semantics. The three curves stay comparable as thumbnails and only
+the selected one expands, which is what makes the two-column fit. Selecting a
+curve switches the preview to a scenario that uses it, so the causal link is
+physical rather than explained.
+
 ## Deferred from the first pass
 
 Called out rather than quietly dropped:
