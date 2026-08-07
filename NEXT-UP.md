@@ -46,6 +46,18 @@ design judgement and you can't make it one at a time. Hovering a row highlights
 the step it points at in the scale above, which is the tie drawn rather than
 described.
 
+**Pinning is gone as a concept, not as a capability.** You override a step by
+typing a value into it; an authored number is drawn in a box and a generated
+one isn't. The box is on the *number*, never on the cell — that bug came back
+twice, because a box around a region always ends up containing a derived value.
+`↺` releases a step back onto the curve. `DEFAULT_STATE.pins` is now `{}`, so
+the shipped scale is **100 / 140 / 200 / 280 / 390**, purely generated.
+
+**Enter and exit are paired inside each step**, not split into two rows — the
+pair anyone reasons about is "fast in, fast out". That freed the exit share to
+join `ratio` and `round to` in the header, where all three multipliers now get
+one row and one treatment, because they are one kind of thing.
+
 **Assignment runs component-first.** Which emphasis a purpose uses is set on
 the purpose, in the preview band — "I'm building a drawer, what should it feel
 like?", not "I have an emphasized spring, what should use it?". This breaks the

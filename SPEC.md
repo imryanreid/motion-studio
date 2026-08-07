@@ -65,33 +65,39 @@ easing      subtle · standard · emphasized                 3 curves,
                                                            each a bezier OR a spring
 ```
 
-**Durations are generated, not hand-entered.** From a base and a ratio, snapped
-to a grid, with any step pinnable — the same Auto-until-you-pin idiom Ramps uses
-for its accents, and the same snap-to-a-grid idea Shape uses for spacing.
+**Durations are generated, not hand-entered.** From a base and a ratio, rounded
+to a grid, with any step overridable — the same auto-until-you-touch-it idiom
+Ramps uses for its accents, and the same round-to-a-grid idea Shape uses for
+spacing.
 
 ```
 step(n) = round_to(snap,  base × ratio^n)      n ∈ {−2, −1, 0, 1, 2}
 ```
 
-Defaults: `base 200ms`, `ratio 1.4`, `snap 10ms`.
+Defaults: `base 200ms`, `ratio 1.4`, `round to 10ms`.
 
-| Token        | Derived | Shipped             | For                                         |
-| ------------ | ------- | ------------------- | ------------------------------------------- |
-| `instant`    | 102ms   | **80ms** _(pinned)_ | Feedback that must read as cause and effect |
-| `fast`       | 143ms   | 140ms               | Small state changes, hovers, checkboxes     |
-| `base`       | 200ms   | 200ms               | The default for anything unspecified        |
-| `slow`       | 280ms   | 280ms               | Surfaces entering, larger travel            |
-| `deliberate` | 392ms   | 390ms               | Motion that is meant to be noticed          |
+| Token        | Unrounded | Shipped | For                                         |
+| ------------ | --------- | ------- | ------------------------------------------- |
+| `instant`    | 102.04ms  | 100ms   | Feedback that must read as cause and effect |
+| `fast`       | 142.86ms  | 140ms   | Small state changes, hovers, checkboxes     |
+| `base`       | 200ms     | 200ms   | The default for anything unspecified        |
+| `slow`       | 280ms     | 280ms   | Surfaces entering, larger travel            |
+| `deliberate` | 392ms     | 390ms   | Motion that is meant to be noticed          |
 
-**`instant` ships pinned, and that's the interesting part.** It is not a point on
-the same perceptual curve as the others — it's an anchor. Feedback meant to read
-as cause and effect needs to sit under roughly 100ms whatever the rest of the
-scale is doing, and the generated 102ms doesn't. Pretending it belongs on the
-curve would be the dishonest version, so it ships pinned and the UI says so.
+**Nothing ships overridden.** `instant` used to ship pinned at 80ms, on the
+argument that feedback has to sit under roughly 100ms whatever the rest of the
+scale does and the generated value doesn't. That argument ignored rounding:
+102.04ms lands on exactly 100ms. The pin was buying 80-over-100, which is taste
+rather than correctness, and a tool whose whole claim is "this is a system"
+should not ship an exception to its own system on load.
 
-Any step can be pinned or released. Derived and pinned steps are marked
-differently, so the scale's system stays legible — the ratio is the lesson, the
-pin is the escape hatch.
+Any step can still be overridden, and the interaction is simply **typing a
+value into it** — no pin, no icon, no verb. An authored number is drawn in a
+box and a generated one isn't, which is the panel's entire legend: **a box
+around a number means that number was typed.** The box is on the number and
+never on the cell, because a box around a region claims everything inside it is
+editable and there is always a derived value in there. A small ↺ puts the step
+back on the curve. The ratio is the lesson; the override is the escape hatch.
 
 ### 3.2 Semantics — emphasis × direction
 

@@ -29,7 +29,7 @@ import { bezierValue } from "./bezier.js"
 describe("durations are generated, with pins as the escape hatch", () => {
   it("produces the documented default scale", () => {
     expect(resolveDurations(DEFAULT_STATE)).toEqual({
-      instant: 80, // pinned — not on the curve
+      instant: 100,
       fast: 140,
       base: 200,
       slow: 280,
@@ -37,11 +37,13 @@ describe("durations are generated, with pins as the escape hatch", () => {
     })
   })
 
-  it("instant ships pinned and the rest derived", () => {
-    expect(isDerived(DEFAULT_STATE, "instant")).toBe(false)
-    for (const n of DURATION_NAMES) {
-      if (n !== "instant") expect(isDerived(DEFAULT_STATE, n)).toBe(true)
-    }
+  it("ships nothing authored — the default scale is purely generated", () => {
+    // `instant` used to ship pinned at 80ms. The defence for it ignored
+    // rounding: 200 / 1.4² is 102.04, which snaps to exactly 100, so the pin
+    // bought taste rather than correctness. A tool claiming to be a system
+    // should not ship an exception to its own system on load.
+    expect(DEFAULT_STATE.pins).toEqual({})
+    for (const n of DURATION_NAMES) expect(isDerived(DEFAULT_STATE, n)).toBe(true)
   })
 
   it("stays ordered whatever the ratio", () => {

@@ -41,11 +41,14 @@ import { SITE_URL } from "./lib/site"
 const TOOL_ID = "motion"
 
 /**
- * One of the two rules that shape the whole scale, sitting in the panel header.
+ * One of the three multipliers, sitting in the panel header.
  *
- * Ratio and snap were full-size fields beside `base`, which put three equal
- * inputs above a strip that only one of them anchored. They belong with the
- * panel title: they describe how the scale is built, not what any step is.
+ * Ratio, exit and round-to are the same kind of thing — rules that turn one
+ * duration into another — so they get one row and one treatment. They were
+ * scattered: two in the header and one heading a row of exit values, which
+ * grouped that one by what it produced rather than by what it is.
+ *
+ * None of them is a value in the scale, which is why none of them sits in it.
  */
 function Rule({
   label,
@@ -189,32 +192,50 @@ export default function App() {
       }
     >
       {/*
-        Left is the system, right is the demonstration.
-        
-        Not "edit vs output" — that split left the duration scale homeless,
-        since it is generated but belongs with the inputs that generate it.
-        Framed this way the answer to "what can I change that affects the
-        animation?" is simply everything on the left, and the right panel is
-        purely about watching. Two controls moved to make it true: stagger was
-        in the preview, and exit was duplicated in the band and the table.
+        Left is the system. Right is one component in it.
 
-        One bordered surface on the left rather than three floating panels, so
-        it reads as a single instrument.
+        Not "edit vs watch" — that split couldn't survive letting you assign a
+        purpose to an emphasis, which is simultaneously a token decision and a
+        what-am-I-looking-at decision. Framed this way both sides can edit and
+        the division still means something: the left holds the rules and the
+        three levels every token is built from, the right holds one component,
+        what it reaches for, and what that looks like.
+
+        It also isn't "edit vs output" — that framing left the duration scale
+        homeless, since it is generated but belongs beside what generates it.
       */}
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <section className="border-line overflow-hidden rounded-lg border">
             <div className="border-line flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2.5">
               <PanelTitle>Timing</PanelTitle>
+              {/*
+                Three multipliers, one row, one treatment — because they are
+                one kind of thing. Ratio generates sideways (step to step) and
+                exit generates downward (entrance to exit); round-to quantises
+                both. Exit used to sit apart from these, heading a row of exit
+                values, which grouped it by what it produced rather than by
+                what it is.
+              */}
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <Rule
                   label="Ratio"
                   value={state.ratio}
                   min={1.05}
                   max={3}
-                  width="w-9"
-                  title="How far apart the steps are. Each one is the base multiplied or divided by this. Pinned steps ignore it."
+                  width="w-8"
+                  title="How far apart the steps are. Each one is the base multiplied or divided by this. A step you've typed a value into ignores it."
                   onChange={(ratio) => setState({ ...state, ratio })}
+                />
+                <Rule
+                  label="Exit"
+                  value={Math.round(state.exitRatio * 100)}
+                  min={20}
+                  max={130}
+                  width="w-6"
+                  suffix="%"
+                  title="Every exit is this share of its entrance — the 'out' figure on each step. Exits should be quicker; lingering on something you've finished with reads as lag. A spring ignores it: a spring settles when it settles."
+                  onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
                 />
                 <Rule
                   label="Round to"
@@ -241,13 +262,13 @@ export default function App() {
             */}
             <div className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 border-t p-4">
               <Slider
-                label="List stagger"
+                label="Stagger"
                 value={state.staggerMs}
                 min={0}
                 max={160}
                 step={5}
                 suffix="ms"
-                title={`Per-row offset in the list scenario — nothing else staggers. It falls off sub-linearly (index^${state.staggerDecay}) so a long list doesn't take proportionally longer.`}
+                title={`Per-child offset for anything that enters as a group. Exported as --stagger, and zeroed under prefers-reduced-motion. It falls off sub-linearly (index^${state.staggerDecay}) so a long list doesn't take proportionally longer.`}
                 onChange={(staggerMs) => setState({ ...state, staggerMs })}
               />
               <span

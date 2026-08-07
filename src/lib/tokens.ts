@@ -138,12 +138,13 @@ export const DEFAULT_STATE: MotionState = {
   base: 200,
   ratio: 1.4,
   snap: 10,
-  // `instant` ships pinned. It is not a point on the same perceptual curve as
-  // the others — it's an anchor. Feedback meant to read as cause and effect
-  // needs to sit under roughly 100ms whatever the rest of the scale does, and
-  // the generated 102ms doesn't. Bending it onto the curve would be the
-  // dishonest version.
-  pins: { instant: 80 },
+  // Nothing is authored by default. `instant` used to ship pinned at 80ms, on
+  // the grounds that feedback has to read as cause and effect — but the
+  // defence ignored rounding: 200 / 1.4² is 102.04ms, which snaps to exactly
+  // 100. The pin was buying 80-over-100, which is taste, not correctness, and
+  // a tool whose whole claim is "this is a system" should not ship an
+  // exception to its own system on load. Type one in if you want one.
+  pins: {},
   easings: {
     subtle: { kind: "bezier", bezier: { x1: 0.3, y1: 0, x2: 0.3, y2: 1 } },
     standard: { kind: "bezier", bezier: { x1: 0.2, y1: 0, x2: 0, y2: 1 } },

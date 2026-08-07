@@ -9,7 +9,7 @@
 // you can't see either if they look identical.
 // ==============================================
 import { useState } from "react"
-import { PushPin } from "@phosphor-icons/react"
+import { ArrowCounterClockwise } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import CopyText from "../shared/components/CopyText"
 import { bezierToCss } from "../lib/bezier"
@@ -34,7 +34,16 @@ const describeEasing = (e: Easing) =>
     : `spring(${e.spring.stiffness}, ${e.spring.damping}, ${e.spring.mass})`
 
 /**
- * A number you type straight into the surface it belongs to — no field chrome.
+ * A number you type straight into the surface it belongs to.
+ *
+ * Two looks, and the difference between them is the panel's entire legend:
+ * `field` draws a box, and a box around a number means that number was typed.
+ * `ghost` is indistinguishable from static text until you hover it — used for
+ * generated values, which you *may* override but have not.
+ *
+ * Bordering the cell instead of the number was the bug that kept coming back:
+ * a box around a region says everything inside it is editable, and there was
+ * always a derived value in there.
  *
  * Holds a draft string while you're typing rather than round-tripping every
  * keystroke through a number: `Number("")` is 0, not NaN, so clearing used to
@@ -47,6 +56,7 @@ export function InlineNumber({
   max,
   width = "w-10",
   suffix,
+  variant = "field",
   className,
   title,
   ariaLabel,
@@ -58,6 +68,8 @@ export function InlineNumber({
   /** Tailwind width for the input, sized to the digits it will hold. */
   width?: string
   suffix?: string
+  /** `field` for an authored value, `ghost` for one you could author. */
+  variant?: "field" | "ghost"
   className?: string
   title?: string
   ariaLabel: string
@@ -65,9 +77,13 @@ export function InlineNumber({
   const [draft, setDraft] = useState<string | null>(null)
 
   const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n))
+  const commit = (raw: string) => {
+    const n = Number(raw)
+    if (raw.trim() !== "" && Number.isFinite(n)) onChange(clamp(n))
+  }
 
   return (
-    <span className={cn("inline-flex items-baseline", className)} title={title}>
+    <span className={cn("inline-flex items-baseline gap-0.5", className)} title={title}>
       <input
         // Text, not number: no spinner, and no browser-specific handling of a
         // half-typed value in a control this small.
@@ -77,20 +93,20 @@ export function InlineNumber({
         value={draft ?? String(value)}
         onChange={(e) => {
           setDraft(e.target.value)
-          const n = Number(e.target.value)
-          if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(clamp(n))
+          commit(e.target.value)
         }}
         onBlur={(e) => {
           setDraft(null)
-          const n = Number(e.target.value)
-          if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(clamp(n))
+          commit(e.target.value)
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur()
         }}
         className={cn(
-          "border-b border-dashed border-current/30 bg-transparent tabular-nums outline-none",
-          "focus:border-solid focus:border-current",
+          "-mx-1 rounded border px-1 tabular-nums outline-none transition-colors",
+          variant === "field"
+            ? "border-line bg-paper focus:border-ink/40"
+            : "hover:border-line/70 border-transparent bg-transparent hover:border-dashed focus:border-solid focus:border-ink/40",
           width,
         )}
       />
@@ -102,18 +118,25 @@ export function InlineNumber({
 /**
  * The duration scale — the one input, then everything it produces.
  *
- * `base` sits leftmost in its own bordered box rather than in scale position,
- * because reading order beats numeric order for the thing you actually type:
- * the eye lands top-left, and that is where the cause should be. The four
- * derived steps stay in scale order to the right of a gap, each labelled with
- * the arithmetic that produced it — a gap between an input and four outputs
- * only reads as cause and effect if the outputs say what was done to them.
+ * `base` leads rather than sitting in numeric position, because reading order
+ * beats numeric order for the value you actually type: the eye lands top-left,
+ * and that is where the cause should be. The four generated steps stay in
+ * scale order after a gap, each carrying the arithmetic that produced it — a
+ * gap between an input and four outputs only reads as cause and effect if the
+ * outputs say what was done to them.
  *
- * Two aligned rows, enter over exit. The exit row is what names the enter
- * durations as entrances, and it puts the exit slider directly under the
- * numbers it drives.
+ * Enter and exit are paired inside each step rather than split into two rows.
+ * The pair anyone reasons about is "fast in, fast out", not "all the exits" —
+ * and pairing them here is a tighter tie than putting the exit share next to a
+ * row of exits ever was, so that control moves up to the header with the other
+ * two multipliers, which are the same kind of thing.
  *
- * Bordered means authored, filled means generated. That is the whole legend.
+ * Every value here is typeable, and the box that appears when you type one is
+ * the whole legend: a box around a number means that number was authored. The
+ * box is on the number and never on the cell — a box around a region claims
+ * everything inside it is editable, and there is always a derived value inside.
+ * This replaces pinning, which needed an icon in every cell and a verb nobody
+ * asked for to say the same thing.
  */
 export function DurationStrip({
   state,
@@ -129,17 +152,16 @@ export function DurationStrip({
   const longest = Math.max(...DURATION_NAMES.map((n) => durations[n]))
   const [hovered, setHovered] = useState<DurationName | null>(null)
 
-  const togglePin = (name: DurationName) => {
+  const exitOf = (ms: number) => Math.max(1, Math.round(ms * state.exitRatio))
+
+  /** Typing into a generated step authors it; the arrow gives it back. */
+  const author = (name: DurationName, ms: number) =>
+    onChange({ ...state, pins: { ...state.pins, [name]: ms } })
+  const release = (name: DurationName) => {
     const pins = { ...state.pins }
-    if (pins[name] === undefined) pins[name] = durations[name]
-    else delete pins[name]
+    delete pins[name]
     onChange({ ...state, pins })
   }
-
-  const exitOf = (ms: number) => Math.max(1, Math.round(ms * state.exitRatio))
-  const rowTag =
-    "text-ash flex items-center gap-1.5 pr-3 font-mono text-[10px] tracking-[0.16em] uppercase"
-  const derivedCell = "bg-ink/[0.03] border-line/60 border-l"
 
   /** The travelling marker: a number is not a feel. */
   const bar = (name: DurationName) => (
@@ -161,174 +183,100 @@ export function DurationStrip({
     </div>
   )
 
-  return (
-    <div className="overflow-x-auto">
-      <div className="grid min-w-[540px] grid-cols-[4.25rem_6.5rem_1.5rem_repeat(4,minmax(0,1fr))] gap-y-1">
-        {/* ── enter ─────────────────────────────────────────────────────── */}
-        <span className={rowTag} title="Entrance durations. Everything else derives from these.">
-          Enter
-        </span>
+  /** One step: its name, its duration, the exit it implies, its length. */
+  const cell = (name: DurationName) => {
+    const ms = durations[name]
+    const derived = isDerived(state, name)
+    const isBase = name === "base"
+    const step = DURATION_STEPS[name]
+    const unrounded = state.base * Math.pow(state.ratio, step)
+    // Which levels reach for this step. Reported on hover, never by dimming
+    // the cell: an unused step is not broken, and greying it out was the
+    // loudest possible way to say the quietest thing on the panel.
+    const users = emphasisUsing(state, name)
 
-        {/*
-          The only bordered thing on the panel, because it is the only value
-          you type. The border used to wrap the exit value too, which said
-          both were editable when only one is.
-        */}
-        <div
-          onMouseEnter={() => setHovered("base")}
-          onMouseLeave={() => setHovered((h) => (h === "base" ? null : h))}
-          className={cn(
-            "border-line bg-paper flex flex-col gap-1 rounded-md border px-2.5 py-2 transition-colors",
-            highlight === "base" && "bg-ink/[0.08]",
-          )}
-        >
-          <span className="text-ink font-mono text-[10px] tracking-wide">base</span>
-          <span className="text-ink font-mono text-sm">
-            <InlineNumber
-              ariaLabel="Base duration in milliseconds"
-              title="The anchor you type. Every other step is this multiplied or divided by the ratio, so changing it moves the whole scale."
-              value={state.base}
-              min={20}
-              max={2000}
-              width="w-10"
-              suffix="ms"
-              onChange={(base) => onChange({ ...state, base })}
-            />
+    return (
+      <div
+        key={name}
+        onMouseEnter={() => setHovered(name)}
+        onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
+        className={cn(
+          "flex flex-col gap-1 px-2 py-2 transition-colors",
+          !isBase && "bg-ink/[0.03] border-line/60 border-l",
+          name === DERIVED_NAMES[0] && "rounded-l-md border-l-0",
+          name === DERIVED_NAMES[DERIVED_NAMES.length - 1] && "rounded-r-md",
+          highlight === name && "bg-ink/[0.09]",
+        )}
+        title={
+          (isBase
+            ? "The anchor you type. Every other step is this multiplied or divided by the ratio."
+            : derived
+              ? `${state.base} ${step < 0 ? "÷" : "×"} ${Math.pow(state.ratio, Math.abs(step)).toFixed(2)} = ${unrounded.toFixed(2)}ms, rounded to ${ms}ms`
+              : `Authored at ${ms}ms — held here instead of following the base and ratio`) +
+          (users.length ? ` · used by ${users.join(", ")}` : " · no emphasis reaches for this step")
+        }
+      >
+        <div className="flex items-baseline justify-between gap-1">
+          <span
+            className={cn(
+              "truncate font-mono text-[10px] tracking-wide",
+              isBase ? "text-ink" : "text-ash",
+            )}
+          >
+            {name}
           </span>
-          {bar("base")}
+          {/* The factor, or — where there is no factor because you overrode
+              it — the way back onto the curve. */}
+          {!isBase &&
+            (derived ? (
+              <span className="text-ash/60 shrink-0 font-mono text-[10px]">
+                {derivationLabel(state.ratio, step)}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => release(name)}
+                title="Release back onto the generated scale"
+                aria-label={`Release ${name}`}
+                className="text-ash hover:text-ink shrink-0"
+              >
+                <ArrowCounterClockwise size={11} weight="bold" />
+              </button>
+            ))}
         </div>
 
+        <span className="text-ink font-mono text-sm">
+          <InlineNumber
+            ariaLabel={`${name} duration in milliseconds`}
+            value={isBase ? state.base : ms}
+            min={20}
+            max={9000}
+            width="w-10"
+            suffix="ms"
+            variant={isBase || !derived ? "field" : "ghost"}
+            onChange={(v) => (isBase ? onChange({ ...state, base: v }) : author(name, v))}
+          />
+        </span>
+
+        {/* The exit this step implies, beside the entrance it came from. */}
+        <span className="text-ash font-mono text-[11px]">{exitOf(ms)} out</span>
+
+        {bar(name)}
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="grid min-w-[500px] grid-cols-[6.5rem_1.75rem_repeat(4,minmax(0,1fr))]">
+        {cell("base")}
         <div
           aria-hidden="true"
           className="text-ash flex items-center justify-center font-mono text-xs"
         >
           →
         </div>
-
-        {DERIVED_NAMES.map((name, i) => {
-          const ms = durations[name]
-          const derived = isDerived(state, name)
-          const step = DURATION_STEPS[name]
-          const unrounded = state.base * Math.pow(state.ratio, step)
-          // Which levels reach for this step. Reported on hover, never by
-          // dimming the cell: an unused step is not broken or disabled, and
-          // greying it out was the loudest possible way to say the quietest
-          // thing on the panel.
-          const users = emphasisUsing(state, name)
-          return (
-            <div
-              key={name}
-              onMouseEnter={() => setHovered(name)}
-              onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
-              className={cn(
-                derivedCell,
-                "flex flex-col gap-1 px-2 py-2 transition-colors",
-                i === 0 && "rounded-l-md border-l-0",
-                i === DERIVED_NAMES.length - 1 && "rounded-r-md",
-                highlight === name && "bg-ink/[0.09]",
-              )}
-              title={
-                (derived
-                  ? `${state.base} ${step < 0 ? "÷" : "×"} ${Math.pow(state.ratio, Math.abs(step)).toFixed(2)} = ${unrounded.toFixed(2)}ms, rounded to ${ms}ms`
-                  : `Pinned at ${ms}ms — held here instead of following the base and ratio`) +
-                (users.length
-                  ? ` · used by ${users.join(", ")}`
-                  : " · no emphasis reaches for this step")
-              }
-            >
-              <div className="flex items-baseline gap-1">
-                <span className="text-ash truncate font-mono text-[10px] tracking-wide">
-                  {name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => togglePin(name)}
-                  title={
-                    derived
-                      ? `Pin at ${ms}ms — holds this value when you change the base or ratio`
-                      : "Release back onto the generated scale"
-                  }
-                  aria-label={derived ? `Pin ${name}` : `Release ${name}`}
-                  className={cn(
-                    "ml-auto shrink-0 transition-opacity",
-                    derived
-                      ? cn(
-                          "text-ash hover:text-ink opacity-0 focus-visible:opacity-100",
-                          hovered === name && "opacity-100",
-                        )
-                      : "text-ink opacity-100",
-                  )}
-                >
-                  <PushPin size={11} weight={derived ? "regular" : "fill"} />
-                </button>
-              </div>
-
-              {/* The factor rides with the number it produced, not with the
-                  step name — it reads as "280ms, and that's base ×1.4", and
-                  it's the only place there's room for it. Absent when pinned:
-                  a pinned step was reached by no arithmetic at all. */}
-              <div className="flex items-baseline justify-between gap-1">
-                <span className="text-ink font-mono text-sm">{ms}ms</span>
-                {derived && (
-                  <span className="text-ash/60 shrink-0 font-mono text-[10px]">
-                    {derivationLabel(state.ratio, step)}
-                  </span>
-                )}
-              </div>
-              {bar(name)}
-            </div>
-          )
-        })}
-
-        {/* ── exit ──────────────────────────────────────────────────────── */}
-        {/*
-          The share lives in the row head rather than in a slider elsewhere in
-          the panel, because it is the rule that produces this exact row and
-          the two were sitting either side of a border. Typed, like the base:
-          the panel now has two authored numbers and they look alike.
-        */}
-        <span
-          className={rowTag}
-          title="Every exit is this share of the entrance above it. Exits should be quicker — lingering on something you've finished with reads as lag. A spring ignores it: a spring settles when it settles."
-        >
-          Exit
-          <InlineNumber
-            ariaLabel="Exit duration as a percentage of the entrance"
-            value={Math.round(state.exitRatio * 100)}
-            min={20}
-            max={130}
-            width="w-6"
-            suffix="%"
-            className="text-ink text-xs normal-case"
-            onChange={(pct) => onChange({ ...state, exitRatio: pct / 100 })}
-          />
-        </span>
-
-        <div
-          className={cn(
-            "bg-ink/[0.03] rounded-md px-2.5 py-1.5 transition-colors",
-            highlight === "base" && "bg-ink/[0.09]",
-          )}
-        >
-          <span className="text-ash font-mono text-xs">{exitOf(durations.base)}ms</span>
-        </div>
-
-        <div />
-
-        {DERIVED_NAMES.map((name, i) => (
-          <div
-            key={name}
-            className={cn(
-              derivedCell,
-              "px-2 py-1.5 transition-colors",
-              i === 0 && "rounded-l-md border-l-0",
-              i === DERIVED_NAMES.length - 1 && "rounded-r-md",
-              highlight === name && "bg-ink/[0.09]",
-            )}
-          >
-            <span className="text-ash font-mono text-xs">{exitOf(durations[name])}ms</span>
-          </div>
-        ))}
+        {DERIVED_NAMES.map((n) => cell(n))}
       </div>
     </div>
   )

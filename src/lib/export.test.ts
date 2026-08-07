@@ -144,8 +144,19 @@ describe("agent markdown", () => {
 
   it("carries the values", () => {
     expect(md).toContain("`base` — 200ms")
-    expect(md).toContain("(pinned, not on the curve)")
     for (const t of resolveSemantics(DEFAULT_STATE)) expect(md).toContain(`motion.${t.id}`)
+  })
+
+  it("flags an authored step, and only when there is one", () => {
+    // Nothing is authored by default, so the default markdown must not claim
+    // otherwise — this assertion used to pass on a pin that shipped in the
+    // defaults, which meant it never tested the branch it named.
+    expect(md).not.toContain("(pinned, not on the curve)")
+    const authored = toAgentMarkdown(
+      { ...DEFAULT_STATE, pins: { instant: 80 } },
+      "https://example.test/",
+    )
+    expect(authored).toContain("(pinned, not on the curve)")
   })
 
   it("states the rules as rules, not as values", () => {
