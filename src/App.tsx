@@ -19,11 +19,11 @@ import ThemeToggle from "./shared/components/ThemeToggle"
 import ResetButton from "./shared/components/ResetButton"
 import ShareButton from "./shared/components/ShareButton"
 import ExportModal from "./shared/components/ExportModal"
-import { FieldLabel, PanelTitle } from "./shared/components/Label"
+import { PanelTitle } from "./shared/components/Label"
 import { useTheme } from "./shared/theme"
 import EasingEditor from "./components/EasingEditor"
 import Preview from "./components/Preview"
-import { DurationStrip, SemanticTable } from "./components/Tokens"
+import { DurationStrip, InlineNumber, SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
 import { DEFAULT_STATE, type DurationName, type Emphasis, type MotionState } from "./lib/tokens"
@@ -34,72 +34,47 @@ import { SITE_URL } from "./lib/site"
 const TOOL_ID = "motion"
 
 /**
- * A compact numeric control.
+ * One of the two rules that shape the whole scale, sitting in the panel header.
  *
- * Holds a draft string while you're typing rather than round-tripping every
- * keystroke through a number. `Number("")` is 0, not NaN, so clearing the field
- * used to commit a 0 — and then typing 1000 over it produced "01000", with a
- * leading zero that wouldn't go away. Same pattern Ramps uses for its colour
- * fields: follow the outside value at rest, hold the draft while focused,
- * commit on blur or Enter.
+ * Ratio and snap were full-size fields beside `base`, which put three equal
+ * inputs above a strip that only one of them anchored. They belong with the
+ * panel title: they describe how the scale is built, not what any step is.
  */
-function NumberField({
+function Rule({
   label,
   value,
   onChange,
-  step = 1,
   min,
   max,
+  width,
   suffix,
   title,
 }: {
   label: string
   value: number
   onChange: (n: number) => void
-  step?: number
-  min?: number
-  max?: number
+  min: number
+  max: number
+  width: string
   suffix?: string
-  title?: string
+  title: string
 }) {
-  const [draft, setDraft] = useState<string | null>(null)
-
-  const commit = (raw: string) => {
-    setDraft(null)
-    const n = Number(raw)
-    if (raw.trim() === "" || !Number.isFinite(n)) return // leave the value alone
-    const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n))
-    onChange(clamped)
-  }
-
   return (
-    <div title={title}>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="border-line bg-paper focus-within:border-ink/30 flex h-9 items-center rounded-md border px-2.5 font-mono text-xs transition-colors">
-        <input
-          type="number"
-          value={draft ?? String(value)}
-          step={step}
-          min={min}
-          max={max}
-          onChange={(e) => {
-            setDraft(e.target.value)
-            // Commit live while it's a usable number, so the preview keeps up —
-            // but never let an empty or half-typed field write a value.
-            const n = Number(e.target.value)
-            if (e.target.value.trim() !== "" && Number.isFinite(n)) {
-              onChange(Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n)))
-            }
-          }}
-          onBlur={(e) => commit(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur()
-          }}
-          className="text-ink w-16 bg-transparent outline-none"
-        />
-        {suffix && <span className="text-ash shrink-0">{suffix}</span>}
-      </div>
-    </div>
+    <span className="flex items-baseline gap-1.5" title={title}>
+      <span className="text-ash font-mono text-[10px] tracking-[0.16em] uppercase">
+        {label}
+      </span>
+      <InlineNumber
+        ariaLabel={label}
+        value={value}
+        min={min}
+        max={max}
+        width={width}
+        suffix={suffix}
+        className="text-ink font-mono text-xs"
+        onChange={onChange}
+      />
+    </span>
   )
 }
 
@@ -217,43 +192,32 @@ export default function App() {
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <section className="border-line overflow-hidden rounded-lg border">
-            <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+            <div className="border-line flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2.5">
               <PanelTitle>Timing</PanelTitle>
-              <span className="text-ash font-mono text-[10px]">applies to every token</span>
-            </div>
-
-            <div className="flex flex-col gap-4 p-4">
-              <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
-                <NumberField
-                  label="Base"
-                  value={state.base}
-                  min={20}
-                  max={2000}
-                  step={10}
-                  suffix="ms"
-                  title="The middle of the scale. Every other duration is derived from it."
-                  onChange={(base) => setState({ ...state, base })}
-                />
-                <NumberField
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <Rule
                   label="Ratio"
                   value={state.ratio}
                   min={1.05}
                   max={3}
-                  step={0.05}
+                  width="w-9"
                   title="Multiplier between steps. Pinned steps ignore it."
                   onChange={(ratio) => setState({ ...state, ratio })}
                 />
-                <NumberField
+                <Rule
                   label="Snap"
                   value={state.snap}
                   min={1}
                   max={100}
-                  step={1}
+                  width="w-6"
                   suffix="ms"
                   title="Generated values round to this."
                   onChange={(snap) => setState({ ...state, snap })}
                 />
               </div>
+            </div>
+
+            <div className="p-4">
               <DurationStrip state={state} onChange={setState} />
             </div>
 
@@ -265,7 +229,7 @@ export default function App() {
                 max={130}
                 step={5}
                 suffix="%"
-                title="Exit duration as a share of the entrance, for every emphasis. Exits should be quicker — lingering on something you've finished with reads as lag."
+                title="Drives the Exit row above: every exit is this share of its entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
                 onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
               />
               <Slider

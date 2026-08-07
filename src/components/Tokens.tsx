@@ -9,10 +9,9 @@
 // you can't see either if they look identical.
 // ==============================================
 import { useState } from "react"
-import { PushPin, PushPinSlash } from "@phosphor-icons/react"
+import { PushPin } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import CopyText from "../shared/components/CopyText"
-import { FieldLabel } from "../shared/components/Label"
 import { bezierToCss } from "../lib/bezier"
 import {
   DURATION_NAMES,
@@ -32,24 +31,85 @@ const describeEasing = (e: Easing) =>
     : `spring(${e.spring.stiffness}, ${e.spring.damping}, ${e.spring.mass})`
 
 /**
- * The duration scale, as a horizontal strip.
+ * A number you type straight into the surface it belongs to — no field chrome.
  *
- * Five equal cells rather than five stacked bars, which is how Ramps renders an
- * 11-step ramp — same family idiom, and it collapses the block from ~200px to
- * ~80px. That's what makes it affordable to sit directly under the controls
- * that generate it, which in turn is what lets the redundant "Generates" echo
- * go away: the generator and the generated are simply adjacent.
+ * Holds a draft string while you're typing rather than round-tripping every
+ * keystroke through a number: `Number("")` is 0, not NaN, so clearing used to
+ * commit a 0 and then typing 1000 over it produced "01000".
  */
+export function InlineNumber({
+  value,
+  onChange,
+  min,
+  max,
+  width = "w-10",
+  suffix,
+  className,
+  title,
+  ariaLabel,
+}: {
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+  /** Tailwind width for the input, sized to the digits it will hold. */
+  width?: string
+  suffix?: string
+  className?: string
+  title?: string
+  ariaLabel: string
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n))
+
+  return (
+    <span className={cn("inline-flex items-baseline", className)} title={title}>
+      <input
+        // Text, not number: no spinner, and no browser-specific handling of a
+        // half-typed value in a control this small.
+        type="text"
+        inputMode="decimal"
+        aria-label={ariaLabel}
+        value={draft ?? String(value)}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          const n = Number(e.target.value)
+          if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(clamp(n))
+        }}
+        onBlur={(e) => {
+          setDraft(null)
+          const n = Number(e.target.value)
+          if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(clamp(n))
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+        }}
+        className={cn(
+          "border-b border-dashed border-current/30 bg-transparent tabular-nums outline-none",
+          "focus:border-solid focus:border-current",
+          width,
+        )}
+      />
+      {suffix && <span className="opacity-60">{suffix}</span>}
+    </span>
+  )
+}
+
 /**
- * The generated duration scale.
+ * The duration scale — two aligned rows, enter over exit.
  *
- * Filled rather than bordered, and carrying no input chrome, because that is
- * the family's signal for "this is output". It replaces four separate ways of
- * saying the same thing — an indent, a left rule, a "generated" label and a
- * caption — none of which said it as directly as simply not looking editable.
+ * `base` is not a separate input above the scale any more; it *is* the base
+ * cell, the one editable value in the row, with the other four fanning out from
+ * it by the ratio. Sitting the generator apart from what it generated was the
+ * source of the "how are these related?" question: the answer is now spatial.
  *
- * The only thing you author here is a pin, so that is the only affordance, and
- * it stays hidden until you hover the cell it belongs to.
+ * The exit row exists because the enter durations were never labelled as such.
+ * A second row of derived numbers directly under the first, driven by the one
+ * slider below it, is what makes the asymmetry rule visible rather than stated.
+ *
+ * Filled and carrying no field chrome, because that is the family's signal for
+ * "generated". The only things you author here are the base and a pin.
  */
 export function DurationStrip({
   state,
@@ -69,12 +129,18 @@ export function DurationStrip({
     onChange({ ...state, pins })
   }
 
+  const rowTag = "text-ash flex items-center px-2.5 font-mono text-[10px] tracking-[0.16em] uppercase"
+
   return (
     <div className="overflow-x-auto">
-      <div className="bg-ink/[0.03] divide-line/60 grid min-w-[460px] grid-cols-5 divide-x rounded-md">
-        {DURATION_NAMES.map((name) => {
+      <div className="bg-ink/[0.03] grid min-w-[520px] grid-cols-[3.25rem_repeat(5,minmax(0,1fr))] overflow-hidden rounded-md">
+        <span className={rowTag} title="Entrance durations, generated from the base and ratio.">
+          Enter
+        </span>
+        {DURATION_NAMES.map((name, i) => {
           const ms = durations[name]
           const derived = isDerived(state, name)
+          const isBase = name === "base"
           // Dimmed rather than labelled: nothing reaches for this step, so it
           // ships in exports with no token referencing it.
           const unused = emphasisUsing(state, name).length === 0
@@ -83,7 +149,12 @@ export function DurationStrip({
               key={name}
               onMouseEnter={() => setHovered(name)}
               onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
-              className={cn("flex flex-col gap-1 px-2.5 py-2", unused && "opacity-45")}
+              className={cn(
+                "border-line/60 flex flex-col gap-1 border-l px-2.5 py-2",
+                i === 0 && "border-l-0",
+                unused && "opacity-45",
+                isBase && "bg-ink/[0.04]",
+              )}
               title={
                 unused
                   ? `${name} — no emphasis uses this, so nothing references it`
@@ -91,31 +162,57 @@ export function DurationStrip({
               }
             >
               <div className="flex items-baseline justify-between gap-1">
-                <span className="text-ash font-mono text-[10px] tracking-wide">{name}</span>
-                <button
-                  type="button"
-                  onClick={() => togglePin(name)}
-                  title={
-                    derived
-                      ? `Pin at ${ms}ms — keeps this value when you change the base or ratio`
-                      : "Release back onto the generated curve"
-                  }
-                  aria-label={derived ? `Pin ${name}` : `Release ${name}`}
+                <span
                   className={cn(
-                    "shrink-0 transition-opacity",
-                    derived
-                      ? cn(
-                          "text-ash hover:text-ink opacity-0 focus-visible:opacity-100",
-                          hovered === name && "opacity-100",
-                        )
-                      : "text-ink opacity-100",
+                    "font-mono text-[10px] tracking-wide",
+                    isBase ? "text-ink" : "text-ash",
                   )}
                 >
-                  <PushPin size={11} weight={derived ? "regular" : "fill"} />
-                </button>
+                  {name}
+                </span>
+                {/* Base has no pin: pinning the anchor to something other than
+                    itself would make the label a lie. */}
+                {!isBase && (
+                  <button
+                    type="button"
+                    onClick={() => togglePin(name)}
+                    title={
+                      derived
+                        ? `Pin at ${ms}ms — keeps this value when you change the base or ratio`
+                        : "Release back onto the generated curve"
+                    }
+                    aria-label={derived ? `Pin ${name}` : `Release ${name}`}
+                    className={cn(
+                      "shrink-0 transition-opacity",
+                      derived
+                        ? cn(
+                            "text-ash hover:text-ink opacity-0 focus-visible:opacity-100",
+                            hovered === name && "opacity-100",
+                          )
+                        : "text-ink opacity-100",
+                    )}
+                  >
+                    <PushPin size={11} weight={derived ? "regular" : "fill"} />
+                  </button>
+                )}
               </div>
 
-              <span className="text-ink font-mono text-sm">{ms}ms</span>
+              {isBase ? (
+                <span className="text-ink font-mono text-sm">
+                  <InlineNumber
+                    ariaLabel="Base duration in milliseconds"
+                    title="The anchor. Every other step is this times the ratio, so changing it moves the whole scale."
+                    value={state.base}
+                    min={20}
+                    max={2000}
+                    width="w-11"
+                    suffix="ms"
+                    onChange={(base) => onChange({ ...state, base })}
+                  />
+                </span>
+              ) : (
+                <span className="text-ink font-mono text-sm">{ms}ms</span>
+              )}
 
               {/* Relative length, and on hover a marker crosses at exactly this
                   duration — a number is not a feel. */}
@@ -135,6 +232,29 @@ export function DurationStrip({
                   }}
                 />
               </div>
+            </div>
+          )
+        })}
+
+        <span
+          className={cn(rowTag, "border-line/60 border-t")}
+          title={`Exit durations: ${Math.round(state.exitRatio * 100)}% of the entrance. A spring token ignores this — it settles when it settles.`}
+        >
+          Exit
+        </span>
+        {DURATION_NAMES.map((name, i) => {
+          const unused = emphasisUsing(state, name).length === 0
+          const exitMs = Math.max(1, Math.round(durations[name] * state.exitRatio))
+          return (
+            <div
+              key={name}
+              className={cn(
+                "border-line/60 border-t border-l px-2.5 py-1.5",
+                i === 0 && "border-l-0",
+                unused && "opacity-45",
+              )}
+            >
+              <span className="text-ash font-mono text-xs">{exitMs}ms</span>
             </div>
           )
         })}

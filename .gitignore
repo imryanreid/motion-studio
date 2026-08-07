@@ -24,3 +24,6 @@ logs/
 # Scratch
 .claude-replay.*
 .tmp-*
+
+# Local dev-server config for the Claude Code browser pane.
+.claude/

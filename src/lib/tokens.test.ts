@@ -201,7 +201,7 @@ describe("URL state", () => {
     { name: "defaults", s: DEFAULT_STATE },
     { name: "retuned scale", s: { ...DEFAULT_STATE, base: 240, ratio: 1.25, snap: 5 } },
     { name: "no pins", s: { ...DEFAULT_STATE, pins: {} } },
-    { name: "many pins", s: { ...DEFAULT_STATE, pins: { instant: 60, base: 210, slow: 300 } } },
+    { name: "many pins", s: { ...DEFAULT_STATE, pins: { instant: 60, fast: 120, slow: 300 } } },
     { name: "tuned exit", s: { ...DEFAULT_STATE, exitRatio: 0.5 } },
     { name: "tuned stagger", s: { ...DEFAULT_STATE, staggerMs: 25, staggerDecay: 0.7 } },
     { name: "tight tolerance", s: { ...DEFAULT_STATE, tolerance: 0.002 } },
@@ -247,6 +247,17 @@ describe("URL state", () => {
 
   it.each(VARIANTS)("$name round-trips", ({ s }) => {
     expect(resolveState(encodeState(s))).toEqual(s)
+  })
+
+  it("refuses a pin on base, however the link was written", () => {
+    // `base` is authored as `d` and every other step derives from it. A pin on
+    // it would let the cell labelled "base" show a value the scale isn't built
+    // from, so the decoder drops it rather than trusting a hand-edited link.
+    expect(decodeState("dp=base:900.slow:300").pins).toEqual({ slow: 300 })
+    // A dp carrying nothing else is the same as no dp at all, so it falls back
+    // to the defaults rather than to an empty set — "-" is how you say none.
+    expect(decodeState("dp=base:900").pins).toBeUndefined()
+    expect(resolveState("d=200.140.10&dp=base:900").pins).toEqual(DEFAULT_STATE.pins)
   })
 
   it("round-trips easings for real, not via the default fallback", () => {

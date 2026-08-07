@@ -91,6 +91,10 @@ function decodePins(raw: string | null): MotionState["pins"] | undefined {
     const [name, value] = chunk.split(":")
     const ms = Number(value)
     if (!DURATION_NAMES.includes(name as DurationName)) continue
+    // `base` is the anchor, authored directly as `d`. A pin on it would let the
+    // cell labelled "base" hold a value the rest of the scale isn't derived
+    // from, so a hand-edited link can't create one.
+    if (name === "base") continue
     if (!Number.isFinite(ms) || ms <= 0 || ms > 60000) continue
     out[name as DurationName] = Math.round(ms)
   }
