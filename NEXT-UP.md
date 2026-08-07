@@ -13,9 +13,38 @@
 
 Working: the five-duration generated scale with per-step pinning, three easings
 each editable as a bezier (draggable) or a spring (parameters), six semantic
-tokens with derived exits, five preview scenarios, the full export panel (CSS,
+tokens with derived exits, seven preview scenarios, the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes, the
-machine-readable block, and URL state. 161 tests.
+machine-readable block, and URL state. 178 tests.
+
+## Layout, third pass
+
+Two structural fixes, both from the same diagnosis: the page was organised by
+mechanism, and neither of the two things you actually author had a home.
+
+**The scale.** `base` is no longer an input sitting above the strip it
+generates — it leads the strip, in its own bordered box, with the four derived
+steps in scale order after a gap and each labelled with the factor that
+produced it (`÷1.4`, `×1.96`). Numeric order would put base in position three,
+which is not where the eye lands. Bordered means authored, filled means
+generated; that is the only legend. A second aligned row of exit durations
+under the first names the enter values as entrances and sits the exit slider
+directly under the numbers it drives. `snap` is now labelled "round to", and
+hovering a derived step shows the unrounded arithmetic.
+
+Consequence: **`base` is no longer pinnable**, and `decodePins` drops a base pin
+from a hand-edited URL. Pinning the anchor would let the cell labelled `base`
+hold a value the rest of the scale isn't derived from.
+
+**The emphasis.** The "Easing" panel is now "Emphasis", an accordion of three
+rows rather than one curve behind tabs. An emphasis is a curve *and* a duration
+*and* the purposes that reach for it; those were split across two panels and a
+caption, which left the primary object of the tool represented by three tab
+labels. Every row now carries its own shape (thumbnail), its duration step by
+name, and what uses it, whether open or not — comparing three curves is the
+design judgement and you can't make it one at a time. Hovering a row highlights
+the step it points at in the scale above, which is the tie drawn rather than
+described.
 
 ## Layout, second pass
 

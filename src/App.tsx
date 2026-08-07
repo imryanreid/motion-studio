@@ -126,8 +126,13 @@ export default function App() {
     resolveState(typeof window === "undefined" ? "" : window.location.search),
   )
   const [exportOpen, setExportOpen] = useState(false)
-  // Which curve is open in the editor. Also drives the preview scenario.
+  // Which curve is open in the editor. Also marks the preview scenarios it
+  // affects.
   const [emphasis, setEmphasis] = useState<Emphasis>("standard")
+  // The step of the scale the emphasis panel is currently pointing at, so the
+  // scale can light it up. Two panels, one relationship, drawn rather than
+  // described.
+  const [linked, setLinked] = useState<DurationName | null>(null)
 
   // What reset threw away, kept just long enough to offer it back.
   const undoSnapshot = useRef<MotionState | null>(null)
@@ -218,7 +223,7 @@ export default function App() {
             </div>
 
             <div className="p-4">
-              <DurationStrip state={state} onChange={setState} />
+              <DurationStrip state={state} onChange={setState} highlight={linked} />
             </div>
 
             <div className="border-line flex flex-wrap items-center gap-x-6 gap-y-3 border-t p-4">
@@ -255,6 +260,7 @@ export default function App() {
             onPairChange={(e, d) =>
               setState({ ...state, durationFor: { ...state.durationFor, [e]: d } })
             }
+            onLink={setLinked}
           />
         </div>
 

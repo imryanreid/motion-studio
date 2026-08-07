@@ -118,9 +118,12 @@ export function InlineNumber({
 export function DurationStrip({
   state,
   onChange,
+  highlight,
 }: {
   state: MotionState
   onChange: (s: MotionState) => void
+  /** A step some other panel is currently pointing at. Draws the tie. */
+  highlight?: DurationName | null
 }) {
   const durations = resolveDurations(state)
   const longest = Math.max(...DURATION_NAMES.map((n) => durations[n]))
@@ -169,8 +172,9 @@ export function DurationStrip({
           onMouseEnter={() => setHovered("base")}
           onMouseLeave={() => setHovered((h) => (h === "base" ? null : h))}
           className={cn(
-            "border-line bg-paper flex flex-col gap-1 rounded-t-md border border-b-0 px-2.5 py-2",
+            "border-line bg-paper flex flex-col gap-1 rounded-t-md border border-b-0 px-2.5 py-2 transition-colors",
             emphasisUsing(state, "base").length === 0 && "opacity-45",
+            highlight === "base" && "bg-ink/[0.08] opacity-100",
           )}
         >
           <span className="text-ink font-mono text-[10px] tracking-wide">base</span>
@@ -210,10 +214,11 @@ export function DurationStrip({
               onMouseEnter={() => setHovered(name)}
               onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
               className={cn(
-                "bg-ink/[0.03] border-line/60 flex flex-col gap-1 border-l px-2.5 py-2",
+                "bg-ink/[0.03] border-line/60 flex flex-col gap-1 border-l px-2.5 py-2 transition-colors",
                 i === 0 && "rounded-tl-md border-l-0",
                 i === DERIVED_NAMES.length - 1 && "rounded-tr-md",
                 unused && "opacity-45",
+                highlight === name && "bg-ink/[0.09] opacity-100",
               )}
               title={
                 derived
@@ -276,8 +281,9 @@ export function DurationStrip({
 
         <div
           className={cn(
-            "border-line bg-paper rounded-b-md border border-t-0 px-2.5 py-1.5",
+            "border-line bg-paper rounded-b-md border border-t-0 px-2.5 py-1.5 transition-colors",
             emphasisUsing(state, "base").length === 0 && "opacity-45",
+            highlight === "base" && "bg-ink/[0.08] opacity-100",
           )}
         >
           <span className="text-ash font-mono text-xs">{exitOf(durations.base)}ms</span>
@@ -291,10 +297,11 @@ export function DurationStrip({
             <div
               key={name}
               className={cn(
-                "bg-ink/[0.03] border-line/60 border-t border-l px-2.5 py-1.5",
+                "bg-ink/[0.03] border-line/60 border-t border-l px-2.5 py-1.5 transition-colors",
                 i === 0 && "rounded-bl-md border-l-0",
                 i === DERIVED_NAMES.length - 1 && "rounded-br-md",
                 unused && "opacity-45",
+                highlight === name && "bg-ink/[0.09] opacity-100",
               )}
             >
               <span className="text-ash font-mono text-xs">{exitOf(durations[name])}ms</span>

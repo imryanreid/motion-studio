@@ -44,11 +44,14 @@ function pathFor(easing: Easing, durationMs: number): string {
 export default function CurvePlot({
   easing,
   onChange,
+  thumb = false,
   className,
 }: {
   easing: Easing
   /** Omit to render read-only. */
   onChange?: (b: Bezier) => void
+  /** Shape only — no guides, no handles. For a collapsed row. */
+  thumb?: boolean
   className?: string
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -77,7 +80,9 @@ export default function CurvePlot({
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
-  const b = easing.kind === "bezier" ? easing.bezier : null
+  // A thumbnail carries the shape and nothing else: at 54px the guides and
+  // handles are noise, and the row it sits in is for comparing three shapes.
+  const b = easing.kind === "bezier" && !thumb ? easing.bezier : null
 
   return (
     <svg
@@ -90,18 +95,22 @@ export default function CurvePlot({
       role="img"
       aria-label="Easing curve"
     >
-      {/* The 0 and 1 lines. Anything outside them is overshoot. */}
-      <line x1={0} y1={toY(0)} x2={W} y2={toY(0)} className="stroke-line" strokeWidth={1} />
-      <line x1={0} y1={toY(1)} x2={W} y2={toY(1)} className="stroke-line" strokeWidth={1} />
-      <line
-        x1={0}
-        y1={toY(0)}
-        x2={W}
-        y2={toY(1)}
-        className="stroke-line"
-        strokeWidth={1}
-        strokeDasharray="3 4"
-      />
+      {!thumb && (
+        <>
+          {/* The 0 and 1 lines. Anything outside them is overshoot. */}
+          <line x1={0} y1={toY(0)} x2={W} y2={toY(0)} className="stroke-line" strokeWidth={1} />
+          <line x1={0} y1={toY(1)} x2={W} y2={toY(1)} className="stroke-line" strokeWidth={1} />
+          <line
+            x1={0}
+            y1={toY(0)}
+            x2={W}
+            y2={toY(1)}
+            className="stroke-line"
+            strokeWidth={1}
+            strokeDasharray="3 4"
+          />
+        </>
+      )}
 
       {b && (
         <>
@@ -124,7 +133,13 @@ export default function CurvePlot({
         </>
       )}
 
-      <path d={pathFor(easing, duration)} fill="none" className="stroke-ink" strokeWidth={2} />
+      <path
+        d={pathFor(easing, duration)}
+        fill="none"
+        className="stroke-ink"
+        strokeWidth={thumb ? 5 : 2}
+        strokeLinecap="round"
+      />
 
       {b && (
         <>
