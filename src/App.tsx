@@ -19,20 +19,13 @@ import ThemeToggle from "./shared/components/ThemeToggle"
 import ResetButton from "./shared/components/ResetButton"
 import ShareButton from "./shared/components/ShareButton"
 import ExportModal from "./shared/components/ExportModal"
-import { PanelTitle } from "./shared/components/Label"
 import { useTheme } from "./shared/theme"
-import EasingEditor from "./components/EasingEditor"
+import Easings from "./components/Easings"
 import Preview from "./components/Preview"
-import { DurationStrip, InlineNumber, SemanticTable } from "./components/Tokens"
+import { SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import {
-  DEFAULT_STATE,
-  staggerDelay,
-  type DurationName,
-  type Emphasis,
-  type MotionState,
-} from "./lib/tokens"
+import { DEFAULT_STATE, staggerDelay, type MotionState } from "./lib/tokens"
 import { LIST_ITEMS } from "./lib/preview"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
@@ -40,55 +33,7 @@ import { SITE_URL } from "./lib/site"
 /** Which entry in the shared tools manifest is this repo. */
 const TOOL_ID = "motion"
 
-/**
- * One of the three multipliers, sitting in the panel header.
- *
- * Ratio, exit and round-to are the same kind of thing — rules that turn one
- * duration into another — so they get one row and one treatment. They were
- * scattered: two in the header and one heading a row of exit values, which
- * grouped that one by what it produced rather than by what it is.
- *
- * None of them is a value in the scale, which is why none of them sits in it.
- */
-function Rule({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  width,
-  suffix,
-  title,
-}: {
-  label: string
-  value: number
-  onChange: (n: number) => void
-  min: number
-  max: number
-  width: string
-  suffix?: string
-  title: string
-}) {
-  return (
-    <span className="flex items-baseline gap-1.5" title={title}>
-      <span className="text-ash font-mono text-[10px] tracking-[0.16em] uppercase">
-        {label}
-      </span>
-      <InlineNumber
-        ariaLabel={label}
-        value={value}
-        min={min}
-        max={max}
-        width={width}
-        suffix={suffix}
-        className="text-ink font-mono text-xs"
-        onChange={onChange}
-      />
-    </span>
-  )
-}
-
-/** A labelled slider, for the rules that shape every token. */
+/** A labelled slider. Stagger is the only thing left that isn't per-motion. */
 function Slider({
   label,
   value,
@@ -136,13 +81,9 @@ export default function App() {
     resolveState(typeof window === "undefined" ? "" : window.location.search),
   )
   const [exportOpen, setExportOpen] = useState(false)
-  // Which curve is open in the editor. Also marks the preview scenarios it
-  // affects.
-  const [emphasis, setEmphasis] = useState<Emphasis>("standard")
-  // The step of the scale the emphasis panel is currently pointing at, so the
-  // scale can light it up. Two panels, one relationship, drawn rather than
-  // described.
-  const [linked, setLinked] = useState<DurationName | null>(null)
+  // Which row is expanded in the Easings list. Also marks the preview
+  // scenarios it affects. "" means every row is collapsed.
+  const [selectedId, setSelectedId] = useState(() => DEFAULT_STATE.primaryId)
 
   // What reset threw away, kept just long enough to offer it back.
   const undoSnapshot = useRef<MotionState | null>(null)
@@ -195,113 +136,63 @@ export default function App() {
         Left is the system. Right is one component in it.
 
         Not "edit vs watch" — that split couldn't survive letting you assign a
-        purpose to an emphasis, which is simultaneously a token decision and a
+        purpose to a motion, which is simultaneously a token decision and a
         what-am-I-looking-at decision. Framed this way both sides can edit and
-        the division still means something: the left holds the rules and the
-        three levels every token is built from, the right holds one component,
-        what it reaches for, and what that looks like.
+        the division still means something: the left holds the set and the one
+        rule that applies across it, the right holds one component, what it
+        reaches for, and what that looks like.
 
-        It also isn't "edit vs output" — that framing left the duration scale
-        homeless, since it is generated but belongs beside what generates it.
+        There used to be a Timing panel above this one, holding a five-step
+        duration scale that the three emphasis levels then mapped onto. Two
+        scales, two names for the same idea, and a mapping to reconcile them.
+        It's gone: a motion owns its own duration.
       */}
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
-          <section className="border-line overflow-hidden rounded-lg border">
-            <div className="border-line flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2.5">
-              <PanelTitle>Timing</PanelTitle>
-              {/*
-                Three multipliers, one row, one treatment — because they are
-                one kind of thing. Ratio generates sideways (step to step) and
-                exit generates downward (entrance to exit); round-to quantises
-                both. Exit used to sit apart from these, heading a row of exit
-                values, which grouped it by what it produced rather than by
-                what it is.
-              */}
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <Rule
-                  label="Ratio"
-                  value={state.ratio}
-                  min={1.05}
-                  max={3}
-                  width="w-8"
-                  title="How far apart the steps are. Each one is the base multiplied or divided by this. A step you've typed a value into ignores it."
-                  onChange={(ratio) => setState({ ...state, ratio })}
-                />
-                <Rule
-                  label="Exit"
-                  value={Math.round(state.exitRatio * 100)}
-                  min={20}
-                  max={130}
-                  width="w-6"
-                  suffix="%"
-                  title="Every exit is this share of its entrance — the 'out' figure on each step. Exits should be quicker; lingering on something you've finished with reads as lag. A spring ignores it: a spring settles when it settles."
-                  onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
-                />
-                <Rule
-                  label="Round to"
-                  value={state.snap}
-                  min={1}
-                  max={100}
-                  width="w-6"
-                  suffix="ms"
-                  title="Generated values land on this grid. 200 ÷ 1.4 is 142.86ms; nobody wants that in a stylesheet, and 10ms is far below what anyone can perceive at these lengths — so the numbers stay legible for free."
-                  onChange={(snap) => setState({ ...state, snap })}
-                />
-              </div>
-            </div>
-
-            <div className="p-4">
-              <DurationStrip state={state} onChange={setState} highlight={linked} />
-            </div>
-
-            {/*
-              The number you set is not the number you care about. 40ms says
-              nothing; "the fifth row starts at 130ms" is the thing you're
-              deciding, and the sequence shows the sub-linear falloff without
-              needing a second control for it.
-            */}
-            <div className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 border-t p-4">
-              <Slider
-                label="Stagger"
-                value={state.staggerMs}
-                min={0}
-                max={160}
-                step={5}
-                suffix="ms"
-                title={`Per-child offset for anything that enters as a group. Exported as --stagger, and zeroed under prefers-reduced-motion. It falls off sub-linearly (index^${state.staggerDecay}) so a long list doesn't take proportionally longer.`}
-                onChange={(staggerMs) => setState({ ...state, staggerMs })}
-              />
-              <span
-                className="text-ash font-mono text-[11px]"
-                title={`Where each of the ${LIST_ITEMS} rows starts, relative to the first.`}
-              >
-                {Array.from({ length: LIST_ITEMS - 1 }, (_, i) => staggerDelay(state, i + 1)).join(
-                  " · ",
-                )}
-                ms
-              </span>
-            </div>
-          </section>
-
-          <EasingEditor
+          <Easings
             state={state}
-            selected={emphasis}
-            onSelect={setEmphasis}
-            onChange={(e, easing) =>
-              setState({ ...state, easings: { ...state.easings, [e]: easing } })
-            }
-            onPairChange={(e, d) =>
-              setState({ ...state, durationFor: { ...state.durationFor, [e]: d } })
-            }
-            onLink={setLinked}
+            onChange={setState}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
           />
+
+          {/*
+            The last thing that isn't per-motion. The number you set is not the
+            number you care about — 40ms says nothing; "the fifth row starts at
+            130ms" is the decision, and the sequence shows the sub-linear
+            falloff without needing a second control for it.
+          */}
+          <section className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border p-4">
+            <Slider
+              label="Stagger"
+              value={state.staggerMs}
+              min={0}
+              max={160}
+              step={5}
+              suffix="ms"
+              title={`Per-child offset for anything that enters as a group. Exported as --stagger, and zeroed under prefers-reduced-motion. It falls off sub-linearly (index^${state.staggerDecay}) so a long list doesn't take proportionally longer.`}
+              onChange={(staggerMs) => setState({ ...state, staggerMs })}
+            />
+            <span
+              className="text-ash font-mono text-[11px]"
+              title={`Where each of the ${LIST_ITEMS} rows starts, relative to the first.`}
+            >
+              {Array.from({ length: LIST_ITEMS - 1 }, (_, i) => staggerDelay(state, i + 1)).join(
+                " · ",
+              )}
+              ms
+            </span>
+          </section>
         </div>
 
         <Preview
           state={state}
-          editing={emphasis}
-          onAssign={(purpose, e) =>
-            setState({ ...state, purposeEmphasis: { ...state.purposeEmphasis, [purpose]: e } })
+          editingId={selectedId}
+          onAssign={(purpose, entryId) =>
+            setState({
+              ...state,
+              purposeEntry: { ...state.purposeEntry, [purpose]: entryId },
+            })
           }
         />
       </div>

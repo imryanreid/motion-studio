@@ -10,25 +10,28 @@
 //
 // Every field is validated independently, so a
 // malformed link degrades to defaults rather than
-// erroring. "." is the list separator because
-// URLSearchParams percent-encodes a comma and leaves
-// a dot alone, which keeps shared links legible.
+// erroring. "." separates numbers and "*" separates
+// the fields of an entry. Those two and "-" and "_"
+// are the only punctuation URLSearchParams leaves
+// alone — "~" looks safe and is not, it comes out as
+// %7E — and neither can appear in a name, because
+// `sanitizeName` won't allow it.
 //
 // Deliberately free of browser and Vite globals so
 // the Vercel Functions can import it.
 // ==============================================
 import {
   DEFAULT_STATE,
-  DURATION_NAMES,
-  EMPHASIS_NAMES,
+  ENTRY_LIMIT,
   PURPOSE_IDS,
-  type DurationName,
+  sanitizeName,
   type Easing,
-  type Emphasis,
+  type MotionEntry,
   type MotionState,
+  type PurposeId,
 } from "./tokens.js"
 
-/** Bezier control points travel as integers ×100 to keep the URL short. */
+/** Bezier control points and mass travel as integers ×100 to keep URLs short. */
 const B = 100
 
 // The kind label is not a number. Rounding the whole array — including "b" —
@@ -47,7 +50,7 @@ function encodeEasing(e: Easing): string {
   return nums("s", [stiffness, damping, mass * B, velocity * B])
 }
 
-function decodeEasing(raw: string | null): Easing | undefined {
+function decodeEasing(raw: string | undefined): Easing | undefined {
   if (!raw) return undefined
   const parts = raw.split(".")
   if (parts.length !== 5) return undefined
@@ -71,34 +74,44 @@ function decodeEasing(raw: string | null): Easing | undefined {
   return undefined
 }
 
-const EASING_PARAM: Record<Emphasis, string> = {
-  subtle: "es",
-  standard: "ed",
-  emphasized: "em",
+/** `id*name*easing[*duration*exit%]`. Springs carry neither of the last two. */
+function encodeEntry(e: MotionEntry): string {
+  const head = [e.id, e.name, encodeEasing(e.easing)]
+  if (e.easing.kind === "spring") return head.join("*")
+  return [
+    ...head,
+    String(Math.round(e.durationMs)),
+    String(Math.round(e.exitRatio * 100)),
+  ].join("*")
 }
 
-function encodePins(pins: MotionState["pins"]): string {
-  return DURATION_NAMES.filter((n) => pins[n] !== undefined)
-    .map((n) => `${n}:${Math.round(pins[n]!)}`)
-    .join(".")
-}
+const ID_OK = /^[A-Za-z0-9_-]{1,12}$/
 
-function decodePins(raw: string | null): MotionState["pins"] | undefined {
-  if (raw === "-") return {}
-  if (!raw) return undefined
-  const out: MotionState["pins"] = {}
-  for (const chunk of raw.split(".")) {
-    const [name, value] = chunk.split(":")
-    const ms = Number(value)
-    if (!DURATION_NAMES.includes(name as DurationName)) continue
-    // `base` is the anchor, authored directly as `d`. A pin on it would let the
-    // cell labelled "base" hold a value the rest of the scale isn't derived
-    // from, so a hand-edited link can't create one.
-    if (name === "base") continue
-    if (!Number.isFinite(ms) || ms <= 0 || ms > 60000) continue
-    out[name as DurationName] = Math.round(ms)
+function decodeEntry(raw: string): MotionEntry | undefined {
+  const parts = raw.split("*")
+  if (parts.length < 3) return undefined
+  const [id, rawName, rawEasing, rawDur, rawExit] = parts
+  if (!ID_OK.test(id)) return undefined
+
+  const easing = decodeEasing(rawEasing)
+  if (!easing) return undefined
+
+  const name = sanitizeName(rawName)
+  if (!name) return undefined
+
+  if (easing.kind === "spring") {
+    // A spring has no duration and no exit share, so nothing is read for one
+    // even if a hand-edited link supplies them. The values kept here are the
+    // defaults it would fall back to if the type were switched.
+    return { id, name, easing, durationMs: DEFAULT_STATE.entries[1].durationMs, exitRatio: 0.7 }
   }
-  return Object.keys(out).length ? out : undefined
+
+  const durationMs = Number(rawDur)
+  const exitPct = Number(rawExit)
+  if (!Number.isFinite(durationMs) || durationMs < 1 || durationMs > 60000) return undefined
+  if (!Number.isFinite(exitPct) || exitPct < 10 || exitPct > 200) return undefined
+
+  return { id, name, easing, durationMs: Math.round(durationMs), exitRatio: exitPct / 100 }
 }
 
 const num = (raw: string | null, min: number, max: number): number | undefined => {
@@ -107,54 +120,12 @@ const num = (raw: string | null, min: number, max: number): number | undefined =
   return Number.isFinite(v) && v >= min && v <= max ? v : undefined
 }
 
-// The two mapping tables travel as indices rather than names: five duration
-// names and three emphasis names would make a long, brittle string, and the
-// orders are already a public contract via the token names themselves.
-function encodeDurationFor(m: MotionState["durationFor"]): string {
-  return EMPHASIS_NAMES.map((e) => DURATION_NAMES.indexOf(m[e])).join(".")
-}
-
-function decodeDurationFor(raw: string | null): MotionState["durationFor"] | undefined {
-  if (!raw) return undefined
-  const parts = raw.split(".").map(Number)
-  if (parts.length !== EMPHASIS_NAMES.length) return undefined
-  if (parts.some((i) => !Number.isInteger(i) || i < 0 || i >= DURATION_NAMES.length)) {
-    return undefined
-  }
-  return Object.fromEntries(
-    EMPHASIS_NAMES.map((e, i) => [e, DURATION_NAMES[parts[i]]]),
-  ) as MotionState["durationFor"]
-}
-
-function encodePurposeEmphasis(m: MotionState["purposeEmphasis"]): string {
-  return PURPOSE_IDS.map((p) => EMPHASIS_NAMES.indexOf(m[p])).join(".")
-}
-
-function decodePurposeEmphasis(raw: string | null): MotionState["purposeEmphasis"] | undefined {
-  if (!raw) return undefined
-  const parts = raw.split(".").map(Number)
-  if (parts.length !== PURPOSE_IDS.length) return undefined
-  if (parts.some((i) => !Number.isInteger(i) || i < 0 || i >= EMPHASIS_NAMES.length)) {
-    return undefined
-  }
-  return Object.fromEntries(
-    PURPOSE_IDS.map((p, i) => [p, EMPHASIS_NAMES[parts[i]]]),
-  ) as MotionState["purposeEmphasis"]
-}
-
 /** Serialize to a compact query string, with no leading "?". */
 export function encodeState(s: MotionState): string {
   const p = new URLSearchParams()
-  p.set("d", [Math.round(s.base), Math.round(s.ratio * B), Math.round(s.snap)].join("."))
-  // "-" says explicitly no pins. Without it, clearing every pin would decode
-  // as "unspecified" and silently restore the default pin on `instant`.
-  p.set("dp", encodePins(s.pins) || "-")
-  for (const e of EMPHASIS_NAMES) p.set(EASING_PARAM[e], encodeEasing(s.easings[e]))
-  const df = encodeDurationFor(s.durationFor)
-  if (df !== encodeDurationFor(DEFAULT_STATE.durationFor)) p.set("pd", df)
-  const pe = encodePurposeEmphasis(s.purposeEmphasis)
-  if (pe !== encodePurposeEmphasis(DEFAULT_STATE.purposeEmphasis)) p.set("pe", pe)
-  if (s.exitRatio !== DEFAULT_STATE.exitRatio) p.set("r", String(Math.round(s.exitRatio * B)))
+  for (const e of s.entries) p.append("e", encodeEntry(e))
+  p.set("p", s.primaryId)
+  p.set("pu", PURPOSE_IDS.map((id) => s.purposeEntry[id]).join("."))
   if (
     s.staggerMs !== DEFAULT_STATE.staggerMs ||
     s.staggerDecay !== DEFAULT_STATE.staggerDecay
@@ -172,38 +143,35 @@ export function decodeState(search: string): Partial<MotionState> {
   const p = new URLSearchParams(search)
   const out: Partial<MotionState> = {}
 
-  const d = p.get("d")?.split(".")
-  if (d?.length === 3) {
-    const base = num(d[0], 1, 60000)
-    const ratio = num(d[1], 101, 400)
-    const snap = num(d[2], 0, 1000)
-    if (base !== undefined) out.base = Math.round(base)
-    if (ratio !== undefined) out.ratio = ratio / B
-    if (snap !== undefined) out.snap = Math.round(snap)
+  // Entries first: everything else refers to them, so a link whose entries
+  // don't survive validation can't have a coherent primary or purpose map.
+  const entries: MotionEntry[] = []
+  const seenIds = new Set<string>()
+  for (const raw of p.getAll("e")) {
+    if (entries.length >= ENTRY_LIMIT) break
+    const e = decodeEntry(raw)
+    if (!e || seenIds.has(e.id)) continue
+    seenIds.add(e.id)
+    entries.push(e)
   }
+  if (!entries.length) return out
+  out.entries = entries
 
-  const pins = decodePins(p.get("dp"))
-  if (pins) out.pins = pins
+  const primary = p.get("p")
+  out.primaryId = primary && seenIds.has(primary) ? primary : entries[0].id
 
-  const easings = {} as Record<Emphasis, Easing>
-  let anyEasing = false
-  for (const e of EMPHASIS_NAMES) {
-    const decoded = decodeEasing(p.get(EASING_PARAM[e]))
-    if (decoded) {
-      easings[e] = decoded
-      anyEasing = true
-    }
+  const pu = p.get("pu")?.split(".")
+  if (pu?.length === PURPOSE_IDS.length) {
+    out.purposeEntry = Object.fromEntries(
+      PURPOSE_IDS.map((id, i) => [id, seenIds.has(pu[i]) ? pu[i] : out.primaryId!]),
+    ) as Record<PurposeId, string>
+  } else {
+    // Entries decoded but the map didn't: point everything at the primary
+    // rather than at ids from a set that is no longer there.
+    out.purposeEntry = Object.fromEntries(
+      PURPOSE_IDS.map((id) => [id, out.primaryId!]),
+    ) as Record<PurposeId, string>
   }
-  // Fill the gaps from defaults so a link carrying one easing still works.
-  if (anyEasing) out.easings = { ...DEFAULT_STATE.easings, ...easings }
-
-  const df = decodeDurationFor(p.get("pd"))
-  if (df) out.durationFor = df
-  const pe = decodePurposeEmphasis(p.get("pe"))
-  if (pe) out.purposeEmphasis = pe
-
-  const r = num(p.get("r"), 10, 200)
-  if (r !== undefined) out.exitRatio = r / B
 
   const sg = p.get("sg")?.split(".")
   if (sg?.length === 2) {
@@ -225,10 +193,8 @@ export function resolveState(search: string): MotionState {
   return {
     ...DEFAULT_STATE,
     ...decoded,
-    pins: decoded.pins ?? DEFAULT_STATE.pins,
-    easings: decoded.easings ?? DEFAULT_STATE.easings,
-    durationFor: decoded.durationFor ?? DEFAULT_STATE.durationFor,
-    purposeEmphasis: decoded.purposeEmphasis ?? DEFAULT_STATE.purposeEmphasis,
+    entries: decoded.entries ?? DEFAULT_STATE.entries,
+    purposeEntry: decoded.purposeEntry ?? DEFAULT_STATE.purposeEntry,
   }
 }
 

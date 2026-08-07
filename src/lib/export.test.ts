@@ -5,7 +5,14 @@
 // what it lost.
 // ==============================================
 import { describe, it, expect } from "vitest"
-import { DEFAULT_STATE, resolveDurations, resolveSemantics, purposes } from "./tokens.js"
+import {
+  DEFAULT_STATE,
+  PURPOSE_IDS,
+  entryForPurpose,
+  resolveSemantics,
+  slugs,
+  type MotionState,
+} from "./tokens.js"
 import {
   toCss,
   toTailwind,
@@ -18,30 +25,54 @@ import {
   tailwindFidelity,
 } from "./export.js"
 
-const ALL_BEZIER = {
+/**
+ * The shipped set is all beziers now, so a spring has to be asked for.
+ *
+ * That's the right way round: the honesty machinery should be exercised by a
+ * fixture that deliberately contains the hard case, not by whatever happened
+ * to be in the defaults. The previous version of this file tested a "no
+ * springs" path by removing one from the defaults, which meant the default
+ * fixture silently carried the interesting case.
+ */
+const WITH_SPRING: MotionState = {
   ...DEFAULT_STATE,
-  easings: {
-    ...DEFAULT_STATE.easings,
-    emphasized: { kind: "bezier" as const, bezier: { x1: 0.2, y1: 0, x2: 0, y2: 1 } },
-  },
+  entries: DEFAULT_STATE.entries.map((e) =>
+    e.id === "emp"
+      ? {
+          ...e,
+          easing: {
+            kind: "spring" as const,
+            spring: { stiffness: 210, damping: 20, mass: 1, velocity: 0 },
+          },
+        }
+      : e,
+  ),
 }
 
-describe("CSS", () => {
-  const css = toCss(DEFAULT_STATE)
+const alias = (s: MotionState, p: (typeof PURPOSE_IDS)[number]) =>
+  slugs(s.entries)[entryForPurpose(s, p).id]
 
-  it("emits every duration, easing, semantic and purpose", () => {
-    for (const n of Object.keys(resolveDurations(DEFAULT_STATE))) {
-      expect(css).toContain(`--duration-${n}:`)
-    }
-    for (const t of resolveSemantics(DEFAULT_STATE)) {
+describe("CSS", () => {
+  const css = toCss(WITH_SPRING)
+
+  it("emits every duration, easing, motion and purpose", () => {
+    for (const t of resolveSemantics(WITH_SPRING)) {
       expect(css).toContain(`--motion-${t.id.replace(".", "-")}:`)
+      expect(css).toContain(`--ease-${t.id.replace(".", "-")}:`)
     }
-    for (const p of purposes(DEFAULT_STATE)) expect(css).toContain(`--motion-${p.id}-enter:`)
+    for (const p of PURPOSE_IDS) expect(css).toContain(`--motion-${p}-enter:`)
+  })
+
+  it("gives an exit its own duration token", () => {
+    // Exits used to be mapped back onto the nearest step of a shared scale,
+    // which was a lie whenever the nearest one wasn't the right one.
+    expect(css).toContain("--duration-standard:")
+    expect(css).toContain("--duration-standard-exit:")
   })
 
   it("aliases purposes rather than copying values", () => {
-    for (const p of purposes(DEFAULT_STATE)) {
-      expect(css).toContain(`--motion-${p.id}-enter: var(--motion-${p.aliasOf}-enter);`)
+    for (const p of PURPOSE_IDS) {
+      expect(css).toContain(`--motion-${p}-enter: var(--motion-${alias(WITH_SPRING, p)}-enter);`)
     }
   })
 
@@ -49,18 +80,28 @@ describe("CSS", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)")
     // Spring shorthands bake in their duration, so overriding only the duration
     // variables would leave them animating.
-    for (const t of resolveSemantics(DEFAULT_STATE)) {
+    for (const t of resolveSemantics(WITH_SPRING)) {
       expect(css).toContain(`--motion-${t.id.replace(".", "-")}: 1ms linear;`)
     }
   })
 
   it("renders springs as linear() and beziers as cubic-bezier()", () => {
-    expect(css).toMatch(/--ease-emphasized: linear\(/)
-    expect(css).toMatch(/--ease-standard: cubic-bezier\(/)
+    expect(css).toMatch(/--ease-emphasized-enter: linear\(/)
+    expect(css).toMatch(/--ease-standard-enter: cubic-bezier\(/)
   })
 
   it("balances its parentheses", () => {
     expect((css.match(/\(/g) ?? []).length).toBe((css.match(/\)/g) ?? []).length)
+  })
+
+  it("uses the name you gave a motion", () => {
+    const renamed: MotionState = {
+      ...DEFAULT_STATE,
+      entries: DEFAULT_STATE.entries.map((e) =>
+        e.id === "std" ? { ...e, name: "Snappy Thing" } : e,
+      ),
+    }
+    expect(toCss(renamed)).toContain("--motion-snappy-thing-enter:")
   })
 })
 
@@ -68,13 +109,13 @@ describe("Tailwind", () => {
   it("emits a theme block with the ease namespace", () => {
     const tw = toTailwind(DEFAULT_STATE)
     expect(tw.startsWith("@theme {")).toBe(true)
-    expect(tw).toContain("--ease-standard:")
-    expect(tw).toContain("--duration-base:")
+    expect(tw).toContain("--ease-standard-enter:")
+    expect(tw).toContain("--duration-standard:")
   })
 })
 
 describe("Framer Motion", () => {
-  const js = toFramer(DEFAULT_STATE)
+  const js = toFramer(WITH_SPRING)
 
   it("uses seconds, not milliseconds", () => {
     // The silent 1000x error. 140ms must appear as 0.140.
@@ -88,8 +129,21 @@ describe("Framer Motion", () => {
   })
 
   it("points purposes at the same objects", () => {
-    for (const p of purposes(DEFAULT_STATE))
-      expect(js).toContain(`${p.id}: motion.${p.aliasOf},`)
+    for (const p of PURPOSE_IDS) expect(js).toContain(`${p}: motion.${alias(WITH_SPRING, p)},`)
+  })
+
+  it("quotes a slug that isn't a valid identifier", () => {
+    const renamed: MotionState = {
+      ...DEFAULT_STATE,
+      entries: DEFAULT_STATE.entries.map((e) =>
+        e.id === "std" ? { ...e, name: "Snappy Thing" } : e,
+      ),
+    }
+    const out = toFramer(renamed)
+    // "snappy-thing" would be a subtraction as a bare key or a dotted access.
+    expect(out).toContain('"snappy-thing": {')
+    expect(out).toContain('motion["snappy-thing"]')
+    expect(out).not.toContain("motion.snappy-thing")
   })
 
   it("says how reduced motion is handled in this runtime", () => {
@@ -98,23 +152,24 @@ describe("Framer Motion", () => {
 })
 
 describe("DTCG", () => {
-  const json = JSON.parse(toDtcg(DEFAULT_STATE))
+  const json = JSON.parse(toDtcg(WITH_SPRING))
 
   it("uses the types the spec actually defines", () => {
-    expect(json.duration.base.$type).toBe("duration")
-    expect(json.duration.base.$value).toEqual({ value: 200, unit: "ms" })
-    expect(json.easing.standard.$type).toBe("cubicBezier")
+    expect(json.duration.standard.$type).toBe("duration")
+    expect(json.duration.standard.$value).toEqual({ value: 200, unit: "ms" })
+    expect(json.easing["standard-enter"].$type).toBe("cubicBezier")
     expect(json.motion.standard.enter.$type).toBe("transition")
   })
 
   it("references rather than inlines", () => {
-    expect(json.motion.standard.enter.$value.timingFunction).toBe("{easing.standard}")
-    expect(json.motion.standard.enter.$value.duration).toMatch(/^\{duration\./)
+    expect(json.motion.standard.enter.$value.timingFunction).toBe("{easing.standard-enter}")
+    expect(json.motion.standard.enter.$value.duration).toBe("{duration.standard}")
+    expect(json.motion.standard.exit.$value.duration).toBe("{duration.standard-exit}")
     expect(json.purpose.drawer.enter.$value).toBe("{motion.emphasized.enter}")
   })
 
   it("carries a spring in an extension and says why", () => {
-    const spring = json.easing.emphasized
+    const spring = json.easing["emphasized-enter"]
     expect(spring.$extensions["studio.motion.spring"].stiffness).toBe(210)
     expect(spring.$extensions["studio.motion.linear"]).toMatch(/^linear\(/)
     expect(spring.$description).toMatch(/no spring type/)
@@ -123,40 +178,28 @@ describe("DTCG", () => {
 
 describe("fidelity is reported only when there is something to report", () => {
   it("CSS is silent when every easing is a bezier", () => {
-    expect(cssFidelity(ALL_BEZIER)).toBeUndefined()
-    expect(dtcgFidelity(ALL_BEZIER)).toBeUndefined()
+    expect(cssFidelity(DEFAULT_STATE)).toBeUndefined()
+    expect(dtcgFidelity(DEFAULT_STATE)).toBeUndefined()
   })
 
   it("CSS reports the measured cost when a spring is present", () => {
-    const f = cssFidelity(DEFAULT_STATE)
+    const f = cssFidelity(WITH_SPRING)
     expect(f).toBeDefined()
     expect(f!.summary).toMatch(/linear\(\) approximation · max error \d+ms/)
     expect(f!.detail).toMatch(/Framer Motion runs the real physics/)
   })
 
   it("Tailwind always mentions the duration namespace gap", () => {
-    expect(tailwindFidelity(ALL_BEZIER)!.detail).toMatch(/no equivalent namespace/)
+    expect(tailwindFidelity(DEFAULT_STATE)!.detail).toMatch(/no equivalent namespace/)
   })
 })
 
 describe("agent markdown", () => {
-  const md = toAgentMarkdown(DEFAULT_STATE, "https://example.test/?d=200.140.10")
+  const md = toAgentMarkdown(WITH_SPRING, "https://example.test/?e=std*standard*b.20.0.0.100*200*70")
 
-  it("carries the values", () => {
-    expect(md).toContain("`base` — 200ms")
-    for (const t of resolveSemantics(DEFAULT_STATE)) expect(md).toContain(`motion.${t.id}`)
-  })
-
-  it("flags an authored step, and only when there is one", () => {
-    // Nothing is authored by default, so the default markdown must not claim
-    // otherwise — this assertion used to pass on a pin that shipped in the
-    // defaults, which meant it never tested the branch it named.
-    expect(md).not.toContain("(pinned, not on the curve)")
-    const authored = toAgentMarkdown(
-      { ...DEFAULT_STATE, pins: { instant: 80 } },
-      "https://example.test/",
-    )
-    expect(authored).toContain("(pinned, not on the curve)")
+  it("carries every token", () => {
+    for (const t of resolveSemantics(WITH_SPRING)) expect(md).toContain(`motion.${t.id}`)
+    expect(md).toContain("3 motions")
   })
 
   it("states the rules as rules, not as values", () => {
@@ -181,9 +224,14 @@ describe("agent markdown", () => {
     expect(md).toMatch(/What the DTCG export costs/)
   })
 
+  it("says nothing about fidelity when nothing was lost", () => {
+    const clean = toAgentMarkdown(DEFAULT_STATE, "https://example.test/")
+    expect(clean).not.toMatch(/What the CSS export costs/)
+  })
+
   it("the prompt points at the URL rather than inlining everything", () => {
-    const p = agentPrompt("https://example.test/?d=1")
-    expect(p).toContain("https://example.test/?d=1")
+    const p = agentPrompt("https://example.test/?e=1")
+    expect(p).toContain("https://example.test/?e=1")
     expect(p.length).toBeLessThan(1200)
     expect(p).toMatch(/Exits must stay faster/)
   })

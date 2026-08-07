@@ -17,6 +17,51 @@ tokens with derived exits, seven preview scenarios, the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes, the
 machine-readable block, and URL state. 178 tests.
 
+## The model rewrite
+
+The five-step duration scale and the fixed three emphasis levels are **gone**.
+The model is now a list of motions you own — name, curve, duration, exit — with
+purposes pointing at them by id. `SPEC.md` §3 is the record; the short version:
+
+- **Live within an entry, one-time between entries.** Exits still derive from
+  their own entrance, always. Everything between motions (Generate, "make one
+  like this but slower") seeds a value once and lets go. No links, no anchor,
+  no multipliers to keep in sync.
+- **Duration, exit and the link idea are bezier-only.** A spring row doesn't
+  render them at all. That's what killed the "spring has no duration" wrinkle —
+  nothing forces a slot on it.
+- **Derivations are named transforms, not multipliers**, applied in each type's
+  own units. `faster` on a spring scales ω₀ and holds ζ, so it's the same
+  spring, quicker. A multiplier could never express that.
+- **The shipped default is what Generate produces** — three beziers at
+  140/200/280. It used to be a mixed set, which promised Generate would hand
+  you a spring.
+- Names are yours (24 chars, `A-Za-z0-9 _-`), slugified and deduplicated for
+  export. Up to 12 motions.
+
+**The URL contract changed completely** — `e` (repeated, one per motion), `p`,
+`pu`, plus the unchanged `sg` and `tol`. Old links no longer decode; they
+degrade to defaults rather than erroring. This was the cheap moment: placeholder
+domain, `noindex`, no links in the wild.
+
+Field separator is `*`, not `~`. URLSearchParams percent-encodes `~` despite it
+being unreserved in RFC 3986 — only `*`, `-`, `.` and `_` survive.
+
+### Found on the way: `motionSettlingTime` is blunt
+
+Motion's `calcGeneratorDuration` reports **600ms for both** `spring(210, 20)`
+and `spring(412, 28)`, even though the closed form puts them at 583ms and 419ms
+— a real 1.4× difference it walks straight past. It rounds to a 50ms grid and
+samples too coarsely to find the faster spring's rest window.
+
+Consequence: a spring's reported duration can be overstated by ~40%, which also
+means the CSS `linear()` runs that much longer than the Framer version of the
+same token — the exact cross-format drift this tool exists to catch. Switching
+the display and exports to our own `settlingTime` would fix it, at the cost of
+no longer reporting "what Framer Motion will compute". **Not changed — needs a
+decision.** The tests assert the physics and only require Motion's number never
+to move the wrong way.
+
 ## Layout, third pass
 
 Two structural fixes, both from the same diagnosis: the page was organised by

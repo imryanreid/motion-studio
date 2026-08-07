@@ -54,99 +54,152 @@ for the family-level reasoning and §9.5 for what we do instead.
 
 ## 3. The token model
 
-Two layers. Primitives hold values; semantics compose them; purposes are
-aliases, not copies.
+**A list of motions you own.** Each one holds a curve, a duration and the exit
+derived from it. Purposes point at motions by id. That is the whole model.
 
-### 3.1 Primitives
+It used to be two stacked scales — five generated durations, and three emphasis
+levels that mapped onto them. `fast` and `subtle` were two names for one idea,
+the mapping between them had to be held in your head, and two of the five steps
+shipped with nothing pointing at them. Every legibility problem this tool had
+was that seam, and six rounds of hierarchy, tabs, hover-highlights and tooltips
+were all attempts to draw a line between two things that shouldn't have been
+two things.
 
-```
-duration    instant · fast · base · slow · deliberate      5 values
-easing      subtle · standard · emphasized                 3 curves,
-                                                           each a bezier OR a spring
-```
+### 3.1 The one rule
 
-**Durations are generated, not hand-entered.** From a base and a ratio, rounded
-to a grid, with any step overridable — the same auto-until-you-touch-it idiom
-Ramps uses for its accents, and the same round-to-a-grid idea Shape uses for
-spacing.
+> **Live within an entry. One-time between entries.**
 
-```
-step(n) = round_to(snap,  base × ratio^n)      n ∈ {−2, −1, 0, 1, 2}
-```
+An exit is always derived from its own entrance, live, because that asymmetry is
+the lesson the tool exists to teach (§3.3). Everything *between* motions — the
+generated set, "make one like this but slower" — seeds a value once and then
+lets go. No links, no anchor, no multipliers to keep in sync.
 
-Defaults: `base 200ms`, `ratio 1.4`, `round to 10ms`.
+That is also what makes springs work. A multiplier on a spring is meaningless,
+because the only number a spring has is a settling threshold. A named transform
+is not: **slower** scales its frequency and holds the damping ratio, so it takes
+longer and feels identical.
 
-| Token        | Unrounded | Shipped | For                                         |
-| ------------ | --------- | ------- | ------------------------------------------- |
-| `instant`    | 102.04ms  | 100ms   | Feedback that must read as cause and effect |
-| `fast`       | 142.86ms  | 140ms   | Small state changes, hovers, checkboxes     |
-| `base`       | 200ms     | 200ms   | The default for anything unspecified        |
-| `slow`       | 280ms     | 280ms   | Surfaces entering, larger travel            |
-| `deliberate` | 392ms     | 390ms   | Motion that is meant to be noticed          |
+### 3.2 A motion
 
-**Nothing ships overridden.** `instant` used to ship pinned at 80ms, on the
-argument that feedback has to sit under roughly 100ms whatever the rest of the
-scale does and the generated value doesn't. That argument ignored rounding:
-102.04ms lands on exactly 100ms. The pin was buying 80-over-100, which is taste
-rather than correctness, and a tool whose whole claim is "this is a system"
-should not ship an exception to its own system on load.
+| Field        | Applies to     | Notes                                              |
+| ------------ | -------------- | -------------------------------------------------- |
+| `name`       | both           | Yours. Slugified for export, deduplicated.          |
+| `easing`     | both           | A cubic-bezier or a spring.                         |
+| `durationMs` | **bezier only** | A spring has none — it settles.                    |
+| `exitRatio`  | **bezier only** | Share of the entrance. A spring exit is critical.  |
 
-Any step can still be overridden, and the interaction is simply **typing a
-value into it** — no pin, no icon, no verb. An authored number is drawn in a
-box and a generated one isn't, which is the panel's entire legend: **a box
-around a number means that number was typed.** The box is on the number and
-never on the cell, because a box around a region claims everything inside it is
-editable and there is always a derived value in there. A small ↺ puts the step
-back on the curve. The ratio is the lesson; the override is the escape hatch.
+**Duration, exit and the type toggle are all bezier-only**, and a spring row
+simply doesn't render them — not greyed, not footnoted. Every control on screen
+applies to the thing it is on.
 
-### 3.2 Semantics — emphasis × direction
-
-Six tokens. Emphasis is _how much attention the change deserves_; direction is
-enter or exit.
+Each motion produces two tokens:
 
 ```
-motion.subtle.enter      motion.subtle.exit
-motion.standard.enter    motion.standard.exit
-motion.emphasized.enter  motion.emphasized.exit
+motion.<slug>.enter      motion.<slug>.exit
 ```
 
-Each resolves to `{ duration, easing, delay? }`.
+Plus one standalone: `motion.stagger` — a per-child offset with a decay factor
+(§7.3), the only value in the tool that isn't per-motion.
 
-Plus one standalone: `motion.stagger` — a per-child offset with an optional
-decay factor (§7.3).
+### 3.3 Generate
 
-### 3.3 Purposes are aliases
+One motion is flagged **primary**. Generate builds the three-level set from it:
 
-A thin naming layer over the six, because "which one do I grab for a drawer?"
-is the question people actually have:
+```
+subtle = faster(primary)   standard = primary   emphasized = slower(primary)
+```
 
-| Purpose    | Aliases      |
-| ---------- | ------------ |
-| `state`    | `subtle`     |
-| `dropdown` | `standard`   |
-| `tooltip`  | `standard`   |
-| `toast`    | `emphasized` |
-| `drawer`   | `emphasized` |
-| `modal`    | `emphasized` |
+Siblings **inherit the primary's type**, so generating from a bezier gives three
+beziers and from a spring gives three springs. They differ in **duration only,
+never in curve**, so that pressing Generate agrees with pressing Faster and
+Slower by hand — if the button secretly did more than the menu items, the two
+would disagree about what "faster" means.
+
+**The shipped default is what Generate produces**: three beziers at 140 / 200 /
+280ms. It used to be a mixed set with a spring, which was worse than merely
+irreproducible — it *promised* Generate would hand you a spring, and pressing it
+once would silently strip the set of its character. A default the tool cannot
+make with its own button is a default it should not ship.
+
+The primary is **not an anchor**. Nothing tracks it, nothing links to it, and it
+carries no multiplier — it is only the entry Generate reads from, which is why
+switching it costs nothing and deleting it is survivable.
+
+### 3.4 Derivations
+
+Named transforms, applied in the units each type is actually made of:
+
+|             | bezier                       | spring                                |
+| ----------- | ---------------------------- | ------------------------------------- |
+| **Faster**  | duration ÷ 1.4               | stiffness × 1.96, damping × 1.4       |
+| **Slower**  | duration × 1.4               | stiffness ÷ 1.96, damping ÷ 1.4       |
+| **Softer**  | blend toward a flatter curve | raise ζ — less bounce                 |
+| **Sharper** | blend toward a steeper curve | lower ζ — more bounce                 |
+| **Duplicate** | exact copy                 | exact copy                            |
+
+The spring column is the whole argument for named transforms. ω₀ = √(k/m), so
+scaling frequency by 1.4 means stiffness by 1.4² — and ζ = c / (2√(km)), so the
+damping has to move by 1.4 alongside it or the character changes. That comes out
+to *the same spring, quicker*, which a raw multiplier could never express.
+
+Generated durations land on a 10ms grid. Values you type are left alone.
+
+### 3.5 Exits are derived — the one live relationship
+
+An entrance introduces something and can afford character. An exit removes
+something the user has already finished with, and lingering on it reads as lag.
+So exits are pushed toward the linear end, automatically:
+
+- **bezier** → mirrored: `cubic-bezier(1-x2, 1-y2, 1-x1, 1-y1)`, at `exitRatio`
+  of the entrance duration. Ease-out `(0, 0, 0.58, 1)` mirrors to exactly ease-in
+  `(0.42, 0, 1, 1)`, which is the check that this is the right transform rather
+  than an approximation of one.
+- **spring** → critically damped, initial velocity zeroed. The bounce goes.
+
+This is the only relationship in the model that stays live, and it is the one
+opinion worth keeping when everything else became configurable.
+
+### 3.6 Purposes are aliases
+
+A thin naming layer over the motions, because "which one do I grab for a
+drawer?" is the question people actually have. Seven purposes — `state`,
+`dropdown`, `tooltip`, `list`, `drawer`, `modal`, `toast` — each pointing at a
+motion by id, and each **assigned on the purpose itself, in the preview band**.
+
+Component-first is the real mental model. Nobody thinks *"I have an emphasized
+spring, what should use it?"*; they think *"I'm building a drawer, what should it
+feel like?"* Assigning a purpose is simultaneously a token decision and a
+what-am-I-watching decision — they are one act, and splitting them across the
+page is what made the tie unreadable.
 
 **Aliases are references, never copies.** In every format that supports
 indirection they emit as references — `var(--motion-emphasized-enter)` in CSS,
 `{motion.emphasized.enter}` in DTCG. In formats that can't alias, they resolve
-to the same literal _and the export states which primitive it came from_.
+to the same literal *and the export states which motion it came from*.
 
 This is not fussiness. Ramps has the same hazard in its Figma export, where a
 token aliasing an excluded ramp would produce a dangling variable reference that
 Figma rejects on import. An alias that silently becomes a second copy of a value
 is the same bug wearing different clothes.
 
-The purpose list is editable and its entries are droppable, so someone who finds
-it noise can export the six primitives alone.
-
 **Why this layer stays**, having been challenged: it gives a person and their
-agent a _shared vocabulary_. "Use the drawer motion" is unambiguous to both, in
-a way "use emphasized enter at 280ms" is not — and agents lean on that naming
-heavily. The six primitives are the system; the purposes are how people talk
-about it. Both earn their place.
+agent a *shared vocabulary*. "Use the drawer motion" is unambiguous to both, in
+a way "use standard enter at 200ms" is not — and agents lean on that naming
+heavily.
+
+### 3.7 Names
+
+Names are yours, capped at 24 characters and limited to `A-Za-z0-9 _-`. That is
+not arbitrary strictness: a name becomes a CSS custom property and a field in a
+query string, and finding that out after typing is worse than being quietly
+prevented from typing it. Input is sanitized as you type.
+
+Slugs are deduplicated — two motions may share a display name, but two custom
+properties may not share a key, so the second gets a `-2`. The editor shows the
+slug under the name field, so nothing about this is a surprise.
+
+Up to 12 motions, minimum 1. The cap exists only to keep a shared link a sane
+length.
 
 ---
 

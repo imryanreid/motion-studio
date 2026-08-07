@@ -14,7 +14,24 @@ import {
 const tokens = resolveSemantics(DEFAULT_STATE)
 const enter = tokens.find((t) => t.id === "standard.enter")!
 const exit = tokens.find((t) => t.id === "standard.exit")!
-const spring = tokens.find((t) => t.id === "emphasized.enter")!
+
+// The shipped set is all beziers now, so a spring has to be asked for rather
+// than borrowed from the defaults — which is the right way round: a fixture
+// for the hard case should say that's what it is.
+const spring = resolveSemantics({
+  ...DEFAULT_STATE,
+  entries: DEFAULT_STATE.entries.map((e) =>
+    e.id === "emp"
+      ? {
+          ...e,
+          easing: {
+            kind: "spring" as const,
+            spring: { stiffness: 400, damping: 12, mass: 1, velocity: 0 },
+          },
+        }
+      : e,
+  ),
+}).find((t) => t.id === "emphasized.enter")!
 
 describe("childProgress", () => {
   it("runs 0 → 1 across an entrance", () => {

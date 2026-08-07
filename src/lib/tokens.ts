@@ -1,81 +1,94 @@
 // ==============================================
 // TOKEN MODEL
-// Primitives hold values, semantics compose them,
-// purposes alias the semantics. Everything on this
-// page is a pure function of the state in here.
+// A list of motion entries. Each one owns a curve, a
+// duration and the exit derived from it; purposes
+// point at entries by id. That is the whole model.
 //
-// Durations are generated from a base and a ratio
-// rather than hand-entered, with any step pinnable —
-// the same auto-until-you-pin idiom Ramps uses for
-// its accents.
+// It used to be two stacked scales — five generated
+// durations, and three emphasis levels that mapped
+// onto them — which meant two names for the same
+// idea ("fast" and "subtle") plus a mapping between
+// them, and two of the five steps shipping with
+// nothing pointing at them. Every legibility problem
+// this tool had was that seam.
 //
-// Exits are derived from entrances, faster and
-// flatter, because that is the rule the tool exists
-// to teach. Deriving it means you get it by default
-// and have to actively opt out.
+// The one rule that survives:
+//
+//   LIVE WITHIN AN ENTRY. ONE-TIME BETWEEN ENTRIES.
+//
+// An exit is always derived from its own entrance,
+// because that asymmetry is the lesson the tool
+// exists to teach. Everything between entries — the
+// generated set, "make one like this but slower" —
+// seeds a value once and then lets go. No links, no
+// anchor, no multipliers to keep in sync.
+//
+// That is also what makes springs work. A multiplier
+// on a spring is meaningless, because the only number
+// a spring has is a settling threshold. A named
+// transform is not: "slower" scales its frequency and
+// holds the damping ratio, so it takes longer and
+// feels identical.
 // ==============================================
 import { clampBezier, type Bezier } from "./bezier.js"
 import { motionSettlingTime, type SpringConfig } from "./spring.js"
 
-export const DURATION_NAMES = ["instant", "fast", "base", "slow", "deliberate"] as const
-export type DurationName = (typeof DURATION_NAMES)[number]
+/** Generated durations land on this grid. Values you type are left alone. */
+const ROUND_MS = 10
 
-/** Offsets from `base` on the ratio, in steps. */
-export const DURATION_STEPS: Record<DurationName, number> = {
-  instant: -2,
-  fast: -1,
-  base: 0,
-  slow: 1,
-  deliberate: 2,
-}
+/** One step of "faster" or "slower". */
+export const STEP = 1.4
 
-/** Every step except the anchor, in scale order. */
-export const DERIVED_NAMES = DURATION_NAMES.filter((n) => n !== "base")
+/** Enough for any real system; keeps a shared URL a sane length. */
+export const ENTRY_LIMIT = 12
 
-/**
- * How a step was reached, as arithmetic: "÷1.96", "×1.4".
- *
- * Shown on the step itself, which is the whole reason base sits apart from the
- * others rather than in the middle of them. A gap between an input and four
- * outputs only reads as cause and effect if the outputs say what was done to
- * them; otherwise it's just a gap.
- */
-export function derivationLabel(ratio: number, step: number): string {
-  if (step === 0) return ""
-  const factor = Math.pow(ratio, Math.abs(step))
-  // 1.40 → "1.4", 1.96 → "1.96". Trailing zeros read as false precision.
-  const text = factor.toFixed(2).replace(/0$/, "").replace(/\.$/, "")
-  return `${step < 0 ? "÷" : "×"}${text}`
-}
-
-export const EMPHASIS_NAMES = ["subtle", "standard", "emphasized"] as const
-export type Emphasis = (typeof EMPHASIS_NAMES)[number]
-
-/**
- * Which duration each emphasis level reaches for — a choice, not a constant.
- *
- * It was hardcoded, which made the tie between the easing panel and the
- * duration scale invisible: you could see both and never learn they were
- * connected. It also froze `instant` and `deliberate` out of the system
- * entirely, since nothing could point at them.
- */
-export const DEFAULT_DURATION_FOR: Record<Emphasis, DurationName> = {
-  subtle: "fast",
-  standard: "base",
-  emphasized: "slow",
-}
+/** Names become CSS custom properties, so the charset is deliberately small. */
+export const NAME_MAX = 24
+const NAME_ALLOWED = /[^A-Za-z0-9 _-]/g
 
 export type Direction = "enter" | "exit"
+
+export type Easing =
+  | { kind: "bezier"; bezier: Bezier }
+  | { kind: "spring"; spring: SpringConfig }
+
+export type EasingKind = Easing["kind"]
+
+export type MotionEntry = {
+  /** Stable across renames — purposes and the URL refer to this. */
+  id: string
+  name: string
+  easing: Easing
+  /** Entrance duration in ms. A spring ignores it: it settles when it settles. */
+  durationMs: number
+  /** Exit duration as a fraction of the entrance. A spring ignores it too. */
+  exitRatio: number
+}
+
+export type MotionState = {
+  /**
+   * Unordered — position carries no meaning and nothing derives from it. New
+   * entries append; there is no drag handle, because an ordered list would
+   * imply a scale and invite people to expect proportion between neighbours.
+   */
+  entries: MotionEntry[]
+  /** Which entry `generateSet` reads from. Not a link — nothing tracks it. */
+  primaryId: string
+  /** Which entry each purpose reaches for, by entry id. */
+  purposeEntry: Record<PurposeId, string>
+  staggerMs: number
+  /** Sub-linear falloff so a long list doesn't take proportionally long. */
+  staggerDecay: number
+  /** Target max deviation for the CSS linear() approximation. */
+  tolerance: number
+}
 
 /**
  * The purposes, which are also the preview scenarios.
  *
- * These were two separate vocabularies — generic scenario shapes on one side,
- * purpose aliases on the other, overlapping but not aligned — so neither taught
- * which motion to reach for. Merged, the preview answers "which do I use for a
- * drawer?" directly, because the thing you are watching is named `drawer`.
- *
- * `travels` marks where distance is meaningful. A checkbox filling has none.
+ * One vocabulary, so the thing you are watching is named the same thing you'd
+ * reach for at a call site. `travels` marks where distance is meaningful — a
+ * checkbox filling has none.
  */
 export const PURPOSE_IDS = [
   "state",
@@ -98,89 +111,246 @@ export const PURPOSE_TRAVELS: Record<PurposeId, boolean> = {
   toast: true,
 }
 
-export const DEFAULT_PURPOSE_EMPHASIS: Record<PurposeId, Emphasis> = {
-  state: "subtle",
-  dropdown: "standard",
-  tooltip: "standard",
-  list: "standard",
-  drawer: "emphasized",
-  modal: "emphasized",
-  toast: "emphasized",
+// ---------- names and slugs ----------
+
+/** Trim a typed name to what can survive a URL and a CSS property. */
+export function sanitizeName(raw: string): string {
+  return raw.replace(NAME_ALLOWED, "").slice(0, NAME_MAX)
 }
 
-export type Easing =
-  { kind: "bezier"; bezier: Bezier } | { kind: "spring"; spring: SpringConfig }
+const slugOf = (name: string) =>
+  name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "motion"
 
-export type MotionState = {
-  /** The middle of the duration scale, in ms. */
-  base: number
-  /** Multiplier between steps. */
-  ratio: number
-  /** Generated durations round to this, in ms. */
-  snap: number
-  /** Steps held at a fixed value instead of being derived. */
-  pins: Partial<Record<DurationName, number>>
-  easings: Record<Emphasis, Easing>
-  /** Which duration step each emphasis reaches for. */
-  durationFor: Record<Emphasis, DurationName>
-  /** Which emphasis each purpose uses. */
-  purposeEmphasis: Record<PurposeId, Emphasis>
-  /** Exit duration as a fraction of enter. */
-  exitRatio: number
-  staggerMs: number
-  /** Sub-linear falloff so a long list doesn't take proportionally long. */
-  staggerDecay: number
-  /** Target max deviation for the CSS linear() approximation. */
-  tolerance: number
+/**
+ * Export slug per entry, deduplicated.
+ *
+ * Two entries may share a display name — that's the user's business — but two
+ * CSS custom properties may not share a key, so the second one gets a suffix.
+ * The UI shows the slug under the name so nothing about this is a surprise.
+ */
+export function slugs(entries: MotionEntry[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  const seen = new Map<string, number>()
+  for (const e of entries) {
+    const base = slugOf(e.name)
+    const n = (seen.get(base) ?? 0) + 1
+    seen.set(base, n)
+    out[e.id] = n === 1 ? base : `${base}-${n}`
+  }
+  return out
+}
+
+/** An id no existing entry is using. */
+export function nextId(entries: MotionEntry[]): string {
+  let n = entries.length + 1
+  const taken = new Set(entries.map((e) => e.id))
+  while (taken.has(`e${n}`)) n++
+  return `e${n}`
+}
+
+// ---------- transforms ----------
+
+const round = (ms: number) => Math.max(1, Math.round(ms / ROUND_MS) * ROUND_MS)
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+/** Curves the bezier transforms pull toward, half the remaining distance each time. */
+const SOFT_TARGET: Bezier = { x1: 0.4, y1: 0, x2: 0.6, y2: 1 }
+const SHARP_TARGET: Bezier = { x1: 0.05, y1: 0.7, x2: 0.1, y2: 1 }
+
+const blend = (a: Bezier, b: Bezier, t: number): Bezier =>
+  clampBezier({
+    x1: Number((a.x1 + (b.x1 - a.x1) * t).toFixed(3)),
+    y1: Number((a.y1 + (b.y1 - a.y1) * t).toFixed(3)),
+    x2: Number((a.x2 + (b.x2 - a.x2) * t).toFixed(3)),
+    y2: Number((a.y2 + (b.y2 - a.y2) * t).toFixed(3)),
+  })
+
+/**
+ * Same character, shorter.
+ *
+ * For a bezier that is just the duration. For a spring it is the natural
+ * frequency: ω₀ = √(k/m), so scaling ω₀ by `STEP` means k by STEP² — and the
+ * damping has to move with it, because ζ = c / (2√(km)). Scale c by STEP and ζ
+ * comes out unchanged, which is what makes this "the same spring, quicker"
+ * rather than "a different spring".
+ */
+export function faster(e: MotionEntry): MotionEntry {
+  if (e.easing.kind === "spring") {
+    const s = e.easing.spring
+    return {
+      ...e,
+      easing: {
+        kind: "spring",
+        spring: {
+          ...s,
+          stiffness: clamp(Math.round(s.stiffness * STEP * STEP), 1, 2000),
+          damping: Number(clamp(s.damping * STEP, 0, 200).toFixed(2)),
+        },
+      },
+    }
+  }
+  return { ...e, durationMs: round(e.durationMs / STEP) }
+}
+
+/** Same character, longer. The inverse of `faster`, ζ likewise unchanged. */
+export function slower(e: MotionEntry): MotionEntry {
+  if (e.easing.kind === "spring") {
+    const s = e.easing.spring
+    return {
+      ...e,
+      easing: {
+        kind: "spring",
+        spring: {
+          ...s,
+          stiffness: clamp(Math.round(s.stiffness / (STEP * STEP)), 1, 2000),
+          damping: Number(clamp(s.damping / STEP, 0, 200).toFixed(2)),
+        },
+      },
+    }
+  }
+  return { ...e, durationMs: round(e.durationMs * STEP) }
+}
+
+/** Gentler: a flatter curve, or a spring with the bounce damped out of it. */
+export function softer(e: MotionEntry): MotionEntry {
+  if (e.easing.kind === "spring") {
+    const s = e.easing.spring
+    return {
+      ...e,
+      easing: {
+        kind: "spring",
+        spring: { ...s, damping: Number(clamp(s.damping * 1.25, 0, 200).toFixed(2)) },
+      },
+    }
+  }
+  return { ...e, easing: { kind: "bezier", bezier: blend(e.easing.bezier, SOFT_TARGET, 0.5) } }
+}
+
+/** More attack: a steeper curve, or a springier spring. */
+export function sharper(e: MotionEntry): MotionEntry {
+  if (e.easing.kind === "spring") {
+    const s = e.easing.spring
+    return {
+      ...e,
+      easing: {
+        kind: "spring",
+        spring: { ...s, damping: Number(clamp(s.damping / 1.25, 0, 200).toFixed(2)) },
+      },
+    }
+  }
+  return { ...e, easing: { kind: "bezier", bezier: blend(e.easing.bezier, SHARP_TARGET, 0.5) } }
+}
+
+export const TRANSFORMS = {
+  faster,
+  slower,
+  softer,
+  sharper,
+} as const
+export type TransformId = keyof typeof TRANSFORMS
+
+// ---------- the generated set ----------
+
+export const DEFAULT_BEZIER: Bezier = { x1: 0.2, y1: 0, x2: 0, y2: 1 }
+export const DEFAULT_SPRING: SpringConfig = {
+  stiffness: 210,
+  damping: 20,
+  mass: 1,
+  velocity: 0,
+}
+
+/**
+ * The three-level set, built from one motion.
+ *
+ * Siblings inherit the primary's type, so generating from a bezier gives three
+ * beziers and from a spring gives three springs. That predictability is the
+ * point — and it is why the shipped default is three beziers rather than the
+ * mixed set it used to be. A default the tool cannot reproduce with its own
+ * button is the tool showing you something it can't make, and it would quietly
+ * promise that Generate hands you a spring.
+ *
+ * Siblings differ in duration only, never in curve, so that pressing Generate
+ * agrees with pressing Faster and Slower by hand. Soften the slow one yourself
+ * if you want it — that's one click, and it stays yours.
+ */
+export function generateSet(primary: MotionEntry): MotionEntry[] {
+  const standard: MotionEntry = { ...primary, id: "std", name: "standard" }
+  return [
+    { ...faster(standard), id: "sub", name: "subtle" },
+    standard,
+    { ...slower(standard), id: "emp", name: "emphasized" },
+  ]
+}
+
+const SEED: MotionEntry = {
+  id: "std",
+  name: "standard",
+  easing: { kind: "bezier", bezier: DEFAULT_BEZIER },
+  durationMs: 200,
+  exitRatio: 0.7,
 }
 
 export const DEFAULT_STATE: MotionState = {
-  base: 200,
-  ratio: 1.4,
-  snap: 10,
-  // Nothing is authored by default. `instant` used to ship pinned at 80ms, on
-  // the grounds that feedback has to read as cause and effect — but the
-  // defence ignored rounding: 200 / 1.4² is 102.04ms, which snaps to exactly
-  // 100. The pin was buying 80-over-100, which is taste, not correctness, and
-  // a tool whose whole claim is "this is a system" should not ship an
-  // exception to its own system on load. Type one in if you want one.
-  pins: {},
-  easings: {
-    subtle: { kind: "bezier", bezier: { x1: 0.3, y1: 0, x2: 0.3, y2: 1 } },
-    standard: { kind: "bezier", bezier: { x1: 0.2, y1: 0, x2: 0, y2: 1 } },
-    emphasized: {
-      kind: "spring",
-      spring: { stiffness: 210, damping: 20, mass: 1, velocity: 0 },
-    },
+  entries: generateSet(SEED),
+  primaryId: "std",
+  purposeEntry: {
+    state: "sub",
+    dropdown: "std",
+    tooltip: "std",
+    list: "std",
+    drawer: "emp",
+    modal: "emp",
+    toast: "emp",
   },
-  durationFor: DEFAULT_DURATION_FOR,
-  purposeEmphasis: DEFAULT_PURPOSE_EMPHASIS,
-  exitRatio: 0.7,
   staggerMs: 40,
   staggerDecay: 0.85,
   tolerance: 0.01,
 }
 
-const roundTo = (value: number, snap: number) =>
-  snap <= 0 ? Math.round(value) : Math.round(value / snap) * snap
+// ---------- lookups ----------
 
-/** The five durations, generated then overridden by any pins. */
-export function resolveDurations(s: MotionState): Record<DurationName, number> {
-  const out = {} as Record<DurationName, number>
-  for (const name of DURATION_NAMES) {
-    const pinned = s.pins[name]
-    out[name] =
-      pinned !== undefined
-        ? pinned
-        : Math.max(1, roundTo(s.base * Math.pow(s.ratio, DURATION_STEPS[name]), s.snap))
-  }
-  return out
+export function entryById(s: MotionState, id: string): MotionEntry | undefined {
+  return s.entries.find((e) => e.id === id)
 }
 
-/** True when a step is showing its generated value rather than a pinned one. */
-export function isDerived(s: MotionState, name: DurationName): boolean {
-  return s.pins[name] === undefined
+/** The primary, or the first entry if the flagged one has gone. */
+export function primaryOf(s: MotionState): MotionEntry {
+  return entryById(s, s.primaryId) ?? s.entries[0]
 }
+
+/** The entry a purpose reaches for, falling back to the primary. */
+export function entryForPurpose(s: MotionState, p: PurposeId): MotionEntry {
+  return entryById(s, s.purposeEntry[p]) ?? primaryOf(s)
+}
+
+/** Which purposes reach for an entry — the "used for" column. */
+export function purposesUsing(s: MotionState, entryId: string): PurposeId[] {
+  return PURPOSE_IDS.filter((p) => entryForPurpose(s, p).id === entryId)
+}
+
+/**
+ * What a bezier entry's exit lasts. A spring's is its settling time, which is
+ * a property of the physics rather than a number anyone chose.
+ */
+export function enterMs(e: MotionEntry): number {
+  return e.easing.kind === "spring"
+    ? motionSettlingTime(e.easing.spring)
+    : Math.max(1, Math.round(e.durationMs))
+}
+
+export function exitMs(e: MotionEntry): number {
+  if (e.easing.kind === "bezier") return Math.max(1, Math.round(e.durationMs * e.exitRatio))
+  const exit = deriveExit(e.easing)
+  // Always a spring — deriveExit preserves the kind — but narrow it rather
+  // than asserting, so a future third kind can't slip through silently.
+  return exit.kind === "spring" ? motionSettlingTime(exit.spring) : enterMs(e)
+}
+
+// ---------- derivation, the one live relationship ----------
 
 /**
  * The mirror of a timing function: `cubic-bezier(1-x2, 1-y2, 1-x1, 1-y1)`.
@@ -214,14 +384,15 @@ export function criticalDamping(s: SpringConfig): number {
 }
 
 /**
- * The exit easing for a given entrance.
+ * The exit easing for a given entrance — the only relationship in the model
+ * that stays live, because it is the rule the tool exists to teach.
  *
  * An entrance introduces something and can afford character. An exit removes
  * something the user has already finished with, and lingering on it reads as
  * lag — so exits are pushed toward the linear end: beziers mirror, and springs
  * lose their bounce by going critical.
  */
-export function deriveExitEasing(enter: Easing): Easing {
+export function deriveExit(enter: Easing): Easing {
   if (enter.kind === "bezier") return { kind: "bezier", bezier: mirrorBezier(enter.bezier) }
   const critical = criticalDamping(enter.spring)
   return {
@@ -235,9 +406,11 @@ export function deriveExitEasing(enter: Easing): Easing {
 }
 
 export type SemanticToken = {
-  /** e.g. "standard.enter" */
+  /** e.g. "standard.enter", built from the export slug. */
   id: string
-  emphasis: Emphasis
+  entryId: string
+  name: string
+  slug: string
   direction: Direction
   /**
    * For a bezier this is the transition duration. For a spring it is the
@@ -249,65 +422,45 @@ export type SemanticToken = {
   easing: Easing
 }
 
+/** Two tokens per entry. What you see on the page is what exports. */
 export function resolveSemantics(s: MotionState): SemanticToken[] {
-  const durations = resolveDurations(s)
+  const slug = slugs(s.entries)
   const out: SemanticToken[] = []
-  for (const emphasis of EMPHASIS_NAMES) {
-    const enterEasing = s.easings[emphasis]
-    const nominal = durations[s.durationFor[emphasis]]
-
-    for (const direction of ["enter", "exit"] as Direction[]) {
-      const easing = direction === "enter" ? enterEasing : deriveExitEasing(enterEasing)
-      const durationMs =
-        easing.kind === "spring"
-          ? motionSettlingTime(easing.spring)
-          : Math.max(1, Math.round(direction === "enter" ? nominal : nominal * s.exitRatio))
-      out.push({ id: `${emphasis}.${direction}`, emphasis, direction, durationMs, easing })
-    }
+  for (const e of s.entries) {
+    out.push({
+      id: `${slug[e.id]}.enter`,
+      entryId: e.id,
+      name: e.name,
+      slug: slug[e.id],
+      direction: "enter",
+      durationMs: enterMs(e),
+      easing: e.easing,
+    })
+    out.push({
+      id: `${slug[e.id]}.exit`,
+      entryId: e.id,
+      name: e.name,
+      slug: slug[e.id],
+      direction: "exit",
+      durationMs: exitMs(e),
+      easing: deriveExit(e.easing),
+    })
   }
   return out
-}
-
-/**
- * Purposes resolved against the current assignment.
- *
- * Aliases, never copies: in every format that supports indirection they emit as
- * references, so a purpose can never drift into a second source of truth.
- */
-export function purposes(
-  s: MotionState,
-): { id: PurposeId; aliasOf: Emphasis; travels: boolean }[] {
-  return PURPOSE_IDS.map((id) => ({
-    id,
-    aliasOf: s.purposeEmphasis[id],
-    travels: PURPOSE_TRAVELS[id],
-  }))
-}
-
-/** Which purposes are affected by a given emphasis — used to mark the preview. */
-export function purposesUsing(s: MotionState, emphasis: Emphasis): PurposeId[] {
-  return PURPOSE_IDS.filter((id) => s.purposeEmphasis[id] === emphasis)
-}
-
-/** Which emphases reach for a duration step. Empty is worth showing. */
-export function emphasisUsing(s: MotionState, name: DurationName): Emphasis[] {
-  return EMPHASIS_NAMES.filter((e) => s.durationFor[e] === name)
 }
 
 /** Progress 0→1 for any easing at a moment in ms. The one entry point. */
 export function easingProgress(easing: Easing, ms: number, durationMs: number): number {
   if (easing.kind === "spring") {
     // A spring is defined in real time, not as a fraction of a duration.
-    return springAt(easing.spring, ms)
+    return springValue(easing.spring, ms)
   }
-  return bezierAtLocal(easing.bezier, ms, durationMs)
+  return bezierAt(easing.bezier, ms, durationMs)
 }
 
-// Imported lazily-ish to keep the dependency direction obvious at a glance.
+// Imported down here to keep the dependency direction obvious at a glance.
 import { springValue } from "./spring.js"
 import { bezierAt } from "./bezier.js"
-const springAt = (s: SpringConfig, ms: number) => springValue(s, ms)
-const bezierAtLocal = (b: Bezier, ms: number, d: number) => bezierAt(b, ms, d)
 
 /** Per-child delay, with sub-linear falloff so long lists stay bearable. */
 export function staggerDelay(s: MotionState, index: number): number {

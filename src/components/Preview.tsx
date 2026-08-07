@@ -42,10 +42,9 @@ import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
 import { PanelTitle } from "../shared/components/Label"
 import {
-  EMPHASIS_NAMES,
   PURPOSE_IDS,
+  entryForPurpose,
   resolveSemantics,
-  type Emphasis,
   type MotionState,
   type PurposeId,
 } from "../lib/tokens"
@@ -85,14 +84,14 @@ const STAGGERS: PurposeId = "list"
 
 export default function Preview({
   state,
-  editing,
+  editingId,
   onAssign,
 }: {
   state: MotionState
-  /** The curve open in the editor. Marks affected scenarios; never moves you. */
-  editing: Emphasis
-  /** Point this purpose at a different emphasis. The one token edit in here. */
-  onAssign: (purpose: PurposeId, emphasis: Emphasis) => void
+  /** The row open in the editor. Marks affected scenarios; never moves you. */
+  editingId: string
+  /** Point this purpose at a different motion. The one token edit in here. */
+  onAssign: (purpose: PurposeId, entryId: string) => void
 }) {
   const [purpose, setPurpose] = useState<PurposeId>("list")
   const [mode, setMode] = useState<Mode>("both")
@@ -101,10 +100,10 @@ export default function Preview({
   const [loop, setLoop] = useState(true)
   const [elapsed, setElapsed] = useState(0)
 
-  const emphasis = state.purposeEmphasis[purpose]
+  const entry = entryForPurpose(state, purpose)
   const semantics = resolveSemantics(state)
-  const enterToken = semantics.find((t) => t.id === `${emphasis}.enter`)!
-  const exitToken = semantics.find((t) => t.id === `${emphasis}.exit`)!
+  const enterToken = semantics.find((t) => t.entryId === entry.id && t.direction === "enter")!
+  const exitToken = semantics.find((t) => t.entryId === entry.id && t.direction === "exit")!
   const token = mode === "exit" ? exitToken : enterToken
   const staggered = purpose === STAGGERS
   const children = staggered ? LIST_ITEMS : 1
@@ -227,7 +226,7 @@ export default function Preview({
           */}
           <div className="flex flex-wrap gap-0.5">
             {PURPOSE_IDS.map((id) => {
-              const affected = state.purposeEmphasis[id] === editing
+              const affected = entryForPurpose(state, id).id === editingId
               const active = id === purpose
               return (
                 <button
@@ -235,7 +234,7 @@ export default function Preview({
                   type="button"
                   onClick={() => setPurpose(id)}
                   aria-pressed={active}
-                  title={`${id} — uses ${state.purposeEmphasis[id]}`}
+                  title={`${id} — uses ${entryForPurpose(state, id).name}`}
                   className={cn(
                     "relative rounded px-2 py-1 font-mono text-[11px] transition-colors",
                     active ? "bg-ink text-paper" : "text-ash hover:text-ink",
@@ -255,23 +254,23 @@ export default function Preview({
 
           {/* Component first, then motion — the order you actually think in. */}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               <span className="text-ash font-mono text-[10px]">{purpose} uses</span>
-              {EMPHASIS_NAMES.map((e) => (
+              {state.entries.map((e) => (
                 <button
-                  key={e}
+                  key={e.id}
                   type="button"
-                  onClick={() => onAssign(purpose, e)}
-                  aria-pressed={e === emphasis}
-                  title={`Point ${purpose} at the ${e} curve. This is a token change — it lands in the export.`}
+                  onClick={() => onAssign(purpose, e.id)}
+                  aria-pressed={e.id === entry.id}
+                  title={`Point ${purpose} at ${e.name}. This is a token change — it lands in the export.`}
                   className={cn(
-                    "rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
-                    e === emphasis
+                    "max-w-[8rem] truncate rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
+                    e.id === entry.id
                       ? "border-ink/30 bg-ink/[0.06] text-ink border"
                       : "text-ash hover:text-ink border border-transparent",
                   )}
                 >
-                  {e}
+                  {e.name}
                 </button>
               ))}
             </div>

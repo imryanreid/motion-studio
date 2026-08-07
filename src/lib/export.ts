@@ -5,6 +5,12 @@
 // here — don't add a second serialization anywhere
 // else.
 //
+// Every name here is the entry's slug, so what you
+// called a motion on the page is what it is called in
+// the file. Slugs are deduplicated in tokens.ts; two
+// CSS custom properties can't share a key even if two
+// display names can.
+//
 // Reduced motion is emitted in every CSS export,
 // unconditionally. Not a checkbox, because the
 // accessible thing should be what you get by default
@@ -12,13 +18,12 @@
 // ==============================================
 import { bezierToArray, bezierToCss } from "./bezier.js"
 import { approximateToTolerance, describeApproximation } from "./linear.js"
-import { derive, springValue, type SpringConfig } from "./spring.js"
+import { springValue, type SpringConfig } from "./spring.js"
 import {
-  DURATION_NAMES,
-  EMPHASIS_NAMES,
-  purposes,
-  resolveDurations,
+  PURPOSE_IDS,
+  entryForPurpose,
   resolveSemantics,
+  slugs,
   type Easing,
   type MotionState,
   type SemanticToken,
@@ -39,37 +44,44 @@ function easingCss(easing: Easing, durationMs: number, tolerance: number): strin
     : springCss(easing.spring, durationMs, tolerance).css
 }
 
+/** "standard.enter" → "standard-enter". */
 const kebab = (id: string) => id.replace(".", "-")
+
+/** The duration token a semantic pair points at. */
+const durationKey = (t: SemanticToken) =>
+  t.direction === "exit" ? `${t.slug}-exit` : t.slug
+
+/** Which purpose aliases point where, by slug. */
+function purposeAliases(s: MotionState): { id: string; slug: string }[] {
+  const slug = slugs(s.entries)
+  return PURPOSE_IDS.map((id) => ({ id, slug: slug[entryForPurpose(s, id).id] }))
+}
 
 // ---------- CSS ----------
 
 export function toCss(s: MotionState): string {
-  const durations = resolveDurations(s)
   const semantics = resolveSemantics(s)
 
   const lines: string[] = [":root {", "  /* Durations */"]
-  for (const n of DURATION_NAMES) lines.push(`  --duration-${n}: ${durations[n]}ms;`)
+  for (const t of semantics) lines.push(`  --duration-${durationKey(t)}: ${t.durationMs}ms;`)
 
   lines.push("", "  /* Easings */")
-  for (const e of EMPHASIS_NAMES) {
-    const enter = semantics.find((t) => t.id === `${e}.enter`)!
-    const exit = semantics.find((t) => t.id === `${e}.exit`)!
-    lines.push(`  --ease-${e}: ${easingCss(enter.easing, enter.durationMs, s.tolerance)};`)
-    lines.push(`  --ease-${e}-exit: ${easingCss(exit.easing, exit.durationMs, s.tolerance)};`)
+  for (const t of semantics) {
+    lines.push(`  --ease-${kebab(t.id)}: ${easingCss(t.easing, t.durationMs, s.tolerance)};`)
   }
 
-  lines.push("", "  /* Semantic motion — duration and easing together */")
+  lines.push("", "  /* Motion — duration and easing together */")
   for (const t of semantics) {
-    const easeVar =
-      t.direction === "exit" ? `--ease-${t.emphasis}-exit` : `--ease-${t.emphasis}`
     const note = t.easing.kind === "spring" ? "  /* spring settling time */" : ""
-    lines.push(`  --motion-${kebab(t.id)}: ${t.durationMs}ms var(${easeVar});${note}`)
+    lines.push(
+      `  --motion-${kebab(t.id)}: ${t.durationMs}ms var(--ease-${kebab(t.id)});${note}`,
+    )
   }
 
   lines.push("", "  /* Purposes — aliases, not copies */")
-  for (const p of purposes(s)) {
+  for (const p of purposeAliases(s)) {
     for (const dir of ["enter", "exit"] as const) {
-      lines.push(`  --motion-${p.id}-${dir}: var(--motion-${p.aliasOf}-${dir});`)
+      lines.push(`  --motion-${p.id}-${dir}: var(--motion-${p.slug}-${dir});`)
     }
   }
 
@@ -87,7 +99,7 @@ export function toCss(s: MotionState): string {
     "@media (prefers-reduced-motion: reduce) {",
     "  :root {",
   )
-  for (const n of DURATION_NAMES) lines.push(`    --duration-${n}: 1ms;`)
+  for (const t of semantics) lines.push(`    --duration-${durationKey(t)}: 1ms;`)
   for (const t of semantics) lines.push(`    --motion-${kebab(t.id)}: 1ms linear;`)
   lines.push("    --stagger: 0ms;", "  }", "}")
 
@@ -97,21 +109,17 @@ export function toCss(s: MotionState): string {
 // ---------- Tailwind ----------
 
 export function toTailwind(s: MotionState): string {
-  const durations = resolveDurations(s)
   const semantics = resolveSemantics(s)
   const lines = ["@theme {", "  /* Generates ease-* utilities. */"]
-  for (const e of EMPHASIS_NAMES) {
-    const enter = semantics.find((t) => t.id === `${e}.enter`)!
-    const exit = semantics.find((t) => t.id === `${e}.exit`)!
-    lines.push(`  --ease-${e}: ${easingCss(enter.easing, enter.durationMs, s.tolerance)};`)
-    lines.push(`  --ease-${e}-exit: ${easingCss(exit.easing, exit.durationMs, s.tolerance)};`)
+  for (const t of semantics) {
+    lines.push(`  --ease-${kebab(t.id)}: ${easingCss(t.easing, t.durationMs, s.tolerance)};`)
   }
   lines.push(
     "",
     "  /* Durations have no theme namespace in v4, so these are plain custom",
-    "     properties. Use them as duration-[var(--duration-base)]. */",
+    "     properties. Use them as duration-[var(--duration-standard)]. */",
   )
-  for (const n of DURATION_NAMES) lines.push(`  --duration-${n}: ${durations[n]}ms;`)
+  for (const t of semantics) lines.push(`  --duration-${durationKey(t)}: ${t.durationMs}ms;`)
   lines.push("}")
   return lines.join("\n")
 }
@@ -129,18 +137,22 @@ function framerTransition(t: SemanticToken): string {
   return `{ duration: ${(t.durationMs / 1000).toFixed(3)}, ease: [${bezierToArray(t.easing.bezier).join(", ")}] }`
 }
 
+/** A slug is safe in CSS but may still need quoting as an object key in JS. */
+const jsKey = (slug: string) => (/^[A-Za-z_$][\w$]*$/.test(slug) ? slug : `"${slug}"`)
+
 export function toFramer(s: MotionState): string {
   const semantics = resolveSemantics(s)
+  const slug = slugs(s.entries)
   const lines = [
     "// Durations are in SECONDS here — Motion's unit, not CSS's.",
     "// Reduced motion is handled by the runtime: wrap your app in",
     '// <MotionConfig reducedMotion="user"> rather than branching per animation.',
     "export const motion = {",
   ]
-  for (const e of EMPHASIS_NAMES) {
-    const enter = semantics.find((t) => t.id === `${e}.enter`)!
-    const exit = semantics.find((t) => t.id === `${e}.exit`)!
-    lines.push(`  ${e}: {`)
+  for (const e of s.entries) {
+    const enter = semantics.find((t) => t.entryId === e.id && t.direction === "enter")!
+    const exit = semantics.find((t) => t.entryId === e.id && t.direction === "exit")!
+    lines.push(`  ${jsKey(slug[e.id])}: {`)
     lines.push(`    enter: ${framerTransition(enter)},`)
     lines.push(`    exit: ${framerTransition(exit)},`)
     lines.push("  },")
@@ -148,7 +160,9 @@ export function toFramer(s: MotionState): string {
   lines.push("} as const", "")
   lines.push("// Aliases, pointing at the same objects.")
   lines.push("export const purpose = {")
-  for (const p of purposes(s)) lines.push(`  ${p.id}: motion.${p.aliasOf},`)
+  for (const p of purposeAliases(s)) {
+    lines.push(`  ${p.id}: motion${/^[A-Za-z_$][\w$]*$/.test(p.slug) ? `.${p.slug}` : `["${p.slug}"]`},`)
+  }
   lines.push("} as const", "")
   lines.push(`export const stagger = ${(s.staggerMs / 1000).toFixed(3)}`)
   lines.push(`export const staggerDecay = ${s.staggerDecay}`)
@@ -158,18 +172,19 @@ export function toFramer(s: MotionState): string {
 // ---------- DTCG ----------
 
 export function toDtcg(s: MotionState): string {
-  const durations = resolveDurations(s)
   const semantics = resolveSemantics(s)
 
   const duration: Record<string, unknown> = {}
-  for (const n of DURATION_NAMES) {
-    duration[n] = { $type: "duration", $value: { value: durations[n], unit: "ms" } }
+  for (const t of semantics) {
+    duration[durationKey(t)] = {
+      $type: "duration",
+      $value: { value: t.durationMs, unit: "ms" },
+    }
   }
 
   const easing: Record<string, unknown> = {}
   for (const t of semantics) {
-    const key = t.direction === "exit" ? `${t.emphasis}-exit` : t.emphasis
-    if (easing[key]) continue
+    const key = kebab(t.id)
     if (t.easing.kind === "bezier") {
       easing[key] = { $type: "cubicBezier", $value: bezierToArray(t.easing.bezier) }
     } else {
@@ -195,41 +210,26 @@ export function toDtcg(s: MotionState): string {
 
   const motion: Record<string, unknown> = {}
   for (const t of semantics) {
-    const easeKey = t.direction === "exit" ? `${t.emphasis}-exit` : t.emphasis
-    motion[t.emphasis] ??= {} as Record<string, unknown>
-    ;(motion[t.emphasis] as Record<string, unknown>)[t.direction] = {
+    motion[t.slug] ??= {} as Record<string, unknown>
+    ;(motion[t.slug] as Record<string, unknown>)[t.direction] = {
       $type: "transition",
       $value: {
-        duration: `{duration.${nearestDurationName(durations, t.durationMs)}}`,
+        duration: `{duration.${durationKey(t)}}`,
         delay: { value: 0, unit: "ms" },
-        timingFunction: `{easing.${easeKey}}`,
+        timingFunction: `{easing.${kebab(t.id)}}`,
       },
     }
   }
 
   const purpose: Record<string, unknown> = {}
-  for (const p of purposes(s)) {
+  for (const p of purposeAliases(s)) {
     purpose[p.id] = {
-      enter: { $type: "transition", $value: `{motion.${p.aliasOf}.enter}` },
-      exit: { $type: "transition", $value: `{motion.${p.aliasOf}.exit}` },
+      enter: { $type: "transition", $value: `{motion.${p.slug}.enter}` },
+      exit: { $type: "transition", $value: `{motion.${p.slug}.exit}` },
     }
   }
 
   return JSON.stringify({ duration, easing, motion, purpose }, null, 2)
-}
-
-/** DTCG transitions reference a duration token, so map back to the nearest. */
-function nearestDurationName(durations: Record<string, number>, ms: number): string {
-  let best = DURATION_NAMES[0] as string
-  let bestDiff = Infinity
-  for (const n of DURATION_NAMES) {
-    const diff = Math.abs(durations[n] - ms)
-    if (diff < bestDiff) {
-      bestDiff = diff
-      best = n
-    }
-  }
-  return best
 }
 
 // ---------- Fidelity ----------
@@ -281,7 +281,7 @@ export function tailwindFidelity(s: MotionState): FormatFidelity {
     detail:
       `Tailwind v4 has an --ease-* theme namespace, so the easings generate ease-* utilities ` +
       `directly. It has no equivalent namespace for transition duration, so durations are emitted ` +
-      `as plain custom properties and used as duration-[var(--duration-base)].` +
+      `as plain custom properties and used as duration-[var(--duration-standard)].` +
       (css ? `\n\n${css.detail}` : ""),
   }
 }
@@ -304,24 +304,17 @@ export function dtcgFidelity(s: MotionState): FormatFidelity {
 
 /** Plain-language rules plus values, written to drop into a CLAUDE.md. */
 export function toAgentMarkdown(s: MotionState, url: string): string {
-  const durations = resolveDurations(s)
   const semantics = resolveSemantics(s)
   const lines: string[] = [
     "# Motion tokens",
     "",
     `Source: ${url}`,
     "",
-    "## Durations",
+    "## The set",
     "",
-    `Generated from a base of ${s.base}ms on a ratio of ${s.ratio}, snapped to ${s.snap}ms.`,
+    `${s.entries.length} motion${s.entries.length === 1 ? "" : "s"}, each shipping an entrance and an exit.`,
     "",
   ]
-  for (const n of DURATION_NAMES) {
-    const pinned = s.pins[n] !== undefined ? " (pinned, not on the curve)" : ""
-    lines.push(`- \`${n}\` — ${durations[n]}ms${pinned}`)
-  }
-
-  lines.push("", "## Semantic motion", "")
   for (const t of semantics) {
     const kind =
       t.easing.kind === "spring"
@@ -333,15 +326,15 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
   }
 
   lines.push("", "## Purposes", "", "Aliases, not copies. Prefer these at call sites.", "")
-  for (const p of purposes(s)) lines.push(`- \`${p.id}\` → \`${p.aliasOf}\``)
+  for (const p of purposeAliases(s)) lines.push(`- \`${p.id}\` → \`${p.slug}\``)
 
   lines.push(
     "",
     "## Rules",
     "",
-    `1. **Exits are faster and flatter than entrances.** Exit duration is ${Math.round(s.exitRatio * 100)}% of enter, and the exit curve is the mirror of the entrance — a spring exit loses its bounce entirely. An entrance introduces something; an exit removes something the user has already finished with, and lingering reads as lag.`,
-    `2. **Match emphasis to how much attention the change deserves.** \`subtle\` for a state change you'd only notice if it were missing, \`standard\` for a surface appearing, \`emphasized\` for something asking to be looked at.`,
-    `3. **Duration should grow with travel distance, sub-linearly.** Roughly \`base x (travel / 160px)^0.5\`, clamped to 0.6x-1.8x. Apply it to motions that actually travel; a checkbox filling has no distance.`,
+    `1. **Exits are faster and flatter than entrances.** The exit curve is the mirror of the entrance — a spring exit loses its bounce entirely. An entrance introduces something; an exit removes something the user has already finished with, and lingering reads as lag.`,
+    `2. **Reach for a purpose, not a raw duration.** The purpose aliases above say what a motion is for; the durations say only how long it is.`,
+    `3. **Duration should grow with travel distance, sub-linearly.** Roughly \`duration x (travel / 160px)^0.5\`, clamped to 0.6x-1.8x. Apply it to motions that actually travel; a checkbox filling has no distance.`,
     `4. **Stagger falls off.** ${s.staggerMs}ms x index^${s.staggerDecay}, so a long list doesn't take proportionally long.`,
     `5. **Always ship the reduced-motion block.** It's in the CSS export already. In Framer Motion use \`<MotionConfig reducedMotion="user">\`.`,
     "",
@@ -373,13 +366,13 @@ export function agentPrompt(url: string): string {
 
 Tokens: ${url}
 
-That page lists every duration, easing and semantic pair in machine-readable
-form, along with the rules for applying them and what each export format costs.
+That page lists every motion, its entrance and exit, and the rules for applying
+them, in machine-readable form — along with what each export format costs.
 
 When you apply them:
 
-- Use the semantic tokens (motion.subtle.*, motion.standard.*, motion.emphasized.*)
-  or the purpose aliases (drawer, modal, toast...) rather than raw durations.
+- Use the purpose aliases (drawer, modal, toast...) or the named motions rather
+  than raw durations.
 - Exits must stay faster and flatter than entrances. That asymmetry is
   deliberate; symmetric motion reads as sluggish on the way out.
 - Ship the prefers-reduced-motion block. It's already in the CSS export.

@@ -10,8 +10,8 @@
 ## What this is
 
 A single-page tool that generates motion tokens you can actually preview:
-cubic-bezier and spring easing, a named duration scale, deliberately asymmetric
-enter/exit pairs, and exports for CSS, Tailwind, Framer Motion and DTCG — with the cross-platform differences stated rather than hidden.
+a set of named motions you own, each a cubic-bezier or a spring with its own
+duration and a derived, deliberately faster exit, and exports for CSS, Tailwind, Framer Motion and DTCG — with the cross-platform differences stated rather than hidden.
 
 Second tool in the **Studio Tools** family, after
 [Ramps Studio](../Ramps%20Studio). Public, open source (MIT), and a portfolio

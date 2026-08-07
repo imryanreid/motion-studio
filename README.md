@@ -4,13 +4,14 @@ Part of **Studio Tools** — small, free, agent-readable design utilities.
 
 Motion tokens are the least systematized part of most design systems, and the
 reason is that nobody can preview them honestly or carry them across platforms.
-This is meant to solve both: cubic-bezier and spring easing, a named duration
-scale, deliberately asymmetric enter/exit pairs, previews on real UI rather than
-a dot on a track, and exports for CSS, Tailwind, Framer Motion and DTCG
+This is meant to solve both: a set of named motions you own — each a
+cubic-bezier or a spring, each with its own duration and a deliberately faster,
+flatter exit derived from it — previewed on real UI rather than on a dot on a
+track, and exports for CSS, Tailwind, Framer Motion and DTCG
 — with the cross-platform differences stated rather than hidden.
 
-**Status: scaffolded, not built.** The shared layer and page shell are in place.
-See [`NEXT-UP.md`](NEXT-UP.md).
+**Status: live** at https://motion-studio-silk.vercel.app, on a placeholder
+domain and noindex until a real one is chosen. See [`NEXT-UP.md`](NEXT-UP.md).
 
 ## Local development
 
