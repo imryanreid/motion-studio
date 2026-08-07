@@ -14,7 +14,10 @@ import { cn } from "../shared/utils"
 import CopyText from "../shared/components/CopyText"
 import { bezierToCss } from "../lib/bezier"
 import {
+  DERIVED_NAMES,
   DURATION_NAMES,
+  DURATION_STEPS,
+  derivationLabel,
   emphasisUsing,
   purposes,
   isDerived,
@@ -97,19 +100,20 @@ export function InlineNumber({
 }
 
 /**
- * The duration scale — two aligned rows, enter over exit.
+ * The duration scale — the one input, then everything it produces.
  *
- * `base` is not a separate input above the scale any more; it *is* the base
- * cell, the one editable value in the row, with the other four fanning out from
- * it by the ratio. Sitting the generator apart from what it generated was the
- * source of the "how are these related?" question: the answer is now spatial.
+ * `base` sits leftmost in its own bordered box rather than in scale position,
+ * because reading order beats numeric order for the thing you actually type:
+ * the eye lands top-left, and that is where the cause should be. The four
+ * derived steps stay in scale order to the right of a gap, each labelled with
+ * the arithmetic that produced it — a gap between an input and four outputs
+ * only reads as cause and effect if the outputs say what was done to them.
  *
- * The exit row exists because the enter durations were never labelled as such.
- * A second row of derived numbers directly under the first, driven by the one
- * slider below it, is what makes the asymmetry rule visible rather than stated.
+ * Two aligned rows, enter over exit. The exit row is what names the enter
+ * durations as entrances, and it puts the exit slider directly under the
+ * numbers it drives.
  *
- * Filled and carrying no field chrome, because that is the family's signal for
- * "generated". The only things you author here are the base and a pin.
+ * Bordered means authored, filled means generated. That is the whole legend.
  */
 export function DurationStrip({
   state,
@@ -129,18 +133,74 @@ export function DurationStrip({
     onChange({ ...state, pins })
   }
 
-  const rowTag = "text-ash flex items-center px-2.5 font-mono text-[10px] tracking-[0.16em] uppercase"
+  const exitOf = (ms: number) => Math.max(1, Math.round(ms * state.exitRatio))
+  const rowTag =
+    "text-ash flex items-center pr-2.5 font-mono text-[10px] tracking-[0.16em] uppercase"
+
+  /** The travelling marker: a number is not a feel. */
+  const bar = (name: DurationName) => (
+    <div className="bg-ink/[0.07] relative h-1 overflow-hidden rounded-full">
+      <div
+        className="bg-ink/70 h-full rounded-full"
+        style={{ width: `${(durations[name] / longest) * 100}%` }}
+      />
+      <div
+        aria-hidden="true"
+        className="bg-paper absolute top-0 bottom-0 w-1 rounded-full transition-transform ease-[cubic-bezier(0.2,0,0,1)]"
+        style={{
+          left: 0,
+          transitionDuration: `${durations[name]}ms`,
+          transform: hovered === name ? "translateX(1000%)" : "none",
+          opacity: hovered === name ? 1 : 0,
+        }}
+      />
+    </div>
+  )
 
   return (
     <div className="overflow-x-auto">
-      <div className="bg-ink/[0.03] grid min-w-[520px] grid-cols-[3.25rem_repeat(5,minmax(0,1fr))] overflow-hidden rounded-md">
-        <span className={rowTag} title="Entrance durations, generated from the base and ratio.">
+      <div className="grid min-w-[540px] grid-cols-[3.25rem_8rem_2rem_repeat(4,minmax(0,1fr))]">
+        {/* ── enter ─────────────────────────────────────────────────────── */}
+        <span className={rowTag} title="Entrance durations. Everything else derives from these.">
           Enter
         </span>
-        {DURATION_NAMES.map((name, i) => {
+
+        <div
+          onMouseEnter={() => setHovered("base")}
+          onMouseLeave={() => setHovered((h) => (h === "base" ? null : h))}
+          className={cn(
+            "border-line bg-paper flex flex-col gap-1 rounded-t-md border border-b-0 px-2.5 py-2",
+            emphasisUsing(state, "base").length === 0 && "opacity-45",
+          )}
+        >
+          <span className="text-ink font-mono text-[10px] tracking-wide">base</span>
+          <span className="text-ink font-mono text-sm">
+            <InlineNumber
+              ariaLabel="Base duration in milliseconds"
+              title="The anchor you type. Every other step is this multiplied or divided by the ratio, so changing it moves the whole scale."
+              value={state.base}
+              min={20}
+              max={2000}
+              width="w-10"
+              suffix="ms"
+              onChange={(base) => onChange({ ...state, base })}
+            />
+          </span>
+          {bar("base")}
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="text-ash flex items-center justify-center font-mono text-xs"
+        >
+          →
+        </div>
+
+        {DERIVED_NAMES.map((name, i) => {
           const ms = durations[name]
           const derived = isDerived(state, name)
-          const isBase = name === "base"
+          const step = DURATION_STEPS[name]
+          const unrounded = state.base * Math.pow(state.ratio, step)
           // Dimmed rather than labelled: nothing reaches for this step, so it
           // ships in exports with no token referencing it.
           const unused = emphasisUsing(state, name).length === 0
@@ -150,111 +210,94 @@ export function DurationStrip({
               onMouseEnter={() => setHovered(name)}
               onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
               className={cn(
-                "border-line/60 flex flex-col gap-1 border-l px-2.5 py-2",
-                i === 0 && "border-l-0",
+                "bg-ink/[0.03] border-line/60 flex flex-col gap-1 border-l px-2.5 py-2",
+                i === 0 && "rounded-tl-md border-l-0",
+                i === DERIVED_NAMES.length - 1 && "rounded-tr-md",
                 unused && "opacity-45",
-                isBase && "bg-ink/[0.04]",
               )}
               title={
-                unused
-                  ? `${name} — no emphasis uses this, so nothing references it`
-                  : `${name} — used by ${emphasisUsing(state, name).join(", ")}`
+                derived
+                  ? `${state.base} ${step < 0 ? "÷" : "×"} ${Math.pow(state.ratio, Math.abs(step)).toFixed(2)} = ${unrounded.toFixed(2)}ms, rounded to ${ms}ms` +
+                    (unused ? " · no emphasis uses this" : ` · used by ${emphasisUsing(state, name).join(", ")}`)
+                  : `Pinned at ${ms}ms — held here instead of following the base and ratio`
               }
             >
-              <div className="flex items-baseline justify-between gap-1">
-                <span
-                  className={cn(
-                    "font-mono text-[10px] tracking-wide",
-                    isBase ? "text-ink" : "text-ash",
-                  )}
-                >
+              <div className="flex items-baseline gap-1">
+                <span className="text-ash truncate font-mono text-[10px] tracking-wide">
                   {name}
                 </span>
-                {/* Base has no pin: pinning the anchor to something other than
-                    itself would make the label a lie. */}
-                {!isBase && (
-                  <button
-                    type="button"
-                    onClick={() => togglePin(name)}
-                    title={
-                      derived
-                        ? `Pin at ${ms}ms — keeps this value when you change the base or ratio`
-                        : "Release back onto the generated curve"
-                    }
-                    aria-label={derived ? `Pin ${name}` : `Release ${name}`}
-                    className={cn(
-                      "shrink-0 transition-opacity",
-                      derived
-                        ? cn(
-                            "text-ash hover:text-ink opacity-0 focus-visible:opacity-100",
-                            hovered === name && "opacity-100",
-                          )
-                        : "text-ink opacity-100",
-                    )}
-                  >
-                    <PushPin size={11} weight={derived ? "regular" : "fill"} />
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => togglePin(name)}
+                  title={
+                    derived
+                      ? `Pin at ${ms}ms — holds this value when you change the base or ratio`
+                      : "Release back onto the generated scale"
+                  }
+                  aria-label={derived ? `Pin ${name}` : `Release ${name}`}
+                  className={cn(
+                    "ml-auto shrink-0 transition-opacity",
+                    derived
+                      ? cn(
+                          "text-ash hover:text-ink opacity-0 focus-visible:opacity-100",
+                          hovered === name && "opacity-100",
+                        )
+                      : "text-ink opacity-100",
+                  )}
+                >
+                  <PushPin size={11} weight={derived ? "regular" : "fill"} />
+                </button>
+              </div>
+
+              {/* The factor rides with the number it produced, not with the
+                  step name — it reads as "280ms, and that's base ×1.4", and
+                  it's the only place there's room for it. Absent when pinned:
+                  a pinned step was reached by no arithmetic at all. */}
+              <div className="flex items-baseline justify-between gap-1">
+                <span className="text-ink font-mono text-sm">{ms}ms</span>
+                {derived && (
+                  <span className="text-ash/60 shrink-0 font-mono text-[10px]">
+                    {derivationLabel(state.ratio, step)}
+                  </span>
                 )}
               </div>
-
-              {isBase ? (
-                <span className="text-ink font-mono text-sm">
-                  <InlineNumber
-                    ariaLabel="Base duration in milliseconds"
-                    title="The anchor. Every other step is this times the ratio, so changing it moves the whole scale."
-                    value={state.base}
-                    min={20}
-                    max={2000}
-                    width="w-11"
-                    suffix="ms"
-                    onChange={(base) => onChange({ ...state, base })}
-                  />
-                </span>
-              ) : (
-                <span className="text-ink font-mono text-sm">{ms}ms</span>
-              )}
-
-              {/* Relative length, and on hover a marker crosses at exactly this
-                  duration — a number is not a feel. */}
-              <div className="bg-ink/[0.07] relative h-1 overflow-hidden rounded-full">
-                <div
-                  className="bg-ink/70 h-full rounded-full"
-                  style={{ width: `${(ms / longest) * 100}%` }}
-                />
-                <div
-                  aria-hidden="true"
-                  className="bg-paper absolute top-0 bottom-0 w-1 rounded-full transition-transform ease-[cubic-bezier(0.2,0,0,1)]"
-                  style={{
-                    left: 0,
-                    transitionDuration: `${ms}ms`,
-                    transform: hovered === name ? "translateX(1000%)" : "none",
-                    opacity: hovered === name ? 1 : 0,
-                  }}
-                />
-              </div>
+              {bar(name)}
             </div>
           )
         })}
 
+        {/* ── exit ──────────────────────────────────────────────────────── */}
         <span
-          className={cn(rowTag, "border-line/60 border-t")}
-          title={`Exit durations: ${Math.round(state.exitRatio * 100)}% of the entrance. A spring token ignores this — it settles when it settles.`}
+          className={rowTag}
+          title={`${Math.round(state.exitRatio * 100)}% of the entrance beside it. A spring token ignores this — it settles when it settles.`}
         >
           Exit
         </span>
-        {DURATION_NAMES.map((name, i) => {
+
+        <div
+          className={cn(
+            "border-line bg-paper rounded-b-md border border-t-0 px-2.5 py-1.5",
+            emphasisUsing(state, "base").length === 0 && "opacity-45",
+          )}
+        >
+          <span className="text-ash font-mono text-xs">{exitOf(durations.base)}ms</span>
+        </div>
+
+        <div />
+
+        {DERIVED_NAMES.map((name, i) => {
           const unused = emphasisUsing(state, name).length === 0
-          const exitMs = Math.max(1, Math.round(durations[name] * state.exitRatio))
           return (
             <div
               key={name}
               className={cn(
-                "border-line/60 border-t border-l px-2.5 py-1.5",
-                i === 0 && "border-l-0",
+                "bg-ink/[0.03] border-line/60 border-t border-l px-2.5 py-1.5",
+                i === 0 && "rounded-bl-md border-l-0",
+                i === DERIVED_NAMES.length - 1 && "rounded-br-md",
                 unused && "opacity-45",
               )}
             >
-              <span className="text-ash font-mono text-xs">{exitMs}ms</span>
+              <span className="text-ash font-mono text-xs">{exitOf(durations[name])}ms</span>
             </div>
           )
         })}

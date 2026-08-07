@@ -201,17 +201,17 @@ export default function App() {
                   min={1.05}
                   max={3}
                   width="w-9"
-                  title="Multiplier between steps. Pinned steps ignore it."
+                  title="How far apart the steps are. Each one is the base multiplied or divided by this. Pinned steps ignore it."
                   onChange={(ratio) => setState({ ...state, ratio })}
                 />
                 <Rule
-                  label="Snap"
+                  label="Round to"
                   value={state.snap}
                   min={1}
                   max={100}
                   width="w-6"
                   suffix="ms"
-                  title="Generated values round to this."
+                  title="Generated values land on this grid. 200 ÷ 1.4 is 142.86ms; nobody wants that in a stylesheet, and 10ms is far below what anyone can perceive at these lengths — so the numbers stay legible for free."
                   onChange={(snap) => setState({ ...state, snap })}
                 />
               </div>

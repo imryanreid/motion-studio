@@ -21,12 +21,31 @@ export const DURATION_NAMES = ["instant", "fast", "base", "slow", "deliberate"] 
 export type DurationName = (typeof DURATION_NAMES)[number]
 
 /** Offsets from `base` on the ratio, in steps. */
-const DURATION_STEPS: Record<DurationName, number> = {
+export const DURATION_STEPS: Record<DurationName, number> = {
   instant: -2,
   fast: -1,
   base: 0,
   slow: 1,
   deliberate: 2,
+}
+
+/** Every step except the anchor, in scale order. */
+export const DERIVED_NAMES = DURATION_NAMES.filter((n) => n !== "base")
+
+/**
+ * How a step was reached, as arithmetic: "÷1.96", "×1.4".
+ *
+ * Shown on the step itself, which is the whole reason base sits apart from the
+ * others rather than in the middle of them. A gap between an input and four
+ * outputs only reads as cause and effect if the outputs say what was done to
+ * them; otherwise it's just a gap.
+ */
+export function derivationLabel(ratio: number, step: number): string {
+  if (step === 0) return ""
+  const factor = Math.pow(ratio, Math.abs(step))
+  // 1.40 → "1.4", 1.96 → "1.96". Trailing zeros read as false precision.
+  const text = factor.toFixed(2).replace(/0$/, "").replace(/\.$/, "")
+  return `${step < 0 ? "÷" : "×"}${text}`
 }
 
 export const EMPHASIS_NAMES = ["subtle", "standard", "emphasized"] as const
