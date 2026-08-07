@@ -46,6 +46,14 @@ design judgement and you can't make it one at a time. Hovering a row highlights
 the step it points at in the scale above, which is the tie drawn rather than
 described.
 
+**Assignment runs component-first.** Which emphasis a purpose uses is set on
+the purpose, in the preview band — "I'm building a drawer, what should it feel
+like?", not "I have an emphasized spring, what should use it?". This breaks the
+earlier rule that nothing in the preview panel edits a token, and the rule was
+wrong: assigning a purpose is simultaneously a token decision and a
+what-am-I-watching decision. They are one act. The split is therefore **the
+system (left) vs. one component in it (right)**, not edit vs. watch.
+
 ## Layout, second pass
 
 The first pass copied Ramps' layout but assigned the wrong thing to "output".
@@ -73,8 +81,9 @@ Called out rather than quietly dropped:
 4. **Agent surfaces** — `middleware.ts`, `api/render`, `api/tokens`, `llms.txt`,
    JSON-LD. The on-page block exists; the no-JavaScript path does not, so this
    tool is not yet agent-readable the way Ramps is. Highest-value next item.
-5. **Purpose aliases aren't editable or droppable** in the UI, though the model
-   supports it.
+5. ~~Purpose aliases aren't editable~~ — done, on the scenario band. Still not
+   **droppable**: you can point a purpose at a different emphasis but not
+   remove it from the set.
 
 ## Blockers / open questions
 

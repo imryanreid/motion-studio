@@ -138,7 +138,8 @@ export function DurationStrip({
 
   const exitOf = (ms: number) => Math.max(1, Math.round(ms * state.exitRatio))
   const rowTag =
-    "text-ash flex items-center pr-2.5 font-mono text-[10px] tracking-[0.16em] uppercase"
+    "text-ash flex items-center gap-1.5 pr-3 font-mono text-[10px] tracking-[0.16em] uppercase"
+  const derivedCell = "bg-ink/[0.03] border-line/60 border-l"
 
   /** The travelling marker: a number is not a feel. */
   const bar = (name: DurationName) => (
@@ -162,19 +163,23 @@ export function DurationStrip({
 
   return (
     <div className="overflow-x-auto">
-      <div className="grid min-w-[540px] grid-cols-[3.25rem_8rem_2rem_repeat(4,minmax(0,1fr))]">
+      <div className="grid min-w-[540px] grid-cols-[4.25rem_6.5rem_1.5rem_repeat(4,minmax(0,1fr))] gap-y-1">
         {/* ── enter ─────────────────────────────────────────────────────── */}
         <span className={rowTag} title="Entrance durations. Everything else derives from these.">
           Enter
         </span>
 
+        {/*
+          The only bordered thing on the panel, because it is the only value
+          you type. The border used to wrap the exit value too, which said
+          both were editable when only one is.
+        */}
         <div
           onMouseEnter={() => setHovered("base")}
           onMouseLeave={() => setHovered((h) => (h === "base" ? null : h))}
           className={cn(
-            "border-line bg-paper flex flex-col gap-1 rounded-t-md border border-b-0 px-2.5 py-2 transition-colors",
-            emphasisUsing(state, "base").length === 0 && "opacity-45",
-            highlight === "base" && "bg-ink/[0.08] opacity-100",
+            "border-line bg-paper flex flex-col gap-1 rounded-md border px-2.5 py-2 transition-colors",
+            highlight === "base" && "bg-ink/[0.08]",
           )}
         >
           <span className="text-ink font-mono text-[10px] tracking-wide">base</span>
@@ -205,26 +210,30 @@ export function DurationStrip({
           const derived = isDerived(state, name)
           const step = DURATION_STEPS[name]
           const unrounded = state.base * Math.pow(state.ratio, step)
-          // Dimmed rather than labelled: nothing reaches for this step, so it
-          // ships in exports with no token referencing it.
-          const unused = emphasisUsing(state, name).length === 0
+          // Which levels reach for this step. Reported on hover, never by
+          // dimming the cell: an unused step is not broken or disabled, and
+          // greying it out was the loudest possible way to say the quietest
+          // thing on the panel.
+          const users = emphasisUsing(state, name)
           return (
             <div
               key={name}
               onMouseEnter={() => setHovered(name)}
               onMouseLeave={() => setHovered((h) => (h === name ? null : h))}
               className={cn(
-                "bg-ink/[0.03] border-line/60 flex flex-col gap-1 border-l px-2.5 py-2 transition-colors",
-                i === 0 && "rounded-tl-md border-l-0",
-                i === DERIVED_NAMES.length - 1 && "rounded-tr-md",
-                unused && "opacity-45",
-                highlight === name && "bg-ink/[0.09] opacity-100",
+                derivedCell,
+                "flex flex-col gap-1 px-2 py-2 transition-colors",
+                i === 0 && "rounded-l-md border-l-0",
+                i === DERIVED_NAMES.length - 1 && "rounded-r-md",
+                highlight === name && "bg-ink/[0.09]",
               )}
               title={
-                derived
-                  ? `${state.base} ${step < 0 ? "÷" : "×"} ${Math.pow(state.ratio, Math.abs(step)).toFixed(2)} = ${unrounded.toFixed(2)}ms, rounded to ${ms}ms` +
-                    (unused ? " · no emphasis uses this" : ` · used by ${emphasisUsing(state, name).join(", ")}`)
-                  : `Pinned at ${ms}ms — held here instead of following the base and ratio`
+                (derived
+                  ? `${state.base} ${step < 0 ? "÷" : "×"} ${Math.pow(state.ratio, Math.abs(step)).toFixed(2)} = ${unrounded.toFixed(2)}ms, rounded to ${ms}ms`
+                  : `Pinned at ${ms}ms — held here instead of following the base and ratio`) +
+                (users.length
+                  ? ` · used by ${users.join(", ")}`
+                  : " · no emphasis reaches for this step")
               }
             >
               <div className="flex items-baseline gap-1">
@@ -272,18 +281,33 @@ export function DurationStrip({
         })}
 
         {/* ── exit ──────────────────────────────────────────────────────── */}
+        {/*
+          The share lives in the row head rather than in a slider elsewhere in
+          the panel, because it is the rule that produces this exact row and
+          the two were sitting either side of a border. Typed, like the base:
+          the panel now has two authored numbers and they look alike.
+        */}
         <span
           className={rowTag}
-          title={`${Math.round(state.exitRatio * 100)}% of the entrance beside it. A spring token ignores this — it settles when it settles.`}
+          title="Every exit is this share of the entrance above it. Exits should be quicker — lingering on something you've finished with reads as lag. A spring ignores it: a spring settles when it settles."
         >
           Exit
+          <InlineNumber
+            ariaLabel="Exit duration as a percentage of the entrance"
+            value={Math.round(state.exitRatio * 100)}
+            min={20}
+            max={130}
+            width="w-6"
+            suffix="%"
+            className="text-ink text-xs normal-case"
+            onChange={(pct) => onChange({ ...state, exitRatio: pct / 100 })}
+          />
         </span>
 
         <div
           className={cn(
-            "border-line bg-paper rounded-b-md border border-t-0 px-2.5 py-1.5 transition-colors",
-            emphasisUsing(state, "base").length === 0 && "opacity-45",
-            highlight === "base" && "bg-ink/[0.08] opacity-100",
+            "bg-ink/[0.03] rounded-md px-2.5 py-1.5 transition-colors",
+            highlight === "base" && "bg-ink/[0.09]",
           )}
         >
           <span className="text-ash font-mono text-xs">{exitOf(durations.base)}ms</span>
@@ -291,23 +315,20 @@ export function DurationStrip({
 
         <div />
 
-        {DERIVED_NAMES.map((name, i) => {
-          const unused = emphasisUsing(state, name).length === 0
-          return (
-            <div
-              key={name}
-              className={cn(
-                "bg-ink/[0.03] border-line/60 border-t border-l px-2.5 py-1.5 transition-colors",
-                i === 0 && "rounded-bl-md border-l-0",
-                i === DERIVED_NAMES.length - 1 && "rounded-br-md",
-                unused && "opacity-45",
-                highlight === name && "bg-ink/[0.09] opacity-100",
-              )}
-            >
-              <span className="text-ash font-mono text-xs">{exitOf(durations[name])}ms</span>
-            </div>
-          )
-        })}
+        {DERIVED_NAMES.map((name, i) => (
+          <div
+            key={name}
+            className={cn(
+              derivedCell,
+              "px-2 py-1.5 transition-colors",
+              i === 0 && "rounded-l-md border-l-0",
+              i === DERIVED_NAMES.length - 1 && "rounded-r-md",
+              highlight === name && "bg-ink/[0.09]",
+            )}
+          >
+            <span className="text-ash font-mono text-xs">{exitOf(durations[name])}ms</span>
+          </div>
+        ))}
       </div>
     </div>
   )

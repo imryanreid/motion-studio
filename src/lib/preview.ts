@@ -26,6 +26,15 @@ import { easingProgress, staggerDelay, type MotionState, type SemanticToken } fr
  * None of these are tokens. They are about watching, not about the system, so
  * they never reach the URL or an export.
  */
+/**
+ * How many rows the list scenario shows.
+ *
+ * Lives here rather than in the component because the stagger control reports
+ * the delays this many children would get, and the two have to agree — the
+ * readout is only useful if it describes the list you're watching.
+ */
+export const LIST_ITEMS = 5
+
 export const LEAD_MS = 250
 export const DWELL_MS = 700
 export const HOLD_MS = 350

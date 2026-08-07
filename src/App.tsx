@@ -26,7 +26,14 @@ import Preview from "./components/Preview"
 import { DurationStrip, InlineNumber, SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import { DEFAULT_STATE, type DurationName, type Emphasis, type MotionState } from "./lib/tokens"
+import {
+  DEFAULT_STATE,
+  staggerDelay,
+  type DurationName,
+  type Emphasis,
+  type MotionState,
+} from "./lib/tokens"
+import { LIST_ITEMS } from "./lib/preview"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
@@ -226,27 +233,32 @@ export default function App() {
               <DurationStrip state={state} onChange={setState} highlight={linked} />
             </div>
 
-            <div className="border-line flex flex-wrap items-center gap-x-6 gap-y-3 border-t p-4">
+            {/*
+              The number you set is not the number you care about. 40ms says
+              nothing; "the fifth row starts at 130ms" is the thing you're
+              deciding, and the sequence shows the sub-linear falloff without
+              needing a second control for it.
+            */}
+            <div className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 border-t p-4">
               <Slider
-                label="Exit"
-                value={Math.round(state.exitRatio * 100)}
-                min={20}
-                max={130}
-                step={5}
-                suffix="%"
-                title="Drives the Exit row above: every exit is this share of its entrance. Exits should be quicker — lingering on something you've finished with reads as lag."
-                onChange={(pct) => setState({ ...state, exitRatio: pct / 100 })}
-              />
-              <Slider
-                label="Stagger"
+                label="List stagger"
                 value={state.staggerMs}
                 min={0}
                 max={160}
                 step={5}
                 suffix="ms"
-                title="Per-child offset in a list. Falls off sub-linearly so long lists stay bearable."
+                title={`Per-row offset in the list scenario — nothing else staggers. It falls off sub-linearly (index^${state.staggerDecay}) so a long list doesn't take proportionally longer.`}
                 onChange={(staggerMs) => setState({ ...state, staggerMs })}
               />
+              <span
+                className="text-ash font-mono text-[11px]"
+                title={`Where each of the ${LIST_ITEMS} rows starts, relative to the first.`}
+              >
+                {Array.from({ length: LIST_ITEMS - 1 }, (_, i) => staggerDelay(state, i + 1)).join(
+                  " · ",
+                )}
+                ms
+              </span>
             </div>
           </section>
 
@@ -264,7 +276,13 @@ export default function App() {
           />
         </div>
 
-        <Preview state={state} editing={emphasis} />
+        <Preview
+          state={state}
+          editing={emphasis}
+          onAssign={(purpose, e) =>
+            setState({ ...state, purposeEmphasis: { ...state.purposeEmphasis, [purpose]: e } })
+          }
+        />
       </div>
 
       <SemanticTable state={state}>

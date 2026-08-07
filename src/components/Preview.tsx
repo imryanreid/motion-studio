@@ -19,12 +19,22 @@
 // the true curve. The CSS export is an approximation
 // of it, and the export panel says by how much.
 //
-// Every control in here changes what you are WATCHING
-// — mode, speed, loop, which scenario. Nothing in here
-// changes a token. Anything that would is on the left,
-// which is the whole point of the split: stagger used
-// to live here and had to move, because it is part of
-// the system rather than part of the view.
+// One exception to "the left edits, the right watches",
+// and it is deliberate: which emphasis a purpose uses is
+// set HERE, on the purpose. Nobody thinks "I have an
+// emphasized spring, what should use it?" — they think
+// "I'm building a drawer, what should it feel like?"
+// The tool only supported the backwards direction, and
+// asked you to infer the mapping from a grey caption.
+// Assigning a purpose is simultaneously a token decision
+// and a what-am-I-watching decision; they are the same
+// act, and splitting them across the page is what made
+// the tie between easings and preview unreadable.
+//
+// So the split is not "edit vs watch" but "the system
+// vs one component in it". Everything else in this panel
+// — mode, speed, loop, scenario — still only changes
+// what you are looking at.
 // ==============================================
 import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
@@ -32,6 +42,7 @@ import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
 import { PanelTitle } from "../shared/components/Label"
 import {
+  EMPHASIS_NAMES,
   PURPOSE_IDS,
   resolveSemantics,
   type Emphasis,
@@ -40,6 +51,7 @@ import {
 } from "../lib/tokens"
 import {
   LEAD_MS,
+  LIST_ITEMS,
   childProgress,
   sequenceProgress,
   sequenceTotal,
@@ -52,8 +64,6 @@ const SPEEDS = [
   { id: "0.5" as const, label: "½×" },
   { id: "0.25" as const, label: "¼×" },
 ]
-
-const LIST_ITEMS = 5
 
 /**
  * Both is the default.
@@ -76,10 +86,13 @@ const STAGGERS: PurposeId = "list"
 export default function Preview({
   state,
   editing,
+  onAssign,
 }: {
   state: MotionState
   /** The curve open in the editor. Marks affected scenarios; never moves you. */
   editing: Emphasis
+  /** Point this purpose at a different emphasis. The one token edit in here. */
+  onAssign: (purpose: PurposeId, emphasis: Emphasis) => void
 }) {
   const [purpose, setPurpose] = useState<PurposeId>("list")
   const [mode, setMode] = useState<Mode>("both")
@@ -205,7 +218,7 @@ export default function Preview({
       </div>
 
       <div className="flex flex-1 flex-col">
-        <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+        <div className="border-line flex flex-col gap-1.5 border-b px-3 py-2">
           {/*
             Scenario tabs are the purposes. Selecting a curve in the editor
             marks the ones it affects rather than jumping you somewhere else —
@@ -239,13 +252,36 @@ export default function Preview({
               )
             })}
           </div>
-          <span className="text-ash font-mono text-[10px]">
-            {emphasis} ·{" "}
-            {mode === "both"
-              ? `${enterToken.durationMs}ms in / ${exitToken.durationMs}ms out`
-              : `${token.durationMs}ms`}
-            {token.easing.kind === "spring" ? " settling" : ""}
-          </span>
+
+          {/* Component first, then motion — the order you actually think in. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <div className="flex items-center gap-1">
+              <span className="text-ash font-mono text-[10px]">{purpose} uses</span>
+              {EMPHASIS_NAMES.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => onAssign(purpose, e)}
+                  aria-pressed={e === emphasis}
+                  title={`Point ${purpose} at the ${e} curve. This is a token change — it lands in the export.`}
+                  className={cn(
+                    "rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
+                    e === emphasis
+                      ? "border-ink/30 bg-ink/[0.06] text-ink border"
+                      : "text-ash hover:text-ink border border-transparent",
+                  )}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            <span className="text-ash font-mono text-[10px]">
+              {mode === "both"
+                ? `${enterToken.durationMs}ms in / ${exitToken.durationMs}ms out`
+                : `${token.durationMs}ms`}
+              {token.easing.kind === "spring" ? " settling" : ""}
+            </span>
+          </div>
         </div>
 
         <div className="bg-ink/[0.02] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
