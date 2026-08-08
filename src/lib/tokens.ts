@@ -30,8 +30,8 @@
 // holds the damping ratio, so it takes longer and
 // feels identical.
 // ==============================================
-import { clampBezier, type Bezier } from "./bezier.js"
-import { motionSettlingTime, type SpringConfig } from "./spring.js"
+import { BEZIER_PRESETS, clampBezier, type Bezier } from "./bezier.js"
+import { SPRING_PRESETS, motionSettlingTime, type SpringConfig } from "./spring.js"
 
 /** Generated durations land on this grid. Values you type are left alone. */
 const ROUND_MS = 10
@@ -72,8 +72,6 @@ export type MotionState = {
    * imply a scale and invite people to expect proportion between neighbours.
    */
   entries: MotionEntry[]
-  /** Which entry `generateSet` reads from. Not a link — nothing tracks it. */
-  primaryId: string
   /** Which entry each purpose reaches for, by entry id. */
   purposeEntry: Record<PurposeId, string>
   staggerMs: number
@@ -255,18 +253,65 @@ export type TransformId = keyof typeof TRANSFORMS
 
 // ---------- the generated set ----------
 
-export const DEFAULT_BEZIER: Bezier = { x1: 0.2, y1: 0, x2: 0, y2: 1 }
-export const DEFAULT_SPRING: SpringConfig = {
-  stiffness: 210,
-  damping: 20,
-  mass: 1,
-  velocity: 0,
+export const DEFAULT_BEZIER: Bezier = BEZIER_PRESETS[0].value
+
+/**
+ * What you land on when you switch a motion to a spring.
+ *
+ * `Lively` rather than the critically-damped `Smooth`, because a critically
+ * damped spring is visually almost indistinguishable from a decent bezier —
+ * someone switching type to find out what a spring is would see nothing
+ * happen. This one visibly overshoots, which is the answer to the question
+ * they were asking.
+ */
+export const DEFAULT_SPRING: SpringConfig = SPRING_PRESETS[2].value
+
+/**
+ * Which named preset an easing currently is, or null for a hand-tuned curve.
+ *
+ * Derived by comparing values, never stored. A stored "selected preset" flag
+ * can disagree with the numbers it claims to describe — drag a handle and the
+ * flag is a lie, load a hand-edited URL and it's a lie on arrival. Comparing
+ * means the answer is always true, and "Custom" needs no representation at
+ * all: it is simply the absence of a match.
+ */
+export function presetIdFor(easing: Easing): string | null {
+  if (easing.kind === "bezier") {
+    const b = easing.bezier
+    const near = (a: number, c: number) => Math.abs(a - c) < 1e-6
+    return (
+      BEZIER_PRESETS.find(
+        (p) =>
+          near(p.value.x1, b.x1) &&
+          near(p.value.y1, b.y1) &&
+          near(p.value.x2, b.x2) &&
+          near(p.value.y2, b.y2),
+      )?.id ?? null
+    )
+  }
+  const s = easing.spring
+  return (
+    SPRING_PRESETS.find(
+      (p) =>
+        p.value.stiffness === s.stiffness &&
+        p.value.damping === s.damping &&
+        p.value.mass === s.mass &&
+        p.value.velocity === s.velocity,
+    )?.id ?? null
+  )
 }
 
 /**
  * The three-level set, built from one motion.
  *
- * Siblings inherit the primary's type, so generating from a bezier gives three
+ * The source is chosen at the moment you press Generate, not held as a flag on
+ * an entry. It was a flag — a "primary" radio on every row — and that was the
+ * last persistent between-entry relationship in a model whose whole rule is
+ * that there aren't any. A one-shot decision does not need a permanent
+ * control, a field in the state, a parameter in the URL, or a promote-someone
+ * -else rule when you delete the entry holding it.
+ *
+ * Siblings inherit the source's type, so generating from a bezier gives three
  * beziers and from a spring gives three springs. That predictability is the
  * point — and it is why the shipped default is three beziers rather than the
  * mixed set it used to be. A default the tool cannot reproduce with its own
@@ -294,9 +339,11 @@ const SEED: MotionEntry = {
   exitRatio: 0.7,
 }
 
+/** Where purposes point when the entry they named has gone. */
+export const PURPOSE_FALLBACK = "std"
+
 export const DEFAULT_STATE: MotionState = {
   entries: generateSet(SEED),
-  primaryId: "std",
   purposeEntry: {
     state: "sub",
     dropdown: "std",
@@ -317,14 +364,15 @@ export function entryById(s: MotionState, id: string): MotionEntry | undefined {
   return s.entries.find((e) => e.id === id)
 }
 
-/** The primary, or the first entry if the flagged one has gone. */
-export function primaryOf(s: MotionState): MotionEntry {
-  return entryById(s, s.primaryId) ?? s.entries[0]
-}
-
-/** The entry a purpose reaches for, falling back to the primary. */
+/**
+ * The entry a purpose reaches for.
+ *
+ * Falls back to the first entry rather than to a designated one, now that
+ * there is no designated one. Deleting an entry repoints anything using it, so
+ * this only fires for a hand-edited link naming an id that never existed.
+ */
 export function entryForPurpose(s: MotionState, p: PurposeId): MotionEntry {
-  return entryById(s, s.purposeEntry[p]) ?? primaryOf(s)
+  return entryById(s, s.purposeEntry[p]) ?? s.entries[0]
 }
 
 /** Which purposes reach for an entry — the "used for" column. */

@@ -124,7 +124,6 @@ const num = (raw: string | null, min: number, max: number): number | undefined =
 export function encodeState(s: MotionState): string {
   const p = new URLSearchParams()
   for (const e of s.entries) p.append("e", encodeEntry(e))
-  p.set("p", s.primaryId)
   p.set("pu", PURPOSE_IDS.map((id) => s.purposeEntry[id]).join("."))
   if (
     s.staggerMs !== DEFAULT_STATE.staggerMs ||
@@ -157,19 +156,16 @@ export function decodeState(search: string): Partial<MotionState> {
   if (!entries.length) return out
   out.entries = entries
 
-  const primary = p.get("p")
-  out.primaryId = primary && seenIds.has(primary) ? primary : entries[0].id
-
   const pu = p.get("pu")?.split(".")
   if (pu?.length === PURPOSE_IDS.length) {
     out.purposeEntry = Object.fromEntries(
-      PURPOSE_IDS.map((id, i) => [id, seenIds.has(pu[i]) ? pu[i] : out.primaryId!]),
+      PURPOSE_IDS.map((id, i) => [id, seenIds.has(pu[i]) ? pu[i] : entries[0].id]),
     ) as Record<PurposeId, string>
   } else {
-    // Entries decoded but the map didn't: point everything at the primary
+    // Entries decoded but the map didn't: point everything at the first entry
     // rather than at ids from a set that is no longer there.
     out.purposeEntry = Object.fromEntries(
-      PURPOSE_IDS.map((id) => [id, out.primaryId!]),
+      PURPOSE_IDS.map((id) => [id, entries[0].id]),
     ) as Record<PurposeId, string>
   }
 

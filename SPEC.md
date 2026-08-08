@@ -70,7 +70,7 @@ two things.
 > **Live within an entry. One-time between entries.**
 
 An exit is always derived from its own entrance, live, because that asymmetry is
-the lesson the tool exists to teach (§3.3). Everything *between* motions — the
+the lesson the tool exists to teach (§3.6). Everything *between* motions — the
 generated set, "make one like this but slower" — seeds a value once and then
 lets go. No links, no anchor, no multipliers to keep in sync.
 
@@ -103,13 +103,14 @@ Plus one standalone: `motion.stagger` — a per-child offset with a decay factor
 
 ### 3.3 Generate
 
-One motion is flagged **primary**. Generate builds the three-level set from it:
+Generate asks **which motion to build from** at the moment you press it, then
+builds the three-level set from your answer:
 
 ```
-subtle = faster(primary)   standard = primary   emphasized = slower(primary)
+subtle = faster(source)    standard = source     emphasized = slower(source)
 ```
 
-Siblings **inherit the primary's type**, so generating from a bezier gives three
+Siblings **inherit the source's type**, so generating from a bezier gives three
 beziers and from a spring gives three springs. They differ in **duration only,
 never in curve**, so that pressing Generate agrees with pressing Faster and
 Slower by hand — if the button secretly did more than the menu items, the two
@@ -121,9 +122,16 @@ irreproducible — it *promised* Generate would hand you a spring, and pressing 
 once would silently strip the set of its character. A default the tool cannot
 make with its own button is a default it should not ship.
 
-The primary is **not an anchor**. Nothing tracks it, nothing links to it, and it
-carries no multiplier — it is only the entry Generate reads from, which is why
-switching it costs nothing and deleting it is survivable.
+**Naming the source is also the confirmation** — Generate replaces the whole
+set, and picking which motion it comes from is a deliberate enough act to serve
+as the warning, where a separate "are you sure?" on top would be one click of
+ceremony too many.
+
+There is no stored primary. It used to be a radio on every row, which was a
+permanent control for a momentary decision — the last persistent between-entry
+relationship in a model whose whole rule is that there aren't any. Deleting it
+also deleted a field in the state, a parameter in the URL, and a
+promote-someone-else rule for when you removed the entry holding the flag.
 
 ### 3.4 Derivations
 
@@ -144,7 +152,34 @@ to *the same spring, quicker*, which a raw multiplier could never express.
 
 Generated durations land on a 10ms grid. Values you type are left alone.
 
-### 3.5 Exits are derived — the one live relationship
+### 3.5 Presets, and how "Custom" works
+
+The shape is chosen from named presets — five per type — and the raw numbers
+only appear once you're past them. Springs get presets too, picked by damping
+ratio rather than by stiffness, because ζ = c / (2√(km)) is what actually
+predicts the feel:
+
+| | ζ | |
+| ------ | ---- | ------------------------------- |
+| Gentle | 1.19 | crawls in, no overshoot at all   |
+| Smooth | 1.0  | critical — quickest, no bounce   |
+| Lively | 0.73 | a little overshoot               |
+| Bouncy | 0.4  | clearly bounces                  |
+| Wobbly | 0.27 | several visible oscillations     |
+
+**Which preset is selected is derived from the values, never stored.** A stored
+flag can disagree with the numbers it claims to name: drag a handle and the flag
+is a lie, load a hand-edited link and it is a lie on arrival. Comparing values
+means the answer is always true and **"Custom" needs no representation at all** —
+it is simply the absence of a match, so nudging anything selects it without a
+single line of code noticing.
+
+Switching type lands on a named preset rather than an arbitrary config —
+`Lively` for a spring rather than the critically-damped `Smooth`, because a
+critical spring looks almost exactly like a decent bezier and someone switching
+type to find out what a spring *is* would see nothing happen.
+
+### 3.6 Exits are derived — the one live relationship
 
 An entrance introduces something and can afford character. An exit removes
 something the user has already finished with, and lingering on it reads as lag.
@@ -159,7 +194,7 @@ So exits are pushed toward the linear end, automatically:
 This is the only relationship in the model that stays live, and it is the one
 opinion worth keeping when everything else became configurable.
 
-### 3.6 Purposes are aliases
+### 3.7 Purposes are aliases
 
 A thin naming layer over the motions, because "which one do I grab for a
 drawer?" is the question people actually have. Seven purposes — `state`,
@@ -187,7 +222,7 @@ agent a *shared vocabulary*. "Use the drawer motion" is unambiguous to both, in
 a way "use standard enter at 200ms" is not — and agents lean on that naming
 heavily.
 
-### 3.7 Names
+### 3.8 Names
 
 Names are yours, capped at 24 characters and limited to `A-Za-z0-9 _-`. That is
 not arbitrary strictness: a name becomes a CSS custom property and a field in a

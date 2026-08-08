@@ -11,11 +11,12 @@
 **Rough version live** at https://motion-studio-silk.vercel.app — still
 `noindex` with `robots.txt` disallowed, because there is no domain yet.
 
-Working: the five-duration generated scale with per-step pinning, three easings
-each editable as a bezier (draggable) or a spring (parameters), six semantic
-tokens with derived exits, seven preview scenarios, the full export panel (CSS,
-Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes, the
-machine-readable block, and URL state. 178 tests.
+Working: a list of named motions, each a bezier (draggable, or picked from
+presets) or a spring (five presets by damping ratio, or raw physics), each with
+a derived exit; Generate builds the three-level set from any one of them; seven
+preview scenarios with component-first assignment; the full export panel (CSS,
+Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes; the
+machine-readable block; and URL state. 199 tests.
 
 ## The model rewrite
 
@@ -39,7 +40,18 @@ purposes pointing at them by id. `SPEC.md` §3 is the record; the short version:
 - Names are yours (24 chars, `A-Za-z0-9 _-`), slugified and deduplicated for
   export. Up to 12 motions.
 
-**The URL contract changed completely** — `e` (repeated, one per motion), `p`,
+**No stored primary.** Generate asks which motion to build from when you press
+it. The radio on every row was a permanent control for a momentary decision —
+and removing it also removed a state field, the `p` URL param, and the
+promote-someone-else rule on delete.
+
+**Presets are the shape selector, for both types**, with the raw numbers behind
+"Custom". Springs got five presets picked by damping ratio. Which one is
+selected is *derived* by comparing values, never stored — so dragging a handle
+lands on Custom with nothing having to notice, and a hand-edited link shows the
+truth on arrival.
+
+**The URL contract changed completely** — `e` (repeated, one per motion) and
 `pu`, plus the unchanged `sg` and `tol`. Old links no longer decode; they
 degrade to defaults rather than erroring. This was the cheap moment: placeholder
 domain, `noindex`, no links in the wild.

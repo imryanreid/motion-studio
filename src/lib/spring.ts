@@ -38,6 +38,31 @@ export const SPRING_DEFAULTS: SpringConfig = {
 }
 
 /**
+ * Named springs, spread across the damping ratio.
+ *
+ * A spring's feel is ζ = c / (2√(km)), not its raw stiffness — so these are
+ * chosen by ζ and the numbers derived from it, which is the opposite of how
+ * anyone picks a spring by hand. ζ = 1 is critical: the quickest arrival with
+ * no overshoot at all. Below it the spring bounces; above it it crawls in.
+ *
+ * Mass is 1 throughout, which costs nothing: only k/m and c/m affect the
+ * motion, so normalising mass is lossless rather than an approximation.
+ */
+export const SPRING_PRESETS: {
+  id: string
+  label: string
+  value: SpringConfig
+  /** The damping ratio these were picked for, shown in the UI. */
+  zeta: number
+}[] = [
+  { id: "gentle", label: "Gentle", zeta: 1.19, value: { stiffness: 120, damping: 26, mass: 1, velocity: 0 } },
+  { id: "smooth", label: "Smooth", zeta: 1.0, value: { stiffness: 210, damping: 29, mass: 1, velocity: 0 } },
+  { id: "lively", label: "Lively", zeta: 0.73, value: { stiffness: 320, damping: 26, mass: 1, velocity: 0 } },
+  { id: "bouncy", label: "Bouncy", zeta: 0.4, value: { stiffness: 400, damping: 16, mass: 1, velocity: 0 } },
+  { id: "wobbly", label: "Wobbly", zeta: 0.27, value: { stiffness: 500, damping: 12, mass: 1, velocity: 0 } },
+]
+
+/**
  * What the numbers mean, rather than what they are.
  *
  * `dampingRatio` and `naturalFrequency` are what actually predict the feel;

@@ -20,6 +20,7 @@ import {
   generateSet,
   mirrorBezier,
   nextId,
+  presetIdFor,
   purposesUsing,
   resolveSemantics,
   sanitizeName,
@@ -32,7 +33,8 @@ import {
   type MotionState,
 } from "./tokens.js"
 import { encodeState, decodeState, resolveState, isDefaultState } from "./params.js"
-import { derive, settlingTime } from "./spring.js"
+import { SPRING_PRESETS, derive, settlingTime } from "./spring.js"
+import { BEZIER_PRESETS } from "./bezier.js"
 import { bezierValue } from "./bezier.js"
 
 const entry = (over: Partial<MotionEntry> = {}): MotionEntry => ({
@@ -60,8 +62,8 @@ describe("the shipped set", () => {
     expect(DEFAULT_STATE.entries).toHaveLength(3)
     for (const e of DEFAULT_STATE.entries) expect(e.easing.kind).toBe("bezier")
 
-    const primary = DEFAULT_STATE.entries.find((e) => e.id === DEFAULT_STATE.primaryId)!
-    expect(generateSet(primary)).toEqual(DEFAULT_STATE.entries)
+    const standard = DEFAULT_STATE.entries.find((e) => e.id === "std")!
+    expect(generateSet(standard)).toEqual(DEFAULT_STATE.entries)
   })
 
   it("lands on the same durations the old five-step scale produced", () => {
@@ -208,6 +210,56 @@ describe("exits are faster and flatter — the one live relationship", () => {
   })
 })
 
+describe("presets are matched, never stored", () => {
+  it("recognises every bezier preset by value", () => {
+    for (const p of BEZIER_PRESETS) {
+      expect(presetIdFor({ kind: "bezier", bezier: p.value })).toBe(p.id)
+    }
+  })
+
+  it("recognises every spring preset by value", () => {
+    for (const p of SPRING_PRESETS) {
+      expect(presetIdFor({ kind: "spring", spring: p.value })).toBe(p.id)
+    }
+  })
+
+  it("spring presets land on the damping ratio they are named for", () => {
+    // These are chosen by zeta and the raw numbers derived from it — a preset
+    // whose stiffness drifted from its damping would be mislabelled.
+    for (const p of SPRING_PRESETS) {
+      expect(derive(p.value).dampingRatio).toBeCloseTo(p.zeta, 1)
+    }
+  })
+
+  it("spring presets run from no bounce to plenty, in order", () => {
+    const zetas = SPRING_PRESETS.map((p) => derive(p.value).dampingRatio)
+    for (let i = 1; i < zetas.length; i++) expect(zetas[i]).toBeLessThan(zetas[i - 1])
+    expect(zetas[0]).toBeGreaterThan(1) // no overshoot at all
+    expect(zetas[zetas.length - 1]).toBeLessThan(0.4) // unmistakably springy
+  })
+
+  it("a nudged value is custom, with nothing needing to be told", () => {
+    // The whole reason this is derived: drag a handle and the selection has to
+    // follow, without a stored flag that could disagree with the curve.
+    const b = BEZIER_PRESETS[0].value
+    expect(presetIdFor({ kind: "bezier", bezier: { ...b, x1: b.x1 + 0.01 } })).toBeNull()
+    const s = SPRING_PRESETS[0].value
+    expect(presetIdFor({ kind: "spring", spring: { ...s, damping: s.damping + 1 } })).toBeNull()
+  })
+
+  it("no two presets share a value, which would make the match ambiguous", () => {
+    const keys = BEZIER_PRESETS.map((p) => JSON.stringify(p.value))
+    expect(new Set(keys).size).toBe(keys.length)
+    const springs = SPRING_PRESETS.map((p) => JSON.stringify(p.value))
+    expect(new Set(springs).size).toBe(springs.length)
+  })
+
+  it("the shipped set and the spring default are both named presets", () => {
+    // Anything you can reach without typing should have a name on it.
+    for (const e of DEFAULT_STATE.entries) expect(presetIdFor(e.easing)).not.toBeNull()
+  })
+})
+
 describe("names, slugs and ids", () => {
   it("keeps only what can survive a URL and a CSS property", () => {
     expect(sanitizeName("Snappy!! <script>")).toBe("Snappy script")
@@ -264,7 +316,7 @@ describe("semantics and purposes", () => {
       ...DEFAULT_STATE,
       purposeEntry: { ...DEFAULT_STATE.purposeEntry, modal: "gone" },
     }
-    expect(entryForPurpose(orphaned, "modal").id).toBe(orphaned.primaryId)
+    expect(entryForPurpose(orphaned, "modal").id).toBe(orphaned.entries[0].id)
   })
 
   it("reports which purposes use a motion", () => {
@@ -299,7 +351,6 @@ describe("URL state", () => {
   const withEntries = (entries: MotionEntry[], over: Partial<MotionState> = {}): MotionState => ({
     ...DEFAULT_STATE,
     entries,
-    primaryId: entries[0].id,
     purposeEntry: Object.fromEntries(PURPOSE_IDS.map((p) => [p, entries[0].id])) as MotionState["purposeEntry"],
     ...over,
   })

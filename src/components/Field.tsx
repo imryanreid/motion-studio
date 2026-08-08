@@ -11,7 +11,6 @@
 // ==============================================
 import { useState } from "react"
 import { cn } from "../shared/utils"
-import { NAME_MAX, sanitizeName } from "../lib/tokens"
 
 /**
  * A number field that holds a draft string while you type.
@@ -83,41 +82,5 @@ export function InlineNumber({
       />
       {suffix && <span className="opacity-60">{suffix}</span>}
     </span>
-  )
-}
-
-/**
- * The name of a motion.
- *
- * Sanitized as you type rather than validated on blur, because the charset
- * isn't arbitrary strictness — the name becomes a CSS custom property and a
- * field in the URL, and finding that out after typing is worse than being
- * quietly prevented from typing it.
- */
-export function NameField({
-  value,
-  onChange,
-  slug,
-}: {
-  value: string
-  onChange: (name: string) => void
-  /** What this actually exports as, shown because it may have been suffixed. */
-  slug: string
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-ash font-mono text-[10px] tracking-wide uppercase">Name</span>
-      <input
-        type="text"
-        value={value}
-        maxLength={NAME_MAX}
-        aria-label="Motion name"
-        onChange={(e) => onChange(sanitizeName(e.target.value))}
-        className="border-line bg-paper text-ink hover:border-ink/30 focus-visible:ring-ink/30 h-8 w-44 rounded-md border px-2 font-mono text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      />
-      <span className="text-ash font-mono text-[10px]" title="What this exports as">
-        motion.{slug}
-      </span>
-    </label>
   )
 }

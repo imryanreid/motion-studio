@@ -25,7 +25,12 @@ import Preview from "./components/Preview"
 import { SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import { DEFAULT_STATE, staggerDelay, type MotionState } from "./lib/tokens"
+import {
+  DEFAULT_STATE,
+  PURPOSE_FALLBACK,
+  staggerDelay,
+  type MotionState,
+} from "./lib/tokens"
 import { LIST_ITEMS } from "./lib/preview"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
@@ -83,7 +88,7 @@ export default function App() {
   const [exportOpen, setExportOpen] = useState(false)
   // Which row is expanded in the Easings list. Also marks the preview
   // scenarios it affects. "" means every row is collapsed.
-  const [selectedId, setSelectedId] = useState(() => DEFAULT_STATE.primaryId)
+  const [selectedId, setSelectedId] = useState(PURPOSE_FALLBACK)
 
   // What reset threw away, kept just long enough to offer it back.
   const undoSnapshot = useRef<MotionState | null>(null)
