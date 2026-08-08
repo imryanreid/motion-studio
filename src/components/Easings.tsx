@@ -13,8 +13,15 @@
 // pushing a body underneath it: the same strip of
 // space becomes the first row of editable fields, so
 // the name and duration appear once instead of twice.
-// Every field is a label over an h-8 control, which
-// is what makes them line up across the row.
+// Every field is a label over an h-8 control and
+// every small button is h-7, which is what makes a
+// row of them line up.
+//
+// Top to bottom the row reads as one decision chain:
+// what kind of easing this is, which named shape of
+// that kind, what it looks like, and only then how
+// long it runs. Duration and exit modify a shape you
+// have already chosen, so they sit after it.
 //
 // The shape is chosen from named presets, and the
 // numbers only appear when you're past them. Which
@@ -32,13 +39,13 @@
 // identical.
 // ==============================================
 import { useState } from "react"
-import { CaretDown, CaretRight, Warning, X } from "@phosphor-icons/react"
+import { CaretDown, CaretRight } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
 import { PanelTitle } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
-import { InlineNumber } from "./Field"
-import Menu, { ChipGroup, FieldStack } from "./Menu"
+import { FieldStack, NumberField, ReadOut, TextField } from "./Field"
+import Menu, { ChipGroup } from "./Menu"
 import { BEZIER_PRESETS } from "../lib/bezier"
 import { SPRING_PRESETS, derive, overshoot, motionSettlingTime } from "../lib/spring"
 import {
@@ -47,6 +54,7 @@ import {
   ENTRY_LIMIT,
   NAME_MAX,
   PURPOSE_FALLBACK,
+  baseSlug,
   TRANSFORMS,
   enterMs,
   exitMs,
@@ -87,44 +95,29 @@ const DERIVATIONS: { id: TransformId | "duplicate"; label: string; title: string
 
 const CUSTOM = "custom"
 
-function Num({
-  label,
-  value,
-  onChange,
-  step = 1,
-  min,
-  max,
-  title,
-}: {
-  label: string
-  value: number
-  onChange: (n: number) => void
-  step?: number
+/** The four spring parameters, in the order they're worth thinking about. */
+const SPRING_FIELDS: {
+  key: "stiffness" | "damping" | "mass" | "velocity"
+  /** Named inside its own box — for a physics parameter the unit IS the name. */
+  short: string
+  step: number
   min?: number
   max?: number
-  title?: string
-}) {
-  return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1" title={title}>
-      <span className="text-ash font-mono text-[10px] tracking-wide uppercase">{label}</span>
-      <input
-        type="number"
-        value={value}
-        step={step}
-        min={min}
-        max={max}
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          if (Number.isFinite(n)) onChange(n)
-        }}
-        className="border-line bg-paper text-ink hover:border-ink/30 focus-visible:ring-ink/30 h-8 w-full min-w-0 rounded-md border px-2 font-mono text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      />
-    </label>
-  )
-}
-
-const chip =
-  "border-line text-ash hover:border-ink/30 hover:text-ink rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+  title: string
+}[] = [
+  { key: "stiffness", short: "stiff", step: 10, min: 1, max: 2000, title: "Stiffness — how hard the spring pulls" },
+  { key: "damping", short: "damp", step: 1, min: 0, max: 200, title: "Damping — how fast the oscillation dies" },
+  {
+    key: "mass",
+    short: "mass",
+    step: 0.1,
+    min: 0.1,
+    max: 10,
+    title: "Mass — only k/m and c/m affect the motion, so this trades against stiffness",
+  },
+  // Deliberately unbounded: a shove can go either way, and hard.
+  { key: "velocity", short: "vel", step: 0.5, title: "Initial velocity — a shove at t=0" },
+]
 
 export default function Easings({
   state,
@@ -138,12 +131,6 @@ export default function Easings({
   selectedId: string
   onSelect: (id: string) => void
 }) {
-  // Generate replaces the whole set, so it asks which motion to build from —
-  // which is also the confirmation, since naming the source is a deliberate
-  // act. That question used to be a permanent "primary" radio on every row: a
-  // persistent control for a momentary decision, in a model whose whole rule
-  // is that nothing between entries persists.
-  const [picking, setPicking] = useState(false)
   // Which row has had Custom clicked explicitly. A row whose values match no
   // preset is custom regardless — this only covers "I want the numbers" while
   // still sitting exactly on a preset.
@@ -198,53 +185,37 @@ export default function Easings({
       },
     })
     onSelect(PURPOSE_FALLBACK)
-    setPicking(false)
   }
 
   return (
     <section className="border-line flex flex-col overflow-hidden rounded-lg border">
       <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
         <PanelTitle>Easings</PanelTitle>
-        {picking ? (
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-ash mr-1 font-mono text-[10px]">
-              Replace all {state.entries.length} with a set from
-            </span>
-            {state.entries.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => generateFrom(e)}
-                title={`Build subtle / standard / emphasized from ${e.name}. Siblings inherit its type.`}
-                className={cn(chip, "max-w-[7rem] truncate")}
-              >
-                {e.name}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setPicking(false)}
-              aria-label="Cancel"
-              className="text-ash hover:text-ink ml-0.5"
-            >
-              <X size={11} weight="bold" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-ash font-mono text-[10px]">
-              {state.entries.length} motion{state.entries.length === 1 ? "" : "s"}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPicking(true)}
-              title="Build the three-level set from one of these motions. Siblings inherit its type and differ in duration only."
-              className={chip}
-            >
-              Generate set
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-ash font-mono text-[10px]">
+            {state.entries.length} motion{state.entries.length === 1 ? "" : "s"}
+          </span>
+          {/*
+            Generate replaces the whole set, so it asks which motion to build
+            from — and naming the source is the confirmation, since picking one
+            by name is deliberate enough on its own.
+          */}
+          <Menu
+            label="Generate a set"
+            triggerLabel="Generate set"
+            groups={[
+              {
+                heading: `Replace all ${state.entries.length} with`,
+                items: state.entries.map((e) => ({
+                  id: e.id,
+                  label: `a set from ${e.name}`,
+                  title: `Build subtle / standard / emphasized from ${e.name}. Siblings inherit its type and differ in duration only.`,
+                  onSelect: () => generateFrom(e),
+                })),
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {state.entries.map((e) => {
@@ -276,16 +247,15 @@ export default function Easings({
                 <div className="flex h-8 shrink-0 items-center">{caret}</div>
 
                 <FieldStack label="Name">
-                  <input
-                    type="text"
+                  <TextField
+                    ariaLabel="Motion name"
                     value={e.name}
                     maxLength={NAME_MAX}
-                    aria-label="Motion name"
-                    onChange={(ev) => patch(e.id, { name: sanitizeName(ev.target.value) })}
-                    className="border-line bg-paper text-ink hover:border-ink/30 focus-visible:ring-ink/30 h-8 w-36 rounded-md border px-2 font-mono text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
                   />
                 </FieldStack>
 
+                {/* Type is the decision the presets below hang off. */}
                 <FieldStack label="Type">
                   <Segmented
                     ariaLabel={`${e.name} curve type`}
@@ -307,50 +277,6 @@ export default function Easings({
                     options={MODE_OPTIONS}
                   />
                 </FieldStack>
-
-                {/* Duration and exit exist only where they mean something. */}
-                {spring ? (
-                  <FieldStack label="Settles">
-                    <span
-                      className="text-ash font-mono text-xs"
-                      title="A spring has no duration. This is where Framer Motion decides it's close enough — other runtimes pick differently."
-                    >
-                      ~{enterMs(e)}ms
-                    </span>
-                  </FieldStack>
-                ) : (
-                  <>
-                    <FieldStack label="Duration">
-                      <span className="text-ink font-mono text-sm">
-                        <InlineNumber
-                          ariaLabel={`${e.name} duration in milliseconds`}
-                          value={e.durationMs}
-                          min={20}
-                          max={9000}
-                          width="w-11"
-                          suffix="ms"
-                          onChange={(durationMs) => patch(e.id, { durationMs })}
-                        />
-                      </span>
-                    </FieldStack>
-                    <FieldStack label="Exit">
-                      <span
-                        className="text-ink font-mono text-sm"
-                        title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
-                      >
-                        <InlineNumber
-                          ariaLabel={`${e.name} exit as a percentage of the entrance`}
-                          value={Math.round(e.exitRatio * 100)}
-                          min={20}
-                          max={130}
-                          width="w-7"
-                          suffix="%"
-                          onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
-                        />
-                      </span>
-                    </FieldStack>
-                  </>
-                )}
 
                 <div className="ml-auto flex h-8 items-center">
                   <Menu
@@ -411,17 +337,27 @@ export default function Easings({
 
             {open && (
               <div className="flex flex-col gap-3 px-4 pb-4">
-                <p className="text-ash font-mono text-[10px]">
-                  <span title="What this exports as">motion.{slug[e.id]}</span>
-                  {" · "}
-                  {used.length ? `used for ${used.join(", ")}` : "nothing uses this yet"}
-                </p>
+                {/*
+                  The export name is only worth saying when it isn't the one
+                  you'd guess — which is exactly when two motions share a name
+                  and the second gets a suffix. Otherwise it repeated what the
+                  Name field already says, next to a purpose list the collapsed
+                  row and the Output table both already carry.
+                */}
+                {slug[e.id] !== baseSlug(e.name) && (
+                  <p className="text-ash font-mono text-[10px]">
+                    Exports as <span className="text-ink">motion.{slug[e.id]}</span> — another
+                    motion already claimed <span className="text-ink">{baseSlug(e.name)}</span>.
+                  </p>
+                )}
 
                 {/*
-                  The shape, chosen by name. Which chip is lit comes from
-                  comparing the current values to each preset, so dragging a
-                  handle lands on Custom without anything having to notice.
+                  The shape, chosen by name, and a function of the type above.
+                  Which chip is lit comes from comparing the current values to
+                  each preset, so dragging a handle lands on Custom without
+                  anything having to notice.
                 */}
+                <FieldStack label="Shape" className="shrink">
                 <ChipGroup
                   ariaLabel={`${e.name} shape`}
                   value={isCustom ? CUSTOM : presetId}
@@ -448,6 +384,7 @@ export default function Easings({
                     })
                   }}
                 />
+                </FieldStack>
 
                 <div className="mx-auto w-full max-w-[380px]">
                   <CurvePlot
@@ -460,121 +397,126 @@ export default function Easings({
                   />
                 </div>
 
-                {isCustom &&
-                  (e.easing.kind === "bezier" ? (
+                {isCustom && (
+                  <FieldStack label={e.easing.kind === "bezier" ? "Handles" : "Physics"}>
                     <div className="flex gap-2">
-                      {(["x1", "y1", "x2", "y2"] as const).map((k) => (
-                        <Num
-                          key={k}
-                          label={k}
-                          value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
-                          step={0.01}
-                          min={k.startsWith("x") ? 0 : undefined}
-                          max={k.startsWith("x") ? 1 : undefined}
-                          title={
-                            k.startsWith("x")
-                              ? "Handle position in time"
-                              : "Handle position in progress. Outside 0–1 overshoots."
-                          }
-                          onChange={(v) =>
-                            e.easing.kind === "bezier" &&
-                            patch(e.id, {
-                              easing: { kind: "bezier", bezier: { ...e.easing.bezier, [k]: v } },
-                            })
-                          }
-                        />
-                      ))}
+                      {e.easing.kind === "bezier"
+                        ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
+                            <NumberField
+                              key={k}
+                              ariaLabel={`${e.name} ${k}`}
+                              suffix={k}
+                              value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
+                              step={0.01}
+                              min={k.startsWith("x") ? 0 : undefined}
+                              max={k.startsWith("x") ? 1 : undefined}
+                              title={
+                                k.startsWith("x")
+                                  ? `${k} — handle position in time`
+                                  : `${k} — handle position in progress. Outside 0–1 overshoots.`
+                              }
+                              onChange={(v) =>
+                                e.easing.kind === "bezier" &&
+                                patch(e.id, {
+                                  easing: {
+                                    kind: "bezier",
+                                    bezier: { ...e.easing.bezier, [k]: v },
+                                  },
+                                })
+                              }
+                            />
+                          ))
+                        : SPRING_FIELDS.map((f) => (
+                            <NumberField
+                              key={f.key}
+                              ariaLabel={`${e.name} ${f.key}`}
+                              suffix={f.short}
+                              value={spring![f.key]}
+                              step={f.step}
+                              min={f.min}
+                              max={f.max}
+                              title={f.title}
+                              onChange={(v) =>
+                                patch(e.id, {
+                                  easing: { kind: "spring", spring: { ...spring!, [f.key]: v } },
+                                })
+                              }
+                            />
+                          ))}
                     </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Num
-                        label="stiff"
-                        value={spring!.stiffness}
-                        min={1}
-                        max={2000}
-                        title="Stiffness — how hard the spring pulls"
-                        onChange={(stiffness) =>
-                          patch(e.id, {
-                            easing: { kind: "spring", spring: { ...spring!, stiffness } },
-                          })
-                        }
-                      />
-                      <Num
-                        label="damp"
-                        value={spring!.damping}
-                        min={0}
-                        max={200}
-                        title="Damping — how fast the oscillation dies"
-                        onChange={(damping) =>
-                          patch(e.id, {
-                            easing: { kind: "spring", spring: { ...spring!, damping } },
-                          })
-                        }
-                      />
-                      <Num
-                        label="mass"
-                        value={spring!.mass}
-                        step={0.1}
-                        min={0.1}
-                        max={10}
-                        title="Mass — only k/m and c/m affect the motion, so this trades against stiffness"
-                        onChange={(mass) =>
-                          patch(e.id, { easing: { kind: "spring", spring: { ...spring!, mass } } })
-                        }
-                      />
-                      <Num
-                        label="vel"
-                        value={spring!.velocity}
-                        step={0.5}
-                        title="Initial velocity — a shove at t=0"
-                        onChange={(velocity) =>
-                          patch(e.id, {
-                            easing: { kind: "spring", spring: { ...spring!, velocity } },
-                          })
-                        }
-                      />
-                    </div>
-                  ))}
-
-                {spring && (
-                  <>
-                    <dl className="text-ash grid grid-cols-3 gap-x-3 font-mono text-[10px] lowercase">
-                      <div>
-                        {/* Not uppercased — CSS text-transform turns ζ into Ζ. */}
-                        <dt className="tracking-wide">ζ damping</dt>
-                        <dd
-                          className={cn(
-                            "text-ink",
-                            d!.regime === "underdamped" && "text-amber-500",
-                          )}
-                        >
-                          {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="tracking-wide">peak</dt>
-                        <dd className="text-ink">{overshoot(spring).peak.toFixed(3)}</dd>
-                      </div>
-                      <div>
-                        <dt className="tracking-wide">settles</dt>
-                        <dd className="text-ink">{motionSettlingTime(spring)}ms</dd>
-                      </div>
-                    </dl>
-                    <p className="text-ash flex items-start gap-1.5 text-[11px] leading-snug">
-                      <Warning
-                        size={12}
-                        weight="fill"
-                        aria-hidden="true"
-                        className="mt-0.5 shrink-0"
-                      />
-                      <span>
-                        A spring has no duration — {motionSettlingTime(spring)}ms is where Framer
-                        Motion decides it's close enough. Other runtimes pick differently, which
-                        is why there's no duration field here.
-                      </span>
-                    </p>
-                  </>
+                  </FieldStack>
                 )}
+
+                {/*
+                  Timing sits last because it modifies a shape you have already
+                  chosen: kind, then which one, then what it looks like, then
+                  how long it runs.
+
+                  A spring has none of it. What it has instead is a settling
+                  time — and the explanation for that lives on hover here
+                  rather than in a paragraph that was permanently shouting a
+                  caveat at someone who had already read it.
+                */}
+                <div className="border-line/60 flex flex-wrap items-end gap-x-3 gap-y-2 border-t pt-3">
+                  {spring ? (
+                    <>
+                      <FieldStack label="Settles">
+                        <ReadOut
+                          title={`A spring has no duration — it approaches its target asymptotically and never arrives. ${motionSettlingTime(spring)}ms is where Framer Motion decides it's close enough. Other runtimes pick a different threshold and will honestly report a different number, which is why there is no duration field here.`}
+                        >
+                          ~{enterMs(e)}ms
+                        </ReadOut>
+                      </FieldStack>
+                      <FieldStack label="ζ damping">
+                        <ReadOut
+                          width="w-32"
+                          title={`Damping ratio: c / (2*sqrt(k*m)). Below 1 the spring overshoots and comes back; at 1 it is critical — the quickest arrival with no bounce at all; above 1 it crawls in.`}
+                        >
+                          <span className={cn(d!.regime === "underdamped" && "text-amber-500")}>
+                            {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
+                          </span>
+                        </ReadOut>
+                      </FieldStack>
+                      <FieldStack label="Peak">
+                        <ReadOut title="How far past its target the spring travels at the top of its first overshoot. 1.0 means it never passes it.">
+                          {overshoot(spring).peak.toFixed(3)}
+                        </ReadOut>
+                      </FieldStack>
+                    </>
+                  ) : (
+                    <>
+                      <FieldStack label="Duration">
+                        <NumberField
+                          ariaLabel={`${e.name} duration in milliseconds`}
+                          value={e.durationMs}
+                          min={20}
+                          max={9000}
+                          step={10}
+                          suffix="ms"
+                          title="How long the entrance runs."
+                          onChange={(durationMs) => patch(e.id, { durationMs })}
+                        />
+                      </FieldStack>
+                      <FieldStack label="Exit">
+                        <NumberField
+                          ariaLabel={`${e.name} exit as a percentage of the entrance`}
+                          value={Math.round(e.exitRatio * 100)}
+                          min={20}
+                          max={130}
+                          step={5}
+                          suffix="%"
+                          title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
+                          onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
+                        />
+                      </FieldStack>
+                      <FieldStack label="Exit runs">
+                        <ReadOut title="Derived, not authored — the exit share applied to the duration beside it.">
+                          {exitMs(e)}ms
+                        </ReadOut>
+                      </FieldStack>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>

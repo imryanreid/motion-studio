@@ -116,7 +116,8 @@ export function sanitizeName(raw: string): string {
   return raw.replace(NAME_ALLOWED, "").slice(0, NAME_MAX)
 }
 
-const slugOf = (name: string) =>
+/** The slug a name wants, before deduplication. */
+export const baseSlug = (name: string) =>
   name
     .toLowerCase()
     .trim()
@@ -134,7 +135,7 @@ export function slugs(entries: MotionEntry[]): Record<string, string> {
   const out: Record<string, string> = {}
   const seen = new Map<string, number>()
   for (const e of entries) {
-    const base = slugOf(e.name)
+    const base = baseSlug(e.name)
     const n = (seen.get(base) ?? 0) + 1
     seen.set(base, n)
     out[e.id] = n === 1 ? base : `${base}-${n}`

@@ -11,8 +11,8 @@
 // that is how a component collects options nobody
 // needs.
 // ==============================================
-import { useEffect, useRef, useState, type ReactNode } from "react"
-import { DotsThree } from "@phosphor-icons/react"
+import { useEffect, useRef, useState } from "react"
+import { CaretDown, DotsThree } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 
 export type MenuItem = {
@@ -29,10 +29,15 @@ export type MenuItem = {
 export default function Menu({
   label,
   groups,
+  triggerLabel,
+  align = "right",
 }: {
   label: string
   /** Each group gets a heading; a group with no heading runs straight on. */
   groups: { heading?: string; items: MenuItem[] }[]
+  /** Set to render a labelled chip instead of the dots icon. */
+  triggerLabel?: string
+  align?: "left" | "right"
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -65,17 +70,28 @@ export default function Menu({
         aria-label={label}
         title={label}
         className={cn(
-          "border-line text-ash hover:border-ink/30 hover:text-ink inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors",
+          "border-line text-ash hover:border-ink/30 hover:text-ink inline-flex h-7 items-center justify-center rounded-md border transition-colors",
+          triggerLabel ? "gap-1 px-2 font-mono text-[10px]" : "w-7",
           open && "border-ink/30 text-ink bg-ink/[0.04]",
         )}
       >
-        <DotsThree size={14} weight="bold" aria-hidden="true" />
+        {triggerLabel ? (
+          <>
+            {triggerLabel}
+            <CaretDown size={9} weight="bold" aria-hidden="true" />
+          </>
+        ) : (
+          <DotsThree size={14} weight="bold" aria-hidden="true" />
+        )}
       </button>
 
       {open && (
         <div
           role="menu"
-          className="border-line bg-paper absolute top-8 right-0 z-20 w-44 overflow-hidden rounded-md border shadow-lg"
+          className={cn(
+            "border-line bg-paper absolute top-8 z-20 w-44 overflow-hidden rounded-md border shadow-lg",
+            align === "right" ? "right-0" : "left-0",
+          )}
         >
           {groups.map((g, gi) => (
             <div key={g.heading ?? gi}>
@@ -136,7 +152,9 @@ export function ChipGroup({
           title={o.title}
           onClick={() => onChange(o.id)}
           className={cn(
-            "rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors",
+            // h-7 everywhere: same height as the menu trigger and every other
+            // small button, so a row of them shares one rhythm.
+            "inline-flex h-7 items-center rounded-md border px-2 font-mono text-[10px] transition-colors",
             o.id === value
               ? "border-ink bg-ink text-paper"
               : "border-line text-ash hover:border-ink/30 hover:text-ink",
@@ -145,26 +163,6 @@ export function ChipGroup({
           {o.label}
         </button>
       ))}
-    </div>
-  )
-}
-
-/** Something that isn't a control, laid out like one. */
-export function FieldStack({
-  label,
-  children,
-  className,
-}: {
-  label: string
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <div className={cn("flex shrink-0 flex-col gap-1", className)}>
-      <span className="text-ash h-3 font-mono text-[10px] leading-3 tracking-wide uppercase">
-        {label}
-      </span>
-      <div className="flex h-8 items-center">{children}</div>
     </div>
   )
 }
