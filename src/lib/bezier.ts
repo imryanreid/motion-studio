@@ -21,7 +21,9 @@ export type Bezier = { x1: number; y1: number; x2: number; y2: number }
  * token name comes from too.
  */
 export const BEZIER_PRESETS: { id: string; label: string; value: Bezier }[] = [
-  { id: "standard", label: "Standard", value: { x1: 0.2, y1: 0, x2: 0, y2: 1 } },
+  // Named "Standard" until it collided with the shipped variant also called
+  // standard — two different things wearing one word in the same panel.
+  { id: "default", label: "Default", value: { x1: 0.2, y1: 0, x2: 0, y2: 1 } },
   { id: "out", label: "Ease out", value: { x1: 0, y1: 0, x2: 0.58, y2: 1 } },
   { id: "in", label: "Ease in", value: { x1: 0.42, y1: 0, x2: 1, y2: 1 } },
   { id: "in-out", label: "Ease in-out", value: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },

@@ -3,6 +3,13 @@
 // A small popover of actions, anchored top-right of
 // whatever it sits in.
 //
+// Set in Inter rather than the mono the rest of the
+// panel uses. A menu is prose — labels and a sentence
+// of explanation — and mono is the family's face for
+// values, not for reading. Inter is already loaded as
+// --font-sans, so this adds a register rather than a
+// typeface.
+//
 // Local to Motion for now rather than in src/shared.
 // Type and Shape will both want one, but the right
 // API for a shared menu is the one a second consumer
@@ -31,6 +38,7 @@ export default function Menu({
   groups,
   triggerLabel,
   align = "right",
+  width = "w-48",
 }: {
   label: string
   /** Each group gets a heading; a group with no heading runs straight on. */
@@ -38,6 +46,8 @@ export default function Menu({
   /** Set to render a labelled chip instead of the dots icon. */
   triggerLabel?: string
   align?: "left" | "right"
+  /** Widen it when a heading is a sentence rather than a label. */
+  width?: string
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -89,14 +99,15 @@ export default function Menu({
         <div
           role="menu"
           className={cn(
-            "border-line bg-paper absolute top-8 z-20 w-44 overflow-hidden rounded-md border shadow-lg",
+            "border-line bg-paper absolute top-8 z-20 overflow-hidden rounded-lg border shadow-lg",
+            width,
             align === "right" ? "right-0" : "left-0",
           )}
         >
           {groups.map((g, gi) => (
             <div key={g.heading ?? gi}>
               {g.heading && (
-                <div className="text-ash border-line/60 border-b px-2.5 py-1.5 font-mono text-[10px] tracking-[0.16em] uppercase">
+                <div className="text-ink border-line/60 border-b px-3 py-2 text-[12px] leading-snug">
                   {g.heading}
                 </div>
               )}
@@ -112,7 +123,7 @@ export default function Menu({
                     setOpen(false)
                   }}
                   className={cn(
-                    "hover:bg-ink/[0.05] block w-full px-2.5 py-1.5 text-left font-mono text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                    "hover:bg-ink/[0.05] block w-full px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                     item.separated && "border-line/60 border-t",
                     item.danger ? "text-red-500" : "text-ink",
                   )}
