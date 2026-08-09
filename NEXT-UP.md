@@ -9,7 +9,12 @@
 ## Current state
 
 **Live** at https://www.springs.studio, indexable and agent-readable, since
-2026-08-09.
+2026-08-09. Has a favicon, app icons and a static OG card; the whole token set
+is in the HTML without JavaScript, with `/api/tokens` and `/llms.txt` beside it.
+
+Listed in the family as **Springs — "Motion, easings & durations"**. The tool's
+own copy stays Motion: the H1, the page title, and the `motion.*` namespace it
+emits. The manifest name is the shelf label.
 
 Working: a list of named motions, each a bezier (draggable, or picked from
 presets) or a spring (five presets by damping ratio, or raw physics), each with
@@ -218,17 +223,11 @@ Called out rather than quietly dropped:
 
 ## Blockers / open questions
 
-- **No favicon.** No `favicon.svg`, `apple-touch-icon` or `icon-192`, and no
-  `<link rel="icon">`. Ramps ships all three; the tab currently shows a default
-  globe. Needs a mark, so it is a design decision rather than a chore.
 - **"max error 375ms (1.0% of travel)" reads as one quantity stated twice.** It
   is two: `maxTemporalMs` is a time error, `maxDeviation` a value error, and on
   a spring's flat tail they move independently — a tighter tolerance can report
   a larger millisecond figure. Correct, but the phrasing invites misreading, and
   it now travels in the agent payload as `conversionCost.css`.
-- **`og:image`.** Motion has no `/api/og`, so there is no card image. Ramps has
-  one; the family looks uneven until this lands. Belongs with the agent-surfaces
-  work.
 - **Browser-pane caveat, for agents only.** The in-app browser pane renders
   pages as a *hidden* tab: `requestAnimationFrame` fires zero frames and
   `setTimeout` is clamped to ~1/sec, so nothing animates and any UI behind an
