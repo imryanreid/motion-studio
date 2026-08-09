@@ -49,7 +49,18 @@ export type MenuItem = {
   submenu?: MenuLevel
 }
 
-export type MenuLevel = { heading?: string; items: MenuItem[] }
+export type MenuLevel = {
+  heading?: string
+  items: MenuItem[]
+  /**
+   * How a checked item is marked.
+   *
+   * A box means several of these can be true at once; a bare tick means you
+   * are choosing one. Using the box for a single choice promises a state the
+   * list cannot hold.
+   */
+  marker?: "checkbox" | "check"
+}
 
 export default function Menu({
   label,
@@ -63,7 +74,7 @@ export default function Menu({
 }: {
   label: string
   /** Each group gets a heading; a group with no heading runs straight on. */
-  groups: { heading?: string; items: MenuItem[] }[]
+  groups: MenuLevel[]
   /** Set to render a labelled chip instead of the dots icon. */
   triggerLabel?: string
   /** Sizing for the trigger itself — a width to truncate a long label into. */
@@ -214,17 +225,27 @@ export default function Menu({
                         item.danger ? "text-red-500" : "text-ink",
                       )}
                     >
-                      {item.checked !== undefined && (
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors",
-                            item.checked ? "border-ink bg-ink text-paper" : "border-line",
-                          )}
-                        >
-                          {item.checked && <Check size={9} weight="bold" />}
-                        </span>
-                      )}
+                      {item.checked !== undefined &&
+                        (g.marker === "check" ? (
+                          // A fixed slot whether ticked or not, so the labels
+                          // still line up on the rows that aren't chosen.
+                          <span
+                            aria-hidden="true"
+                            className="text-ink flex h-3.5 w-3.5 shrink-0 items-center justify-center"
+                          >
+                            {item.checked && <Check size={11} weight="bold" />}
+                          </span>
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors",
+                              item.checked ? "border-ink bg-ink text-paper" : "border-line",
+                            )}
+                          >
+                            {item.checked && <Check size={9} weight="bold" />}
+                          </span>
+                        ))}
                       <span className="truncate">{item.label}</span>
                       {/* Who owns it now — a checkbox that silently unticks
                         itself elsewhere is a checkbox lying about what it does. */}

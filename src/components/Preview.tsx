@@ -288,6 +288,8 @@ export default function Preview({
           groups={[
             {
               heading: "Draw the component at",
+              // One of these, not several — so a tick rather than a box.
+              marker: "check" as const,
               items: ZOOMS.map((z) => ({
                 id: String(z),
                 label: `${Math.round(z * 100)}%`,
