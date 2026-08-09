@@ -48,7 +48,7 @@ import { PanelTitle } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
 import { FIELD_TEXT, FieldStack, NumberField, ReadOut, TextField } from "./Field"
 import Menu, { ChipGroup } from "./Menu"
-import { BEZIER_PRESETS } from "../lib/bezier"
+import { BEZIER_PRESETS, Y_MAX, Y_MIN } from "../lib/bezier"
 import { SPRING_PRESETS, derive, overshoot, motionSettlingTime } from "../lib/spring"
 import {
   DEFAULT_BEZIER,
@@ -475,7 +475,13 @@ export default function Easings({
                   </FieldStack>
                 </div>
 
-                <div className="w-full max-w-[380px]">
+                {/*
+                  The curve and the numbers that describe it are one thing, so
+                  they share one surface. Loose on the panel they had no edges,
+                  and the handles could be dragged toward a boundary that was
+                  not drawn anywhere.
+                */}
+                <div className="border-line/60 bg-paper/40 flex w-full max-w-[420px] flex-col gap-3 rounded-lg border p-3">
                   <CurvePlot
                     easing={e.easing}
                     onChange={
@@ -484,60 +490,60 @@ export default function Easings({
                         : undefined
                     }
                   />
-                </div>
 
-                {isCustom && (
-                  <FieldStack label={e.easing.kind === "bezier" ? "Handles" : "Physics"}>
-                    <div className="flex gap-2">
-                      {e.easing.kind === "bezier"
-                        ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
-                            <NumberField
-                              key={k}
-                              ariaLabel={`${e.name} ${k}`}
-                              suffix={k}
-                              value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
-                              step={0.01}
-                              min={k.startsWith("x") ? 0 : undefined}
-                              max={k.startsWith("x") ? 1 : undefined}
-                              title={
-                                k.startsWith("x")
-                                  ? `${k} — handle position in time`
-                                  : `${k} — handle position in progress. Outside 0–1 overshoots.`
-                              }
-                              onChange={(v) =>
-                                e.easing.kind === "bezier" &&
-                                patch(e.id, {
-                                  easing: {
-                                    kind: "bezier",
-                                    bezier: { ...e.easing.bezier, [k]: v },
-                                  },
-                                })
-                              }
-                            />
-                          ))
-                        : SPRING_FIELDS.map((f) => (
-                            <NumberField
-                              key={f.key}
-                              ariaLabel={`${e.name} ${f.key}`}
-                              suffix={f.short}
-                              value={spring![f.key]}
-                              step={f.step}
-                              min={f.min}
-                              max={f.max}
-                              title={f.title}
-                              onChange={(v) =>
-                                patch(e.id, {
-                                  easing: {
-                                    kind: "spring",
-                                    spring: { ...spring!, [f.key]: v },
-                                  },
-                                })
-                              }
-                            />
-                          ))}
-                    </div>
-                  </FieldStack>
-                )}
+                  {isCustom && (
+                    <FieldStack label={e.easing.kind === "bezier" ? "Handles" : "Physics"}>
+                      <div className="flex gap-2">
+                        {e.easing.kind === "bezier"
+                          ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
+                              <NumberField
+                                key={k}
+                                ariaLabel={`${e.name} ${k}`}
+                                suffix={k}
+                                value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
+                                step={0.01}
+                                min={k.startsWith("x") ? 0 : Y_MIN}
+                                max={k.startsWith("x") ? 1 : Y_MAX}
+                                title={
+                                  k.startsWith("x")
+                                    ? `${k} — handle position in time`
+                                    : `${k} — handle position in progress. Outside 0–1 overshoots.`
+                                }
+                                onChange={(v) =>
+                                  e.easing.kind === "bezier" &&
+                                  patch(e.id, {
+                                    easing: {
+                                      kind: "bezier",
+                                      bezier: { ...e.easing.bezier, [k]: v },
+                                    },
+                                  })
+                                }
+                              />
+                            ))
+                          : SPRING_FIELDS.map((f) => (
+                              <NumberField
+                                key={f.key}
+                                ariaLabel={`${e.name} ${f.key}`}
+                                suffix={f.short}
+                                value={spring![f.key]}
+                                step={f.step}
+                                min={f.min}
+                                max={f.max}
+                                title={f.title}
+                                onChange={(v) =>
+                                  patch(e.id, {
+                                    easing: {
+                                      kind: "spring",
+                                      spring: { ...spring!, [f.key]: v },
+                                    },
+                                  })
+                                }
+                              />
+                            ))}
+                      </div>
+                    </FieldStack>
+                  )}
+                </div>
 
                 {/*
                   Timing sits last because it modifies a shape you have already
@@ -579,47 +585,64 @@ export default function Easings({
                         Broken, they separate and the exit is its own number.
                         Both values persist, so toggling loses neither.
                       */}
-                      <div className={cn("flex items-end", e.exitLinked ? "gap-0" : "gap-2")}>
-                        <FieldStack label="Enter">
-                          <NumberField
-                            ariaLabel={`${e.name} duration in milliseconds`}
-                            value={e.durationMs}
-                            min={20}
-                            max={9000}
-                            step={10}
-                            suffix="ms"
-                            boxClassName={e.exitLinked ? "rounded-r-none" : undefined}
-                            title="How long the entrance runs."
-                            onChange={(durationMs) => patch(e.id, { durationMs })}
-                          />
-                        </FieldStack>
-
-                        <FieldStack label="Exit">
-                          {e.exitLinked ? (
+                      {/*
+                        Fixed width on the pair, with the fields flexing inside
+                        it, so the right edge — and therefore the link button —
+                        lands on the same pixel whether they are joined or
+                        apart. Sized by content, the 8px gap pushed the button
+                        sideways every time you toggled the link.
+                      */}
+                      <div className="flex w-[11.5rem] items-end">
+                        <div
+                          className={cn(
+                            "flex min-w-0 flex-1 items-end",
+                            e.exitLinked ? "gap-0" : "gap-2",
+                          )}
+                        >
+                          <FieldStack label="Enter" className="min-w-0 flex-1 shrink">
                             <NumberField
-                              ariaLabel={`${e.name} exit as a percentage of the entrance`}
-                              value={Math.round(e.exitRatio * 100)}
-                              min={20}
-                              max={130}
-                              step={5}
-                              suffix="%"
-                              boxClassName="-ml-px rounded-l-none"
-                              title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
-                              onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
-                            />
-                          ) : (
-                            <NumberField
-                              ariaLabel={`${e.name} exit duration in milliseconds`}
-                              value={e.exitAbsoluteMs}
+                              ariaLabel={`${e.name} duration in milliseconds`}
+                              value={e.durationMs}
                               min={20}
                               max={9000}
                               step={10}
                               suffix="ms"
-                              title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
-                              onChange={(exitAbsoluteMs) => patch(e.id, { exitAbsoluteMs })}
+                              width="w-full"
+                              boxClassName={e.exitLinked ? "rounded-r-none" : undefined}
+                              title="How long the entrance runs."
+                              onChange={(durationMs) => patch(e.id, { durationMs })}
                             />
-                          )}
-                        </FieldStack>
+                          </FieldStack>
+
+                          <FieldStack label="Exit" className="min-w-0 flex-1 shrink">
+                            {e.exitLinked ? (
+                              <NumberField
+                                ariaLabel={`${e.name} exit as a percentage of the entrance`}
+                                value={Math.round(e.exitRatio * 100)}
+                                min={20}
+                                max={130}
+                                step={5}
+                                suffix="%"
+                                width="w-full"
+                                boxClassName="-ml-px rounded-l-none"
+                                title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
+                                onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
+                              />
+                            ) : (
+                              <NumberField
+                                ariaLabel={`${e.name} exit duration in milliseconds`}
+                                value={e.exitAbsoluteMs}
+                                min={20}
+                                max={9000}
+                                step={10}
+                                suffix="ms"
+                                width="w-full"
+                                title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
+                                onChange={(exitAbsoluteMs) => patch(e.id, { exitAbsoluteMs })}
+                              />
+                            )}
+                          </FieldStack>
+                        </div>
 
                         <button
                           type="button"

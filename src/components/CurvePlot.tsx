@@ -33,8 +33,50 @@ const PANEL_CURVE = {
   y2: EASE_PANEL[3],
 }
 
+/** The whole drawable box, in viewBox units. */
+const VB_H = H + PAD * 2
+
+/**
+ * The value range the box shows, and what it defaults to.
+ *
+ * Expressed in progress units so the mapping has one definition. The defaults
+ * reproduce the original fixed layout exactly: v = 1 lands on PAD, v = 0 lands
+ * on PAD + H.
+ */
+export type View = { lo: number; hi: number }
+const DEFAULT_VIEW: View = { lo: -PAD / H, hi: 1 + PAD / H }
+
+/**
+ * Fit the box to whatever the curve and its handles actually need.
+ *
+ * A curve that overshoots past the default range used to be drawn off-canvas —
+ * you could see neither the arc nor the handle that made it, and a handle you
+ * cannot see is a handle you cannot drag back. The box now rescales instead,
+ * so nothing is ever outside it. In the common case nothing exceeds the
+ * defaults and this returns them unchanged, so the plot doesn't breathe while
+ * you work inside the normal range.
+ */
+function fitView(samples: number[], handles: number[]): View {
+  let { lo, hi } = DEFAULT_VIEW
+  for (const v of samples) {
+    if (v < lo) lo = v
+    if (v > hi) hi = v
+  }
+  for (const v of handles) {
+    if (v < lo) lo = v
+    if (v > hi) hi = v
+  }
+  // Breathing room, but only on a side that actually grew.
+  const span = DEFAULT_VIEW.hi - DEFAULT_VIEW.lo
+  if (lo < DEFAULT_VIEW.lo) lo -= span * 0.08
+  if (hi > DEFAULT_VIEW.hi) hi += span * 0.08
+  return { lo, hi }
+}
+
 const toX = (t: number) => t * W
-const toY = (v: number) => PAD + (1 - v) * H
+const toY = (v: number, view: View) => ((view.hi - v) / (view.hi - view.lo)) * VB_H
+/** The inverse, for turning a pointer position back into a value. */
+const fromY = (frac: number, view: View) => view.hi - frac * (view.hi - view.lo)
 
 const STEPS = 120
 
@@ -51,9 +93,11 @@ function samplesFor(easing: Easing, durationMs: number): number[] {
   return out
 }
 
-const pathFrom = (samples: number[]): string =>
+const pathFrom = (samples: number[], view: View): string =>
   samples
-    .map((v, i) => `${i === 0 ? "M" : "L"}${toX(i / STEPS).toFixed(2)},${toY(v).toFixed(2)}`)
+    .map(
+      (v, i) => `${i === 0 ? "M" : "L"}${toX(i / STEPS).toFixed(2)},${toY(v, view).toFixed(2)}`,
+    )
     .join(" ")
 
 /**
@@ -128,6 +172,7 @@ export default function CurvePlot({
   // Mirrored into state only so the path can drop its animation mid-drag; a
   // curve that eases toward your cursor is a curve that feels broken.
   const [isDragging, setDragging] = useState(false)
+  const [hovered, setHovered] = useState<1 | 2 | null>(null)
   const reduced =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -140,8 +185,7 @@ export default function CurvePlot({
     const box = svgRef.current?.getBoundingClientRect()
     if (!box) return
     const t = (e.clientX - box.left) / box.width
-    // Invert the y mapping, including the padding that gives overshoot room.
-    const v = 1 - ((e.clientY - box.top) / box.height) * ((H + PAD * 2) / H) + PAD / H
+    const v = fromY((e.clientY - box.top) / box.height, frozenView.current)
     const next =
       dragging.current === 1
         ? { ...easing.bezier, x1: t, y1: v }
@@ -167,10 +211,25 @@ export default function CurvePlot({
 
   const shown = useMorphingSamples(samplesFor(easing, duration), !isDragging && !reduced)
 
+  /*
+    The view follows the drawn curve, so it grows smoothly as a morph plays.
+
+    But it is FROZEN for the duration of a drag, and that is not an
+    optimisation — it breaks a feedback loop. Pointer position maps to a value
+    through the view; if the view then rescaled to fit that value, the same
+    pointer would map to a different one on the next frame, and near the top
+    edge it diverges rather than settling. Frozen, a drag is exactly 1:1, and
+    the box re-fits when you let go.
+  */
+  const liveView = fitView(shown, b ? [b.y1, b.y2] : [])
+  const frozenView = useRef(liveView)
+  if (!isDragging) frozenView.current = liveView
+  const view = isDragging ? frozenView.current : liveView
+
   return (
     <svg
       ref={svgRef}
-      viewBox={`0 ${0} ${W} ${H + PAD * 2}`}
+      viewBox={`0 0 ${W} ${VB_H}`}
       className={cn("w-full touch-none select-none", editable && "cursor-crosshair", className)}
       onPointerMove={move}
       onPointerUp={endDrag}
@@ -181,13 +240,27 @@ export default function CurvePlot({
       {!thumb && (
         <>
           {/* The 0 and 1 lines. Anything outside them is overshoot. */}
-          <line x1={0} y1={toY(0)} x2={W} y2={toY(0)} className="stroke-line" strokeWidth={1} />
-          <line x1={0} y1={toY(1)} x2={W} y2={toY(1)} className="stroke-line" strokeWidth={1} />
           <line
             x1={0}
-            y1={toY(0)}
+            y1={toY(0, view)}
             x2={W}
-            y2={toY(1)}
+            y2={toY(0, view)}
+            className="stroke-line"
+            strokeWidth={1}
+          />
+          <line
+            x1={0}
+            y1={toY(1, view)}
+            x2={W}
+            y2={toY(1, view)}
+            className="stroke-line"
+            strokeWidth={1}
+          />
+          <line
+            x1={0}
+            y1={toY(0, view)}
+            x2={W}
+            y2={toY(1, view)}
             className="stroke-line"
             strokeWidth={1}
             strokeDasharray="3 4"
@@ -199,17 +272,17 @@ export default function CurvePlot({
         <>
           <line
             x1={toX(0)}
-            y1={toY(0)}
+            y1={toY(0, view)}
             x2={toX(b.x1)}
-            y2={toY(b.y1)}
+            y2={toY(b.y1, view)}
             className="stroke-ash/40"
             strokeWidth={1}
           />
           <line
             x1={toX(1)}
-            y1={toY(1)}
+            y1={toY(1, view)}
             x2={toX(b.x2)}
-            y2={toY(b.y2)}
+            y2={toY(b.y2, view)}
             className="stroke-ash/40"
             strokeWidth={1}
           />
@@ -217,33 +290,47 @@ export default function CurvePlot({
       )}
 
       <path
-        d={pathFrom(shown)}
+        d={pathFrom(shown, view)}
         fill="none"
         className="stroke-ink"
         strokeWidth={thumb ? 5 : 2}
         strokeLinecap="round"
       />
 
-      {b && (
-        <>
-          <circle
-            cx={toX(b.x1)}
-            cy={toY(b.y1)}
-            r={editable ? 6 : 4}
-            className={cn("fill-paper stroke-ink", editable && "cursor-grab")}
-            strokeWidth={2}
-            onPointerDown={handle(1)}
-          />
-          <circle
-            cx={toX(b.x2)}
-            cy={toY(b.y2)}
-            r={editable ? 6 : 4}
-            className={cn("fill-paper stroke-ink", editable && "cursor-grab")}
-            strokeWidth={2}
-            onPointerDown={handle(2)}
-          />
-        </>
-      )}
+      {b &&
+        ([1, 2] as const).map((n) => {
+          const x = n === 1 ? b.x1 : b.x2
+          const y = n === 1 ? b.y1 : b.y2
+          const active = dragging.current === n && isDragging
+          const warm = active || hovered === n
+          return (
+            /*
+              An invisible ring around each handle, so the target is 22px
+              across while the dot stays 12. Grabbing a 12px circle exactly is
+              a game, not a control — and the hit area is where the hover
+              state comes from too, which is why it carries the listeners.
+            */
+            <g
+              key={n}
+              onPointerEnter={() => editable && setHovered(n)}
+              onPointerLeave={() => setHovered((h) => (h === n ? null : h))}
+              onPointerDown={handle(n)}
+              className={cn(editable && (active ? "cursor-grabbing" : "cursor-grab"))}
+            >
+              <circle cx={toX(x)} cy={toY(y, view)} r={11} fill="transparent" />
+              <circle
+                cx={toX(x)}
+                cy={toY(y, view)}
+                r={editable ? (active ? 7.5 : warm ? 7 : 6) : 4}
+                className={cn(
+                  "transition-[r,fill] duration-100",
+                  active ? "fill-ink stroke-ink" : "fill-paper stroke-ink",
+                )}
+                strokeWidth={2}
+              />
+            </g>
+          )
+        })}
     </svg>
   )
 }

@@ -15,6 +15,8 @@ import {
   bezierToArray,
   clampBezier,
   BEZIER_PRESETS,
+  Y_MIN,
+  Y_MAX,
   type Bezier,
 } from "./bezier.js"
 import {
@@ -81,8 +83,19 @@ describe("bezierValue", () => {
     const clamped = clampBezier({ x1: -0.5, y1: 2, x2: 1.8, y2: -1 })
     expect(clamped.x1).toBe(0)
     expect(clamped.x2).toBe(1)
-    expect(clamped.y1).toBe(2) // y is deliberately left alone
+    // y stays free through the whole overshoot range — that is the point of it.
+    expect(clamped.y1).toBe(2)
     expect(clamped.y2).toBe(-1)
+  })
+
+  it("bounds y far out, so a dragged handle can't be lost off-canvas", () => {
+    // Unbounded sounds permissive and isn't: a handle at y = 40 draws a curve
+    // nobody can see, with no way to reach it again.
+    const wild = clampBezier({ x1: 0.5, y1: 40, x2: 0.5, y2: -40 })
+    expect(wild.y1).toBe(Y_MAX)
+    expect(wild.y2).toBe(Y_MIN)
+    expect(Y_MAX).toBeGreaterThan(2) // still room for a real overshoot
+    expect(Y_MIN).toBeLessThan(-1)
   })
 
   it("serializes to the form CSS, Framer and DTCG all take", () => {

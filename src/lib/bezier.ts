@@ -31,16 +31,28 @@ export const BEZIER_PRESETS: { id: string; label: string; value: Bezier }[] = [
 ]
 
 /**
+ * How far past its endpoints a handle may reach.
+ *
+ * y is bounded but generously: 3 is a 200% overshoot, far beyond anything a
+ * timing function should do, and −2 is the same in reverse. It was unbounded,
+ * which sounds permissive and isn't — a handle dragged to y = 40 draws a curve
+ * nobody can see and leaves no way to get it back.
+ */
+export const Y_MIN = -2
+export const Y_MAX = 3
+
+/**
  * x1 and x2 must stay in [0,1] — required by CSS and by what a timing function
- * means, since time cannot run backwards. y is deliberately unbounded: that is
- * what allows a single overshoot.
+ * means, since time cannot run backwards. y is bounded far more loosely, since
+ * leaving [0,1] is exactly what produces an overshoot.
  */
 export function clampBezier(b: Bezier): Bezier {
+  const y = (n: number) => Math.min(Y_MAX, Math.max(Y_MIN, n))
   return {
     x1: Math.min(1, Math.max(0, b.x1)),
-    y1: b.y1,
+    y1: y(b.y1),
     x2: Math.min(1, Math.max(0, b.x2)),
-    y2: b.y2,
+    y2: y(b.y2),
   }
 }
 
