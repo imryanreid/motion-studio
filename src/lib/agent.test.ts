@@ -265,3 +265,23 @@ describe("llms.txt is true", () => {
     expect(contract).not.toContain("/api/palette")
   })
 })
+
+describe("family discovery", () => {
+  it("lists the other tools, so finding one finds all of them", () => {
+    // The switcher doesn't exist until JavaScript runs and these readers don't
+    // run it, so the dropdown is not a discovery surface for them. Ramps has
+    // carried this from the start; Motion shipped without it for a few hours.
+    const { text } = buildAgentPayload("", ORIGIN)
+    expect(text).toContain("Other tools in this family")
+    for (const name of ["Ramps", "Shape", "Type", "Icons", "Sound"]) {
+      expect(text, `${name} missing from the family listing`).toContain(name)
+    }
+    // And it says which one you are looking at.
+    expect(text).toMatch(/\(this tool\)/)
+  })
+
+  it("puts the same listing in the rendered page", async () => {
+    const res = await withShell(SHELL, () => render(new Request(`${ORIGIN}/`)))
+    expect(await res.text()).toContain("Other tools in this family")
+  })
+})
