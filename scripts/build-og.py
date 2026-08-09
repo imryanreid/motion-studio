@@ -79,12 +79,26 @@ d.text((72 * S, 404 * S), "Generate agent-optimized easings and", font=sub, fill
 d.text((72 * S, 440 * S), "semantic tokens in a few clicks.",     font=sub, fill=ASH)
 
 # ---- Right: curve tiles, staggered and bleeding off the edge like Ramps ----
+#
+# The tiles start clear of the longest line in the lockup, measured rather than
+# assumed — the title is the widest thing on the left and its extent depends on
+# the font, so a hardcoded column edge is a guess that goes stale the moment the
+# copy changes.
 TILE, GAP, OFFSETS = 126, 14, [96, 0, 60, 24]
+title = f("Geist-SemiBold.ttf", 78)
+sub_f = f("Geist-Regular.ttf", 26)
+widest = max(
+    72 + d.textlength("Motion Token", font=title) / S,
+    72 + d.textlength("Generator", font=title) / S,
+    72 + d.textlength("Generate agent-optimized easings and", font=sub_f) / S,
+)
+GUTTER = 56
+COL = math.ceil((widest + GUTTER) / 2) * 2
 top = (H - (4 * TILE + 3 * GAP)) // 2
 mono = f("GeistMono-Regular.ttf", 15)
 for row in range(4):
     y = top + row * (TILE + GAP)
-    x0 = 600 + OFFSETS[row]
+    x0 = COL + OFFSETS[row]
     for col in range(4):
         x = x0 + col * (TILE + GAP)
         if x > W: break
