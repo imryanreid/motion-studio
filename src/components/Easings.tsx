@@ -840,7 +840,7 @@ export default function Easings({
                           </>
                         )}
 
-                        <FieldStack label="Stagger">
+                        <FieldStack label="List stagger">
                           <NumberField
                             ariaLabel={`${e.name} stagger in milliseconds`}
                             value={e.staggerMs}
