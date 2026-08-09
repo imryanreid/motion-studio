@@ -8,7 +8,8 @@
 
 ## Current state
 
-**Live** at https://www.springs.studio, indexable, since 2026-08-09.
+**Live** at https://www.springs.studio, indexable and agent-readable, since
+2026-08-09.
 
 Working: a list of named motions, each a bezier (draggable, or picked from
 presets) or a spring (five presets by damping ratio, or raw physics), each with
@@ -16,6 +17,36 @@ a derived exit; Generate builds the three-level set from any one of them; seven
 preview scenarios with component-first assignment; the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes; the
 machine-readable block; per-token export selection; and URL state. 216 tests.
+
+## Agent surfaces (2026-08-09)
+
+`middleware.ts` sends `/` to `api/render`, which injects the motion set into the
+HTML as both a JSON script and a `<pre>`. A no-JavaScript fetch of the homepage
+went from 1,497 bytes to ~19,200. `/api/tokens` is the same payload as JSON,
+`/llms.txt` is the contract, JSON-LD is in the head. `src/lib/agent.ts` builds
+the payload and is pure, so the functions import it without React.
+
+**Two things went wrong; both are worth remembering.**
+
+*The renderer served the previous build's shell.* `/index.html` is a stable URL
+whose contents change every deploy, so the internal fetch took a CDN hit from
+the last build — and production served current tokens grafted onto a document
+whose asset hash 404'd. Perfectly readable to an agent, completely broken for a
+person. Fixed with `cache: "no-store"` plus a per-deployment query key. Ramps
+had the identical shape and was one deploy from the same failure — PR #3 there.
+
+*llms.txt was wrong, which is worse than absent.* It documented spring mass as a
+plain number when the codec scales it ×100, and called the tolerance
+thousandths when it is ten-thousandths. An agent would have followed it and
+built a URL decoding to a different spring. There is now a test that parses the
+worked example out of the file and asserts it decodes to what the prose claims
+— and that test immediately found a real codec bug, where `decodeState`
+returned early without an `e`, silently discarding `?tol=`.
+
+**The rule this establishes:** anything touching `api/`, `src/lib/agent.ts` or
+`src/lib/params.ts` gets a real no-JavaScript fetch. Note that preview
+deployments are SSO-protected, so that check has to run against production —
+which is why the launch shipped and was verified in that order.
 
 ## Choosing what ships
 
@@ -187,6 +218,14 @@ Called out rather than quietly dropped:
 
 ## Blockers / open questions
 
+- **No favicon.** No `favicon.svg`, `apple-touch-icon` or `icon-192`, and no
+  `<link rel="icon">`. Ramps ships all three; the tab currently shows a default
+  globe. Needs a mark, so it is a design decision rather than a chore.
+- **"max error 375ms (1.0% of travel)" reads as one quantity stated twice.** It
+  is two: `maxTemporalMs` is a time error, `maxDeviation` a value error, and on
+  a spring's flat tail they move independently — a tighter tolerance can report
+  a larger millisecond figure. Correct, but the phrasing invites misreading, and
+  it now travels in the agent payload as `conversionCost.css`.
 - **`og:image`.** Motion has no `/api/og`, so there is no card image. Ramps has
   one; the family looks uneven until this lands. Belongs with the agent-surfaces
   work.
