@@ -17,6 +17,18 @@
 | `.mise.toml`     | Pins the toolchain: Node 22, pnpm 10.                                                                                             |
 | `LICENSE`        | MIT.                                                                                                                              |
 
+## `public/`
+
+| File                   | What it is                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `favicon.svg`          | A spring's step response — rise, overshoot, settle — in amber on ink.           |
+| `apple-touch-icon.png` | 180px, flattened onto ink so a home screen never shows a transparent corner.    |
+| `icon-192.png`         | 192px, same mark.                                                               |
+| `og.png`               | The share card. Static — nothing in it depends on the URL. Rebuild with `scripts/build-og.py`. |
+| `llms.txt`             | The agent contract: every parameter, the token names, the rules that matter.    |
+| `robots.txt`           | Permissive, points at the sitemap.                                              |
+| `sitemap.xml`          | One URL. There is one page.                                                     |
+
 ## `api/` — serverless, agent-facing
 
 | File        | What it is                                                                                            |
@@ -28,6 +40,7 @@
 
 | File             | What it does                                                                                                                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `build-og.py`    | Redraws `public/og.png` with Pillow and the Geist TTFs. Run by hand; the card only changes when the copy does. |
 | `sync-shared.sh` | Pulls `src/shared` from Ramps Studio, which is upstream. `--check` diffs and exits non-zero instead. Wired up as `pnpm sync` and `pnpm sync:check`. Copied, not authored here. |
 
 ## `src/`

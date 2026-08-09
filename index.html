@@ -12,11 +12,15 @@
     <link rel="canonical" href="https://www.springs.studio/" />
     <meta name="robots" content="index, follow" />
 
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     <!--
-      No og:image. Ramps points at its own /api/og; Motion has no such route
-      yet, and an og:image tag aimed at a 404 is worse than none — a card with
-      a broken image reads as a broken site. Add it, and switch the twitter
-      card to summary_large_image, when the agent-surfaces work lands.
+      A static card, unlike Ramps' per-palette /api/og. Nothing about this one
+      depends on the URL, so rendering it on every unfurl would be a serverless
+      invocation to produce a byte-identical file. scripts/build-og.py
+      regenerates it.
     -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.springs.studio/" />
@@ -29,7 +33,16 @@
       property="og:description"
       content="Cubic-bezier and spring easings previewed on real UI, each with its own duration and a derived, faster exit. Exports to CSS, Tailwind, Framer Motion and DTCG, with the cost of each conversion measured rather than hidden."
     />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="https://www.springs.studio/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Motion Token Generator — a grid of easing curves, from cubic-beziers to overshooting springs"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://www.springs.studio/og.png" />
     <meta
       name="twitter:title"
       content="Motion · Easings and semantic tokens your agent can read"

@@ -495,7 +495,7 @@ function Stage({
 
   if (purpose === "state") {
     return (
-      <div className="border-line flex h-8 w-14 items-center rounded-full border px-1">
+      <div className="border-line bg-paper flex h-8 w-14 items-center rounded-full border px-1 shadow-sm">
         <div
           className="bg-ink h-6 w-6 rounded-full"
           style={{ transform: `translateX(${p * 24}px)` }}
