@@ -285,7 +285,11 @@ export default function Easings({
             layout
             transition={{ duration: DUR.panel, ease: EASE_PANEL }}
             className={cn(
-              "border-line/60 relative overflow-hidden border-b",
+              // The section draws its own bottom edge, so the last row must
+              // not draw one too — two 1px strokes on the same line read as a
+              // single heavier one, which is the only place the panel looked
+              // bottom-weighted.
+              "border-line/60 relative overflow-hidden border-b last:border-b-0",
               open && "bg-ink/[0.03]",
             )}
           >
