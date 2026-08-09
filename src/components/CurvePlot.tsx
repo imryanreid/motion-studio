@@ -37,6 +37,16 @@ const PANEL_CURVE = {
 const VB_H = H + PAD * 2
 
 /**
+ * Slack around the drawable box, so a handle sitting on an edge is drawn whole.
+ *
+ * A handle at t = 0 is centred on x = 0, and the viewBox used to start there —
+ * so half the circle fell outside it and got clipped into a half-moon. The
+ * same happened vertically at the top of the range. The mapping is unchanged;
+ * the canvas is simply bigger than the area things are mapped into.
+ */
+const EDGE = 12
+
+/**
  * The value range the box shows, and what it defaults to.
  *
  * Expressed in progress units so the mapping has one definition. The defaults
@@ -184,8 +194,12 @@ export default function CurvePlot({
     if (!dragging.current || easing.kind !== "bezier" || !onChange) return
     const box = svgRef.current?.getBoundingClientRect()
     if (!box) return
-    const t = (e.clientX - box.left) / box.width
-    const v = fromY((e.clientY - box.top) / box.height, frozenView.current)
+    // The element spans the padded viewBox, so a pointer fraction has to be
+    // mapped back through the slack before it means anything in curve units.
+    const vbX = -EDGE + ((e.clientX - box.left) / box.width) * (W + EDGE * 2)
+    const vbY = -EDGE + ((e.clientY - box.top) / box.height) * (VB_H + EDGE * 2)
+    const t = vbX / W
+    const v = fromY(vbY / VB_H, frozenView.current)
     const next =
       dragging.current === 1
         ? { ...easing.bezier, x1: t, y1: v }
@@ -229,7 +243,9 @@ export default function CurvePlot({
   return (
     <svg
       ref={svgRef}
-      viewBox={`0 0 ${W} ${VB_H}`}
+      viewBox={
+        thumb ? `0 0 ${W} ${VB_H}` : `${-EDGE} ${-EDGE} ${W + EDGE * 2} ${VB_H + EDGE * 2}`
+      }
       className={cn("w-full touch-none select-none", editable && "cursor-crosshair", className)}
       onPointerMove={move}
       onPointerUp={endDrag}
