@@ -178,7 +178,7 @@ export default function Preview({
               "rounded-md border px-2 py-1 font-mono text-[10px] transition-colors",
               loop
                 ? "border-ink/30 bg-ink/[0.05] text-ink"
-                : "border-line text-ash hover:text-ink",
+                : "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
             )}
           >
             loop
@@ -188,7 +188,7 @@ export default function Preview({
             onClick={() => setPlaying((p) => !p)}
             title={playing ? "Pause" : "Play"}
             aria-label={playing ? "Pause" : "Play"}
-            className="border-line text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
           >
             {playing ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" />}
           </button>
@@ -197,7 +197,7 @@ export default function Preview({
             onClick={replay}
             title="Replay"
             aria-label="Replay"
-            className="border-line text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
           >
             <ArrowClockwise size={12} weight="bold" />
           </button>
@@ -251,7 +251,7 @@ export default function Preview({
             </span>
             <span>
               {mode === "both"
-                ? `${enterToken.durationMs}ms in / ${exitToken.durationMs}ms out`
+                ? `${enterToken.durationMs}ms enter / ${exitToken.durationMs}ms exit`
                 : `${token.durationMs}ms`}
               {token.easing.kind === "spring" ? " settling" : ""}
             </span>

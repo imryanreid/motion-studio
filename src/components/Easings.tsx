@@ -580,7 +580,7 @@ export default function Easings({
                         Both values persist, so toggling loses neither.
                       */}
                       <div className={cn("flex items-end", e.exitLinked ? "gap-0" : "gap-2")}>
-                        <FieldStack label="Duration">
+                        <FieldStack label="Enter">
                           <NumberField
                             ariaLabel={`${e.name} duration in milliseconds`}
                             value={e.durationMs}
@@ -678,8 +678,8 @@ export default function Easings({
                 </span>
                 <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
                 <span className="text-ink shrink-0 font-mono text-[11px]">
-                  {enterMs(e)}ms <span className="text-ash">in</span> / {exitMs(e)}ms{" "}
-                  <span className="text-ash">out{spring && " settling"}</span>
+                  {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
+                  <span className="text-ash">exit{spring && " settling"}</span>
                 </span>
                 <span className="text-ash ml-auto truncate pl-2 text-right text-[11px]">
                   {used.length ? used.join(", ") : "—"}

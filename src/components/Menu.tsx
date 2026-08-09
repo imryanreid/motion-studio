@@ -106,7 +106,12 @@ export default function Menu({
         title={label}
         className={cn(
           "text-ash hover:text-ink inline-flex items-center justify-center transition-colors",
-          bare ? "h-4 w-4" : "border-line hover:border-ink/30 h-7 rounded-md border",
+          bare
+            ? // Negative margin cancels the extra height, so a 24px hover
+              // target still measures 16 in the label band it has to stay
+              // centred in.
+              "hover:bg-ink/[0.07] -my-1 h-6 w-6 rounded"
+            : "border-line bg-paper hover:border-ink/30 h-7 rounded-md border",
           !bare && (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-[10px]" : "w-7"),
           triggerClassName,
           open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.04]"),
@@ -222,7 +227,9 @@ export function ChipGroup({
             "inline-flex h-7 items-center rounded-md border px-2 font-mono text-[10px] transition-colors",
             o.id === value
               ? "border-ink bg-ink text-paper"
-              : "border-line text-ash hover:border-ink/30 hover:text-ink",
+              : // Same surface as an input: transparent on a tinted panel, an
+                // unselected option reads as disabled rather than as a choice.
+                "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
           )}
         >
           {o.label}
