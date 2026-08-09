@@ -307,7 +307,11 @@ export function cssFidelity(s: MotionState): FormatFidelity {
       `measured against the exact closed-form curve rather than estimated.\n\n` +
       `Framer Motion runs the real physics, so its export is exact — the same token will differ ` +
       `slightly depending on which one you took. Tighten the accuracy control to close the gap at ` +
-      `the cost of a longer string.`,
+      `the cost of a longer string.\n\n` +
+      `That figure is position: the polyline stays within ${(worstApprox.maxDeviation * 100).toFixed(1)}% of the element's total ` +
+      `travel at every moment. The largest *timing* difference — when the approximation reaches a ` +
+      `given position against when the true curve does — is ${Math.round(worstApprox.maxTemporalMs)}ms, and on a spring ` +
+      `almost all of it sits in the asymptotic tail, after the element has visually arrived.`,
   }
 }
 
@@ -384,7 +388,7 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
     `2. **Reach for a purpose, not a raw duration.** The purpose aliases above say what a motion is for; the durations say only how long it is.`,
     `3. **Duration should grow with travel distance, sub-linearly.** Roughly \`duration x (travel / 160px)^0.5\`, clamped to 0.6x-1.8x. Apply it to motions that actually travel; a checkbox filling has no distance.`,
     `4. **Stagger falls off.** Each motion carries its own per-child offset — ${s.entries.map((e) => `${slugs(s.entries)[e.id]} ${e.staggerMs}ms`).join(", ")} — applied as \`offset x index^${STAGGER_DECAY}\`, so a long list doesn't take proportionally long.`,
-    `5. **Always ship the reduced-motion block.** It's in the CSS export already. In Framer Motion use \`<MotionConfig reducedMotion="user">\`.`,
+    `5. **Always ship the \`prefers-reduced-motion\` block.** It's in the CSS export already. In Framer Motion use \`<MotionConfig reducedMotion="user">\`.`,
     "",
     "## A spring has no duration",
     "",
@@ -410,7 +414,16 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
   // this block is written for don't run it — so without this an agent that
   // finds this tool has no way to learn the others exist. Ramps has carried
   // this from the start; this was the half of the contract Motion was missing.
+  // Where the actual code is. The four export formats live in the JSON script
+  // tag, which HTML-to-markdown conversion strips — so the reader most likely
+  // to be seeing this text is exactly the one who cannot see them, and nothing
+  // here said so. Rebuilding a stylesheet from the table above is work nobody
+  // should do by hand.
   lines.push(
+    "",
+    "## Getting the code",
+    "",
+    `The ready-made CSS, Tailwind theme, Framer Motion transitions and DTCG file are not in this text. They are in the JSON at ${new URL("/api/tokens", url).toString()}, which takes the same query string as this page. If you are reading this as markdown, that JSON was stripped along with the script tag holding it — fetch the URL rather than rebuilding the stylesheet from the table above.`,
     "",
     "## Other tools in this family",
     "",

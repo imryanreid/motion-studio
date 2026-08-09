@@ -177,9 +177,7 @@ describe("linear() approximation", () => {
     const s = { stiffness: 210, damping: 20, mass: 1, velocity: 0 }
     const d = motionSettlingTime(s)
     const line = describeApproximation(approximate(springProgress(s, d), d, 24))
-    expect(line).toMatch(
-      /^linear\(\) approximation · max error \d+ms \(\d+\.\d% of travel\) · \d+ samples$/,
-    )
+    expect(line).toMatch(/^linear\(\) approximation · within \d+\.\d% of travel · \d+ samples$/)
   })
 
   it("a straight line needs no interior points", () => {

@@ -190,7 +190,19 @@ export function approximateToTolerance(
 /** One line for the export panel's fidelity note. */
 export function describeApproximation(a: LinearApproximation & { atCap?: boolean }): string {
   const pct = (a.maxDeviation * 100).toFixed(1)
-  const base = `linear() approximation · max error ${Math.round(a.maxTemporalMs)}ms (${pct}% of travel) · ${a.points.length} samples`
+  // Deviation, not maxTemporalMs, and deliberately.
+  //
+  // This used to read "max error 375ms (1.0% of travel)", which invites you to
+  // read one quantity stated twice. They are different axes: deviation is
+  // vertical (position), maxTemporalMs is horizontal (timing). Worse, the
+  // sampler optimises deviation and the timing figure is emergent, so
+  // tightening the tolerance could make the headline number go *up* — 3% gave
+  // 306ms where 1% gave 375ms, which reads as a broken control.
+  //
+  // The timing figure is real and still reported, but in the detail where it
+  // can say where it comes from: on a spring it lands in the asymptotic tail,
+  // after the element has visually arrived.
+  const base = `linear() approximation · within ${pct}% of travel · ${a.points.length} samples`
   // Say when the sample cap bound the result rather than the tolerance —
   // otherwise the number reads as a choice when it was a limit.
   return a.atCap ? `${base} · at sample cap` : base

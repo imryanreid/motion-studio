@@ -285,3 +285,25 @@ describe("family discovery", () => {
     expect(await res.text()).toContain("Other tools in this family")
   })
 })
+
+describe("payload stability", () => {
+  it("declares a version, and llms.txt says what it means", () => {
+    const { json } = buildAgentPayload("", ORIGIN)
+    expect(json.version).toBe(1)
+    const contract = readFileSync(
+      fileURLToPath(new URL("../../public/llms.txt", import.meta.url)),
+      "utf8",
+    )
+    expect(contract).toContain("version")
+    expect(contract).toMatch(/only ever added/)
+  })
+
+  it("tells a markdown reader where the code actually is", () => {
+    // The formats live in the script tag that markdown conversion strips, so
+    // the text has to name the endpoint or that reader rebuilds a stylesheet
+    // by hand from the token table.
+    const { text } = buildAgentPayload("", ORIGIN)
+    expect(text).toContain("/api/tokens")
+    expect(text).toContain("prefers-reduced-motion")
+  })
+})

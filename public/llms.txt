@@ -28,6 +28,12 @@ For JSON alone, swap the path:
 
 Both accept the same query string, so a share link works on either.
 
+The ready-made CSS, Tailwind theme, Framer Motion transitions and DTCG file are
+in that JSON under `formats`. They are deliberately not in the page text: if
+you are reading the page as markdown, the JSON was stripped along with the
+script tag holding it, so fetch /api/tokens rather than rebuilding a stylesheet
+from the token table.
+
 ## Query contract
 
 Every parameter is optional. With none, you get the shipped default set.
@@ -71,6 +77,15 @@ Each motion publishes two tokens:
 and each purpose aliases one of them:
 
   motion.<purpose>-enter -> var(--motion-<slug>-enter)
+
+## Stability
+
+The JSON at /api/tokens carries a `version` integer, currently 1.
+
+Keys are only ever added. An existing key will not be removed, retyped, or
+given a new meaning without `version` changing — so parse defensively for keys
+you do not recognise, and treat a `version` you do not know as a reason to stop
+rather than to guess.
 
 ## Rules that matter when applying these
 
