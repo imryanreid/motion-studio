@@ -10,8 +10,9 @@
 // physics, not from points you can grab — so it draws
 // read-only and is edited through its parameters.
 // ==============================================
-import { useRef, type PointerEvent as ReactPointerEvent } from "react"
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { cn } from "../shared/utils"
+import { DUR, EASE_PANEL } from "../shared/motion"
 import { clampBezier, bezierValue, type Bezier } from "../lib/bezier"
 import { springValue, motionSettlingTime } from "../lib/spring"
 import type { Easing } from "../lib/tokens"
@@ -24,21 +25,89 @@ const H = 112
 /** Room above and below the box so overshoot has somewhere to go. */
 const PAD = 22
 
+/** The family's panel easing, as a curve this file can evaluate. */
+const PANEL_CURVE = {
+  x1: EASE_PANEL[0],
+  y1: EASE_PANEL[1],
+  x2: EASE_PANEL[2],
+  y2: EASE_PANEL[3],
+}
+
 const toX = (t: number) => t * W
 const toY = (v: number) => PAD + (1 - v) * H
 
-function pathFor(easing: Easing, durationMs: number): string {
-  const steps = 120
-  const pts: string[] = []
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    const v =
+const STEPS = 120
+
+/** Progress at each sample. Always the same length, whatever the easing is. */
+function samplesFor(easing: Easing, durationMs: number): number[] {
+  const out = new Array<number>(STEPS + 1)
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS
+    out[i] =
       easing.kind === "bezier"
         ? bezierValue(easing.bezier, t)
         : springValue(easing.spring, t * durationMs)
-    pts.push(`${i === 0 ? "M" : "L"}${toX(t).toFixed(2)},${toY(v).toFixed(2)}`)
   }
-  return pts.join(" ")
+  return out
+}
+
+const pathFrom = (samples: number[]): string =>
+  samples
+    .map((v, i) => `${i === 0 ? "M" : "L"}${toX(i / STEPS).toFixed(2)},${toY(v).toFixed(2)}`)
+    .join(" ")
+
+/**
+ * Travel to a new curve rather than cutting to it.
+ *
+ * Motion cannot do this for us: `animate={{ d }}` leaves the attribute
+ * undefined, because the `d` attribute isn't one of the SVG properties it
+ * interpolates. But every curve here is sampled at the same fixed count, so
+ * the two shapes are just two arrays of the same length — lerping them
+ * pointwise is exact, and it's what lets a bezier morph into a spring.
+ *
+ * Eased with the family's own panel curve, evaluated by the same bezier code
+ * the tool exports.
+ *
+ * Skipped entirely while dragging (a curve easing toward your cursor feels
+ * broken) and under reduced motion, which the rest of the app honours too.
+ */
+function useMorphingSamples(target: number[], animate: boolean): number[] {
+  // Null except mid-flight, and the target is what renders otherwise. That
+  // ordering is the point: an animation that fails to run leaves the correct
+  // curve on screen rather than a stale one. Holding the tween as the source
+  // of truth made the drawing depend on requestAnimationFrame actually firing
+  // — and in a throttled or backgrounded tab it doesn't, which stranded the
+  // plot on the previous shape while every number beside it had moved on.
+  const [morph, setMorph] = useState<number[] | null>(null)
+  const previous = useRef(target)
+  const key = target.length + ":" + target.map((v) => v.toFixed(4)).join(",")
+
+  useEffect(() => {
+    const start = previous.current
+    previous.current = target
+    if (!animate || start.length !== target.length) {
+      setMorph(null)
+      return
+    }
+    let raf = 0
+    const t0 = performance.now()
+    const ms = DUR.panel * 1000
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / ms)
+      if (p >= 1) {
+        setMorph(null)
+        return
+      }
+      const e = bezierValue(PANEL_CURVE, p)
+      setMorph(target.map((v, i) => start[i] + (v - start[i]) * e))
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the values, not the array identity
+  }, [key, animate])
+
+  return morph ?? target
 }
 
 export default function CurvePlot({
@@ -56,6 +125,12 @@ export default function CurvePlot({
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const dragging = useRef<1 | 2 | null>(null)
+  // Mirrored into state only so the path can drop its animation mid-drag; a
+  // curve that eases toward your cursor is a curve that feels broken.
+  const [isDragging, setDragging] = useState(false)
+  const reduced =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   const duration = easing.kind === "spring" ? motionSettlingTime(easing.spring) : 1
 
   const editable = easing.kind === "bezier" && Boolean(onChange)
@@ -77,12 +152,20 @@ export default function CurvePlot({
   const handle = (n: 1 | 2) => (e: ReactPointerEvent) => {
     if (!editable) return
     dragging.current = n
+    setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const endDrag = () => {
+    dragging.current = null
+    setDragging(false)
   }
 
   // A thumbnail carries the shape and nothing else: at 54px the guides and
   // handles are noise, and the row it sits in is for comparing three shapes.
   const b = easing.kind === "bezier" && !thumb ? easing.bezier : null
+
+  const shown = useMorphingSamples(samplesFor(easing, duration), !isDragging && !reduced)
 
   return (
     <svg
@@ -90,8 +173,8 @@ export default function CurvePlot({
       viewBox={`0 ${0} ${W} ${H + PAD * 2}`}
       className={cn("w-full touch-none select-none", editable && "cursor-crosshair", className)}
       onPointerMove={move}
-      onPointerUp={() => (dragging.current = null)}
-      onPointerLeave={() => (dragging.current = null)}
+      onPointerUp={endDrag}
+      onPointerLeave={endDrag}
       role="img"
       aria-label="Easing curve"
     >
@@ -134,7 +217,7 @@ export default function CurvePlot({
       )}
 
       <path
-        d={pathFor(easing, duration)}
+        d={pathFrom(shown)}
         fill="none"
         className="stroke-ink"
         strokeWidth={thumb ? 5 : 2}

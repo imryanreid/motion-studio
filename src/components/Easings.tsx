@@ -39,8 +39,10 @@
 // identical.
 // ==============================================
 import { useState } from "react"
+import { motion } from "motion/react"
 import { CaretDown, CaretRight } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
+import { DUR, EASE_PANEL } from "../shared/motion"
 import Segmented from "../shared/components/Segmented"
 import { PanelTitle } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
@@ -271,7 +273,24 @@ export default function Easings({
         )
 
         return (
-          <div key={e.id} className={cn("border-line/60 border-b", open && "bg-ink/[0.02]")}>
+          /*
+            `layout` earns two things at once: the row animates its own height
+            as it expands, and every row below it slides down rather than
+            jumping. overflow-hidden is what turns the height change into a
+            reveal instead of the new content spilling out of a growing box.
+
+            Reduced motion is handled upstream — ToolShell wraps the app in
+            MotionConfig reducedMotion="user", and the CSS block in tokens.css
+            covers the non-Motion transitions. A tool that ships a
+            prefers-reduced-motion block in every export does not get to ignore
+            one in its own UI.
+          */
+          <motion.div
+            key={e.id}
+            layout
+            transition={{ duration: DUR.panel, ease: EASE_PANEL }}
+            className={cn("border-line/60 overflow-hidden border-b", open && "bg-ink/[0.02]")}
+          >
             {open ? (
               /*
                 A gutter for the chevron and a single column for everything
@@ -567,17 +586,18 @@ export default function Easings({
                   {e.name}
                 </span>
                 <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
+                {/* Matches the preview band's phrasing exactly — "98 out" left
+                    you to infer that the first number was the entrance. */}
                 <span className="text-ink shrink-0 font-mono text-[11px]">
-                  {enterMs(e)}ms
-                  {spring && <span className="text-ash"> settling</span>}
-                  <span className="text-ash"> · {exitMs(e)} out</span>
+                  {enterMs(e)}ms <span className="text-ash">in</span> / {exitMs(e)}ms{" "}
+                  <span className="text-ash">out{spring && " settling"}</span>
                 </span>
                 <span className="text-ash ml-auto truncate pl-2 text-right text-[11px]">
                   {used.length ? used.join(", ") : "nothing uses this"}
                 </span>
               </button>
             )}
-          </div>
+          </motion.div>
         )
       })}
     </section>
