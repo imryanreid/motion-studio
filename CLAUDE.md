@@ -50,6 +50,25 @@ direction only. That rule is what keeps the copy mechanical.
 
 Run `pnpm sync:check` before any release.
 
+### Parallel sessions and worktrees
+
+If more than one agent is working this repo at once, **only one of them should
+be anywhere near `src/shared/`** — and strictly speaking none of them should,
+since it is authored in Ramps Studio. Work here splits cleanly along
+`src/lib/`, `src/components/`, `api/` and the docs.
+
+Worktrees must be created **inside `Studio Tools/`**, because
+`scripts/sync-shared.sh` finds its upstream by filesystem path rather than by
+git — `FAMILY_ROOT` is just the parent directory of this repo:
+
+```bash
+git worktree add "../Motion Studio-feature-x" -b feature-x origin/main
+```
+
+A worktree anywhere else looks for `Ramps Studio` beside itself, doesn't find
+it, and `pnpm sync` fails. Give each session its own dev port too
+(`pnpm dev --port 5184`); the default is held with `--strictPort`.
+
 ## Conventions
 
 Inherited from Ramps Studio, and they matter more here because the two repos
