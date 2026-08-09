@@ -58,7 +58,7 @@ export default function AgentData({ state, url }: { state: MotionState; url: str
             <button
               type="button"
               onClick={() => copy(code)}
-              className="border-ink/20 text-ink hover:bg-ink/[0.04] inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-[11px] transition-colors"
+              className="border-ink/20 text-ink hover:bg-ink/[0.06] inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-[11px] transition-colors"
             >
               {copied ? "Copied" : `Copy ${format.toUpperCase()}`}
             </button>

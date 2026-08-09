@@ -177,7 +177,7 @@ export default function Preview({
             className={cn(
               "rounded-md border px-2 py-1 font-mono text-[10px] transition-colors",
               loop
-                ? "border-ink/30 bg-ink/[0.05] text-ink"
+                ? "border-ink/30 bg-ink/[0.06] text-ink"
                 : "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
             )}
           >
@@ -188,7 +188,7 @@ export default function Preview({
             onClick={() => setPlaying((p) => !p)}
             title={playing ? "Pause" : "Play"}
             aria-label={playing ? "Pause" : "Play"}
-            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.08] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
           >
             {playing ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" />}
           </button>
@@ -197,7 +197,7 @@ export default function Preview({
             onClick={replay}
             title="Replay"
             aria-label="Replay"
-            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.04] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
+            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.08] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
           >
             <ArrowClockwise size={12} weight="bold" />
           </button>
@@ -258,7 +258,7 @@ export default function Preview({
           </div>
         </div>
 
-        <div className="bg-ink/[0.02] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
+        <div className="bg-ink/[0.04] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
           <Stage purpose={purpose} progressAt={progressAt} />
         </div>
 

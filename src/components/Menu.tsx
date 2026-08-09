@@ -110,11 +110,11 @@ export default function Menu({
             ? // Negative margin cancels the extra height, so a 24px hover
               // target still measures 16 in the label band it has to stay
               // centred in.
-              "hover:bg-ink/[0.07] -my-1 h-6 w-6 rounded"
+              "hover:bg-ink/[0.08] -my-1 h-6 w-6 rounded"
             : "border-line bg-paper hover:border-ink/30 h-7 rounded-md border",
           !bare && (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-[10px]" : "w-7"),
           triggerClassName,
-          open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.04]"),
+          open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.06]"),
         )}
       >
         {triggerLabel ? (
@@ -165,7 +165,7 @@ export default function Menu({
                       if (!item.keepOpen) setOpen(false)
                     }}
                     className={cn(
-                      "hover:bg-ink/[0.05] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                      "hover:bg-ink/[0.06] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                       item.separated && "border-line/60 border-t",
                       item.danger ? "text-red-500" : "text-ink",
                     )}

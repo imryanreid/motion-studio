@@ -286,7 +286,7 @@ export default function Easings({
             transition={{ duration: DUR.panel, ease: EASE_PANEL }}
             className={cn(
               "border-line/60 relative overflow-hidden border-b",
-              open && "bg-ink/[0.02]",
+              open && "bg-ink/[0.04]",
             )}
           >
             {/*
@@ -480,8 +480,20 @@ export default function Easings({
                   they share one surface. Loose on the panel they had no edges,
                   and the handles could be dragged toward a boundary that was
                   not drawn anywhere.
+
+                  `bg-paper`, not a partial. It was `bg-paper/40` over a tinted
+                  row — 40% of the way back to base, which is a surface nothing
+                  else on the page uses, so it matched neither the row it sat
+                  on nor the inputs beside it.
+
+                  Full paper is the base surface, exactly what the inputs use.
+                  Which side of the row that lands on does flip by theme, since
+                  a tint moves toward ink: a card in light, a well in dark.
+                  That flip is inherent to tinting rather than a bug, and it is
+                  fine as long as one element doesn't sit on a third surface of
+                  its own — which is what the partial was doing.
                 */}
-                <div className="border-line/60 bg-paper/40 flex w-full max-w-[420px] flex-col gap-3 rounded-lg border p-3">
+                <div className="border-line/60 bg-paper flex w-full max-w-[420px] flex-col gap-3 rounded-lg border p-3">
                   <CurvePlot
                     easing={e.easing}
                     onChange={
@@ -657,7 +669,7 @@ export default function Easings({
                           className={cn(
                             "ml-1.5 flex h-8 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
                             e.exitLinked
-                              ? "border-ink/30 bg-ink/[0.05] text-ink"
+                              ? "border-ink/30 bg-ink/[0.06] text-ink"
                               : "border-line text-ash hover:border-ink/30 hover:text-ink",
                           )}
                         >
@@ -694,7 +706,7 @@ export default function Easings({
                 type="button"
                 onClick={() => onSelect(e.id)}
                 aria-expanded={false}
-                className="hover:bg-ink/[0.03] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
+                className="hover:bg-ink/[0.05] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
               >
                 <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
                   {e.name}

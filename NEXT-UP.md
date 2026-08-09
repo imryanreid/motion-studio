@@ -172,10 +172,23 @@ Called out rather than quietly dropped:
 
 ## Blockers / open questions
 
-- **No domain.** `motion.studio` is taken. When one is chosen, flip together:
-  `index.html` canonical + `og:url` + robots meta, `public/robots.txt`,
-  `public/sitemap.xml`, `src/lib/site.ts`, and the manifest entry in **Ramps
-  Studio** (then `pnpm sync`).
+- **Domain: `springs.studio`.** Bought, not yet configured — `motion.studio`
+  was taken. Nothing is crawlable until it is pointed here, so the site stays
+  `noindex` with `robots.txt` disallowing everything in the meantime.
+
+  When it is hooked up, flip together:
+  - `index.html` — canonical, `og:url`, and the robots meta
+  - `public/robots.txt` — allow, and point agents at `/llms.txt`
+  - `public/sitemap.xml`
+  - `src/lib/site.ts` — `SITE_URL`
+  - the manifest entry in **Ramps Studio** (`src/shared/tools.ts`): set
+    `domain: "springs.studio"`, add a `wordmark`, and flip `status` from
+    `"soon"` to `"live"` — then `pnpm sync` so every tool's switcher links out.
+    That one is a Ramps change, so it needs a branch.
+
+  Worth deciding at the same time: the tool is named Motion and the domain is
+  springs.studio, so the switcher wordmark and the title prefix have to pick
+  one. The titles currently read `Motion · …`.
 - **The preview animation has not been observed running.** The browser pane used
   during the build throttles `requestAnimationFrame` while hidden, so `elapsed`
   stayed at 0 in every check. The timeline maths is unit-tested in
