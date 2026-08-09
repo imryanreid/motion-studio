@@ -20,7 +20,7 @@
 // ==============================================
 import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { CaretDown, Check, DotsThree } from "@phosphor-icons/react"
+import { CaretDown, CaretLeft, CaretRight, Check, DotsThree } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import { DUR, EASE_PANEL } from "../shared/motion"
 
@@ -39,7 +39,17 @@ export type MenuItem = {
   note?: string
   /** Stay open after this one, so a multi-select can be worked through. */
   keepOpen?: boolean
+  /**
+   * Drill into a second level rather than acting.
+   *
+   * A drill-down rather than a hover submenu: one popover, content swapped,
+   * so there is no second surface to position, no hover-intent timing, and it
+   * works on touch and by keyboard without any of that being special-cased.
+   */
+  submenu?: MenuLevel
 }
+
+export type MenuLevel = { heading?: string; items: MenuItem[] }
 
 export default function Menu({
   label,
@@ -72,7 +82,13 @@ export default function Menu({
   width?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [drilled, setDrilled] = useState<MenuLevel | null>(null)
   const root = useRef<HTMLDivElement>(null)
+
+  // Never reopen onto a level the last visit drilled into.
+  useEffect(() => {
+    if (!open) setDrilled(null)
+  }, [open])
 
   // Close on anything that means "I'm done here": a click elsewhere, Escape,
   // or focus leaving the menu entirely (which covers tabbing out).
@@ -146,13 +162,23 @@ export default function Menu({
               align === "right" ? "right-0" : "left-0",
             )}
           >
-            {groups.map((g, gi) => (
+            {(drilled ? [drilled] : groups).map((g, gi) => (
               <div key={g.heading ?? gi}>
-                {g.heading && (
-                  <div className="text-ash border-line/60 border-b px-3 py-2 text-[12px] leading-snug">
-                    {g.heading}
-                  </div>
-                )}
+                {g.heading &&
+                  (drilled ? (
+                    <button
+                      type="button"
+                      onClick={() => setDrilled(null)}
+                      className="text-ash hover:text-ink border-line/60 flex w-full items-center gap-1.5 border-b px-3 py-2 text-left text-[12px] leading-snug transition-colors"
+                    >
+                      <CaretLeft size={10} weight="bold" aria-hidden="true" className="shrink-0" />
+                      {g.heading}
+                    </button>
+                  ) : (
+                    <div className="text-ash border-line/60 border-b px-3 py-2 text-[12px] leading-snug">
+                      {g.heading}
+                    </div>
+                  ))}
                 {g.items.map((item) => (
                   <button
                     key={item.id}
@@ -161,7 +187,12 @@ export default function Menu({
                     disabled={item.disabled}
                     title={item.title}
                     onClick={() => {
+                      if (item.submenu) {
+                        setDrilled(item.submenu)
+                        return
+                      }
                       item.onSelect()
+                      if (drilled) setDrilled(null)
                       if (!item.keepOpen) setOpen(false)
                     }}
                     className={cn(
@@ -186,6 +217,14 @@ export default function Menu({
                         itself elsewhere is a checkbox lying about what it does. */}
                     {item.note && (
                       <span className="text-ash ml-auto shrink-0 text-[11px]">{item.note}</span>
+                    )}
+                    {item.submenu && (
+                      <CaretRight
+                        size={10}
+                        weight="bold"
+                        aria-hidden="true"
+                        className={cn("text-ash shrink-0", !item.note && "ml-auto")}
+                      />
                     )}
                   </button>
                 ))}

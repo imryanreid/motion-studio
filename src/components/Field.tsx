@@ -22,7 +22,15 @@ const BOX =
   "border-line bg-paper hover:border-ink/30 focus-within:border-ink/40 flex h-8 items-center gap-1 rounded-md border px-2 font-mono text-xs transition-colors"
 
 /** Readouts right-align too, so a column of values shares a decimal edge. */
-const READOUT = "border-line/50 text-ash flex h-8 items-center justify-end rounded-md border border-dashed px-2 font-mono text-xs"
+/*
+  A readout is a VALUE, so it is set in ink like every other value. It was
+  `text-ash` — label colour — which left the spring's settling time and damping
+  ratio reading as captions of themselves and, on a tinted row, barely reading
+  at all. The dashed border is what says "derived"; the text colour never had
+  to say it too.
+*/
+const READOUT =
+  "border-line text-ink flex h-8 items-center justify-end rounded-md border border-dashed px-2 font-mono text-xs"
 
 /**
  * A label over a control, at a fixed height so a row of them shares a baseline.
@@ -164,10 +172,7 @@ export function ReadOut({
   width?: string
 }) {
   return (
-    <div
-      className={cn(READOUT, width)}
-      title={title}
-    >
+    <div className={cn(READOUT, width)} title={title}>
       {children}
     </div>
   )

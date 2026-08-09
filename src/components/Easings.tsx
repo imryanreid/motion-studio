@@ -286,7 +286,7 @@ export default function Easings({
             transition={{ duration: DUR.panel, ease: EASE_PANEL }}
             className={cn(
               "border-line/60 relative overflow-hidden border-b",
-              open && "bg-ink/[0.04]",
+              open && "bg-ink/[0.03]",
             )}
           >
             {/*
@@ -369,11 +369,19 @@ export default function Easings({
                       onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
                     />
                     {/*
-                      A component belongs to exactly one motion, so ticking it
-                      here takes it from wherever it was — which each row says
-                      out loud by naming its current owner. A checkbox that
-                      silently unticks itself somewhere else is a checkbox
-                      lying about what it does.
+                      A component belongs to exactly one motion, so the two
+                      directions are not the same operation and don't get the
+                      same interaction.
+
+                      CLAIMING is unambiguous — one click takes a component
+                      from wherever it was, and the row says whose it was.
+
+                      RELEASING is not. "This component no longer uses me"
+                      leaves it pointing at nothing, which the model has no way
+                      to represent and an export has no way to emit. So a row
+                      this motion already owns drills into "move it where?"
+                      instead of offering a tick you can't untick. The checkbox
+                      was promising an operation that doesn't exist.
                     */}
                     <Menu
                       label={`Components using ${e.name}`}
@@ -382,29 +390,41 @@ export default function Easings({
                       }
                       triggerClassName="w-44 justify-between"
                       align="left"
-                      width="w-56"
+                      width="w-60"
                       groups={[
                         {
                           heading: `Which components use ${e.name}?`,
                           items: PURPOSE_IDS.map((p) => {
                             const owner = entryForPurpose(state, p)
                             const mine = owner.id === e.id
+                            const assign = (entryId: string) =>
+                              onChange({
+                                ...state,
+                                purposeEntry: { ...state.purposeEntry, [p]: entryId },
+                              })
                             return {
                               id: p,
                               label: p,
                               checked: mine,
                               note: mine ? undefined : owner.name,
-                              keepOpen: true,
+                              keepOpen: !mine,
                               title: mine
-                                ? `${p} uses ${e.name}`
+                                ? `${p} uses ${e.name} — move it to another motion`
                                 : `${p} currently uses ${owner.name} — this moves it here`,
-                              onSelect: () => {
-                                if (mine) return
-                                onChange({
-                                  ...state,
-                                  purposeEntry: { ...state.purposeEntry, [p]: e.id },
-                                })
-                              },
+                              onSelect: () => !mine && assign(e.id),
+                              submenu: mine
+                                ? {
+                                    heading: `Move ${p} to…`,
+                                    items: state.entries
+                                      .filter((v) => v.id !== e.id)
+                                      .map((v) => ({
+                                        id: v.id,
+                                        label: v.name,
+                                        title: `${p} will use ${v.name}`,
+                                        onSelect: () => assign(v.id),
+                                      })),
+                                  }
+                                : undefined,
                             }
                           }),
                         },
@@ -581,9 +601,14 @@ export default function Easings({
                           width="w-32"
                           title="Damping ratio: c / (2*sqrt(k*m)). Below 1 the spring overshoots and comes back; at 1 it is critical — the quickest arrival with no bounce at all; above 1 it crawls in."
                         >
-                          <span className={cn(d!.regime === "underdamped" && "text-amber-500")}>
-                            {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
-                          </span>
+                          {/*
+                            Was amber, which was the only hard-coded palette
+                            colour in the app — against the family's five-token
+                            rule — and scored about 2:1 on a light background.
+                            The word already says it bounces; the colour was
+                            saying the same thing less legibly.
+                          */}
+                          {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
                         </ReadOut>
                       </FieldStack>
                       <div className="bg-line mx-1 mb-1 h-6 w-px shrink-0" aria-hidden="true" />

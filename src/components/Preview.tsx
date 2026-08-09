@@ -258,7 +258,7 @@ export default function Preview({
           </div>
         </div>
 
-        <div className="bg-ink/[0.04] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
+        <div className="bg-ink/[0.03] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
           <Stage purpose={purpose} progressAt={progressAt} />
         </div>
 
