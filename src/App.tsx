@@ -61,7 +61,7 @@ export default function App() {
     <ToolShell
       toolId={TOOL_ID}
       title="Motion Token Generator"
-      subtitle="Easing curves, springs and durations, previewed on real UI — and honest about what each export costs."
+      subtitle="Easings and semantic tokens, previewed on real UI, built to start a project and hand to your agent."
       actions={
         <>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
