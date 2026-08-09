@@ -7,8 +7,8 @@
 // ==============================================
 import { describe, it, expect } from "vitest"
 import { buildAgentPayload, publicOrigin } from "./agent.js"
-import { DEFAULT_STATE, tokenKey } from "./tokens.js"
-import { encodeState } from "./params.js"
+import { DEFAULT_STATE, PURPOSE_IDS, tokenKey } from "./tokens.js"
+import { encodeState, resolveState } from "./params.js"
 import { readFileSync, existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { GET as render } from "../../api/render.js"
@@ -205,5 +205,63 @@ describe("against the built dist/index.html", () => {
     expect(html).toContain('<meta name="robots" content="index, follow" />')
     expect(html).toContain(`<link rel="canonical" href="${ORIGIN}/" />`)
     expect(html).toContain('id="motion-studio-tokens"')
+  })
+})
+
+/**
+ * llms.txt is a contract, and a wrong contract is worse than none — an agent
+ * follows it confidently and builds a URL that decodes to something else.
+ *
+ * This shipped wrong once: the file documented spring mass as a plain number
+ * when the codec scales it by 100, so the documented `mass: 1` decoded as
+ * 0.01 — a spring a hundred times stiffer than asked for. It also called the
+ * tolerance "thousandths" when it is ten-thousandths. Both were invisible
+ * until something actually parsed the example.
+ */
+describe("llms.txt is true", () => {
+  const file = fileURLToPath(new URL("../../public/llms.txt", import.meta.url))
+  const contract = readFileSync(file, "utf8")
+
+  it("documents an example that decodes to what it claims", () => {
+    const link = contract.match(/https:\/\/www\.springs\.studio\/\?(\S+)/)
+    expect(link, "llms.txt must carry a worked example URL").not.toBeNull()
+
+    const state = resolveState(link![1])
+    expect(state.entries).toHaveLength(1)
+    const e = state.entries[0]
+    expect(e.name).toBe("pop")
+    expect(e.durationMs).toBe(300)
+    expect(e.staggerMs).toBe(40)
+    expect(e.exitRatio).toBeCloseTo(0.7)
+    expect(e.easing.kind).toBe("spring")
+    // The values the file spells out in prose, decoded.
+    expect(e.easing.kind === "spring" && e.easing.spring).toMatchObject({
+      stiffness: 400,
+      damping: 12,
+      mass: 1,
+    })
+    // And every purpose points at it, as the example says.
+    expect(new Set(Object.values(state.purposeEntry))).toEqual(new Set([e.id]))
+  })
+
+  it("documents the purposes the code actually has, in the order pu expects", () => {
+    const listed = contract
+      .split("Purposes, in the order `pu` expects them:")[1]
+      .split("\n")[1]
+      .split(",")
+      .map((p) => p.trim())
+    expect(listed).toEqual([...PURPOSE_IDS])
+  })
+
+  it("documents the tolerance scale correctly", () => {
+    expect(contract).toContain("ten-thousandths")
+    expect(resolveState("tol=100").tolerance).toBeCloseTo(0.01)
+    expect(resolveState("tol=30").tolerance).toBeCloseTo(0.003)
+  })
+
+  it("only advertises endpoints that exist", () => {
+    expect(contract).toContain("/api/tokens")
+    // Ramps' endpoint name, easy to copy by accident when adapting the file.
+    expect(contract).not.toContain("/api/palette")
   })
 })

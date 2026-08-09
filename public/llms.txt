@@ -35,17 +35,31 @@ Every parameter is optional. With none, you get the shipped default set.
   e    Repeated once per motion. Six fields, separated by "*":
          id*name*easing*durationMs*exit*staggerMs
        easing is either
-         b.<x1>.<y1>.<x2>.<y2>   cubic-bezier, values x100
+         b.<x1>.<y1>.<x2>.<y2>
+           cubic-bezier. All four values are multiplied by 100, so
+           cubic-bezier(0.2, 0, 0, 1) is written b.20.0.0.100
          s.<stiffness>.<damping>.<mass>.<velocity>
+           spring. stiffness and damping are written as-is; mass and velocity
+           are multiplied by 100, so stiffness 400, damping 12, mass 1 is
+           written s.400.12.100.0
        exit is either
          r<percent>   a share of the entrance, e.g. r70
          a<ms>        an absolute duration, e.g. a140
-  pu   Repeated. Which motion a purpose points at: <purpose>.<entryId>
-  xt   Tokens held out of the export: <entryId>*<enter|exit>, "." between entries
-  tol  Spring sampling tolerance for the CSS linear() approximation, 1–2000
-       (thousandths). Default 10, i.e. 1%.
+  pu   One value, not repeated: the entry id for each purpose in the order
+       below, joined by ".", e.g. pu=sub.std.std.std.emp.emp.emp
+  xt   Tokens held out of the export: <entryId>*<enter|exit>, "." between
+       entries, e.g. xt=sub*exit.emp*enter
+  tol  Spring sampling tolerance for the CSS linear() approximation, in
+       ten-thousandths, 1-2000. Default 100, i.e. 1%. The UI offers 300 (3%),
+       100 (1%) and 30 (0.3%).
 
-Purposes: state, dropdown, tooltip, list, drawer, modal, toast
+Purposes, in the order `pu` expects them:
+  state, dropdown, tooltip, list, drawer, modal, toast
+
+A complete example — one bouncy spring named "pop", 300ms, exit at 70% of the
+entrance, 40ms stagger, used by every purpose:
+
+  https://www.springs.studio/?e=pop*pop*s.400.12.100.0*300*r70*40&pu=pop.pop.pop.pop.pop.pop.pop
 
 ## What comes back
 

@@ -173,6 +173,13 @@ export function decodeState(search: string): Partial<MotionState> {
   const p = new URLSearchParams(search)
   const out: Partial<MotionState> = {}
 
+  // Tolerance before the entries guard, because it is the one parameter that
+  // refers to nothing else. Below that guard it was silently dropped from any
+  // URL without an `e`, so "?tol=30" — which llms.txt invites, since every
+  // parameter is documented as optional — did nothing at all.
+  const tol = num(p.get("tol"), 1, 2000)
+  if (tol !== undefined) out.tolerance = tol / 10000
+
   // Entries first: everything else refers to them, so a link whose entries
   // don't survive validation can't have a coherent primary or purpose map.
   const entries: MotionEntry[] = []
@@ -211,9 +218,6 @@ export function decodeState(search: string): Partial<MotionState> {
       .filter((k): k is string => k !== null)
     if (held.length) out.excluded = held
   }
-
-  const tol = num(p.get("tol"), 1, 2000)
-  if (tol !== undefined) out.tolerance = tol / 10000
 
   return out
 }
