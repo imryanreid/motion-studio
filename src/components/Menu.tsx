@@ -261,7 +261,7 @@ export function ChipGroup({
   onChange,
 }: {
   ariaLabel: string
-  options: { id: string; label: string; title?: string }[]
+  options: { id: string; label: string; title?: string; dot?: boolean }[]
   /** `null` selects nothing — used for a value that matches no preset. */
   value: string | null
   onChange: (id: string) => void
@@ -287,6 +287,17 @@ export function ChipGroup({
                 "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
           )}
         >
+          {/* A quiet marker for "this one is affected by what you're editing",
+              which is a different axis from being selected. */}
+          {o.dot && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "mr-1.5 inline-block h-1 w-1 rounded-full",
+                o.id === value ? "bg-paper/70" : "bg-ink/50",
+              )}
+            />
+          )}
           {o.label}
         </button>
       ))}

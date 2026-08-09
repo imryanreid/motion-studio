@@ -31,6 +31,7 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
+import { ChipGroup } from "./Menu"
 import { PanelTitle } from "../shared/components/Label"
 import {
   PURPOSE_IDS,
@@ -48,6 +49,117 @@ import {
   timelineTotal,
   tick,
 } from "../lib/preview"
+
+/**
+ * A draggable timeline.
+ *
+ * The clock was already seekable — `elapsed` is state and `tick` returns its
+ * own origin — so this is wiring, not new machinery. Scrubbing pauses and
+ * release resumes only if it was playing when you grabbed it, which is what
+ * every media control does and what makes a scrub feel borrowed rather than
+ * learned.
+ *
+ * A slider rather than a bar with a click handler: it answers to arrow keys,
+ * Home and End, and announces its position, none of which a div does.
+ */
+function Scrubber({
+  elapsed,
+  total,
+  onSeek,
+  onScrubStart,
+  onScrubEnd,
+}: {
+  elapsed: number
+  total: number
+  onSeek: (ms: number) => void
+  onScrubStart: () => void
+  onScrubEnd: () => void
+}) {
+  const track = useRef<HTMLDivElement>(null)
+  const [scrubbing, setScrubbing] = useState(false)
+  const pct = total > 0 ? Math.min(100, (elapsed / total) * 100) : 0
+
+  const seekTo = (clientX: number) => {
+    const box = track.current?.getBoundingClientRect()
+    if (!box || box.width === 0) return
+    const frac = Math.min(1, Math.max(0, (clientX - box.left) / box.width))
+    onSeek(frac * total)
+  }
+
+  const step = (by: number) => onSeek(Math.min(total, Math.max(0, elapsed + by)))
+
+  return (
+    <div
+      ref={track}
+      role="slider"
+      tabIndex={0}
+      aria-label="Timeline"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(total)}
+      aria-valuenow={Math.round(elapsed)}
+      aria-valuetext={`${Math.round(elapsed)} of ${Math.round(total)} milliseconds`}
+      onPointerDown={(e) => {
+        setScrubbing(true)
+        onScrubStart()
+        // Seek before capturing, and never let capture failing take the seek
+        // down with it — the jump to where you clicked is the part that has to
+        // happen, and pointer capture is only what keeps the drag alive once
+        // the cursor leaves the track.
+        seekTo(e.clientX)
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId)
+        } catch {
+          // Some pointer ids can't be captured; dragging still works while the
+          // cursor stays over the track.
+        }
+      }}
+      onPointerMove={(e) => scrubbing && seekTo(e.clientX)}
+      onPointerUp={() => {
+        setScrubbing(false)
+        onScrubEnd()
+      }}
+      onPointerCancel={() => {
+        setScrubbing(false)
+        onScrubEnd()
+      }}
+      onKeyDown={(e) => {
+        const nudge = Math.max(10, total / 100)
+        if (e.key === "ArrowLeft") step(-nudge)
+        else if (e.key === "ArrowRight") step(nudge)
+        else if (e.key === "Home") onSeek(0)
+        else if (e.key === "End") onSeek(total)
+        else return
+        e.preventDefault()
+      }}
+      className={cn(
+        // The bar is 4px; the target is the whole 20px strip around it, because
+        // a 4px pointer target is a dare rather than a control.
+        "group focus-visible:ring-ink/30 relative flex h-5 flex-1 cursor-pointer touch-none items-center rounded outline-none focus-visible:ring-2",
+        scrubbing && "cursor-grabbing",
+      )}
+    >
+      <div className="bg-ink/10 relative h-1 w-full overflow-hidden rounded-full">
+        <div
+          className="bg-ink absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span
+        aria-hidden="true"
+        style={{ left: `${pct}%` }}
+        className={cn(
+          "bg-ink border-paper absolute h-3 w-3 -translate-x-1/2 rounded-full border-2 transition-opacity",
+          scrubbing
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
+        )}
+      />
+    </div>
+  )
+}
+
+const TRANSPORT =
+  "border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.08] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors"
 
 const SPEEDS = [
   { id: "1" as const, label: "1×" },
@@ -103,6 +215,8 @@ export default function Preview({
 
   const raf = useRef<number | null>(null)
   const start = useRef(0)
+  // Whether a scrub interrupted playback, so releasing can put it back.
+  const resumeAfterScrub = useRef(false)
 
   useEffect(() => {
     if (!playing) return
@@ -152,7 +266,36 @@ export default function Preview({
     <section className="border-line flex flex-col overflow-hidden rounded-lg border">
       <div className="border-line flex min-h-[3.25rem] flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
         <PanelTitle>Preview</PanelTitle>
-        <div className="flex flex-wrap items-center gap-2">
+        {/*
+          Everything else moved: what to play sits with what you're playing it
+          on, and the transport sits with the timeline it drives. A control
+          belongs next to the thing it changes, not in a header because there
+          was room there.
+        */}
+      </div>
+
+      <div className="flex flex-1 flex-col">
+        <div className="border-line flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-3 py-2">
+          {/*
+            The scenarios are the purposes, styled as the shape presets are —
+            one chip treatment for "pick one of these" wherever it appears.
+
+            A dot marks the ones using the motion open in the editor. That is a
+            different axis from being selected, so it gets its own mark rather
+            than a second selected state: selection is where you're looking,
+            the dot is what you're editing.
+          */}
+          <ChipGroup
+            ariaLabel="Scenario"
+            value={purpose}
+            onChange={(id) => setPurpose(id as PurposeId)}
+            options={PURPOSE_IDS.map((id) => ({
+              id,
+              label: id,
+              dot: entryForPurpose(state, id).id === editingId,
+              title: `${id} — uses ${entryForPurpose(state, id).name}`,
+            }))}
+          />
           <Segmented
             ariaLabel="What to play"
             layoutId="preview-mode"
@@ -161,6 +304,54 @@ export default function Preview({
             onChange={setMode}
             options={MODES}
           />
+        </div>
+
+        <div className="bg-ink/[0.03] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
+          <Stage purpose={purpose} progressAt={progressAt} />
+        </div>
+
+        {/* Transport, timeline and playback settings in one strip, in the
+            order a media control has them. */}
+        <div className="border-line flex flex-wrap items-center gap-2 border-t px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setPlaying((p) => !p)}
+            title={playing ? "Pause" : "Play"}
+            aria-label={playing ? "Pause" : "Play"}
+            className={TRANSPORT}
+          >
+            {playing ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" />}
+          </button>
+          <button
+            type="button"
+            onClick={replay}
+            title="Replay from the start"
+            aria-label="Replay"
+            className={TRANSPORT}
+          >
+            <ArrowClockwise size={12} weight="bold" />
+          </button>
+
+          <Scrubber
+            elapsed={elapsed}
+            total={total}
+            onSeek={(ms) => {
+              setElapsed(ms)
+              // Keep the clock's origin under the new position, or resuming
+              // would snap back to wherever it had got to on its own.
+              start.current = performance.now() - ms / rate
+            }}
+            onScrubStart={() => {
+              resumeAfterScrub.current = playing
+              setPlaying(false)
+            }}
+            onScrubEnd={() => setPlaying(resumeAfterScrub.current)}
+          />
+
+          <span className="text-ash w-14 shrink-0 text-right font-mono text-[10px] tabular-nums">
+            {Math.round(elapsed)}ms
+          </span>
+
           <Segmented
             ariaLabel="Playback speed"
             layoutId="preview-speed"
@@ -175,7 +366,7 @@ export default function Preview({
             aria-pressed={loop}
             title={loop ? "Looping — click to play once" : "Plays once — click to loop"}
             className={cn(
-              "rounded-md border px-2 py-1 font-mono text-[10px] transition-colors",
+              "h-7 rounded-md border px-2 font-mono text-[10px] transition-colors",
               loop
                 ? "border-ink/30 bg-ink/[0.06] text-ink"
                 : "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
@@ -183,95 +374,6 @@ export default function Preview({
           >
             loop
           </button>
-          <button
-            type="button"
-            onClick={() => setPlaying((p) => !p)}
-            title={playing ? "Pause" : "Play"}
-            aria-label={playing ? "Pause" : "Play"}
-            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.08] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
-          >
-            {playing ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" />}
-          </button>
-          <button
-            type="button"
-            onClick={replay}
-            title="Replay"
-            aria-label="Replay"
-            className="border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.08] inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors"
-          >
-            <ArrowClockwise size={12} weight="bold" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col">
-        <div className="border-line flex flex-col gap-1.5 border-b px-3 py-2">
-          {/*
-            Scenario tabs are the purposes. Selecting a curve in the editor
-            marks the ones it affects rather than jumping you somewhere else —
-            moving the view under you implied each curve belonged to one
-            element, which is the opposite of what this tool teaches.
-          */}
-          <div className="flex flex-wrap gap-0.5">
-            {PURPOSE_IDS.map((id) => {
-              const affected = entryForPurpose(state, id).id === editingId
-              const active = id === purpose
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setPurpose(id)}
-                  aria-pressed={active}
-                  title={`${id} — uses ${entryForPurpose(state, id).name}`}
-                  className={cn(
-                    "relative rounded px-2 py-1 font-mono text-[11px] transition-colors",
-                    active ? "bg-ink text-paper" : "text-ash hover:text-ink",
-                  )}
-                >
-                  {id}
-                  {affected && !active && (
-                    <span
-                      aria-hidden="true"
-                      className="bg-ink/40 absolute inset-x-2 -bottom-px h-0.5 rounded-full"
-                    />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          {/*
-            Assignment moved onto the motion itself, where one control can set
-            all of a variant's components at once. What stays here is the
-            readout: which motion this scenario is playing, and how long.
-          */}
-          <div className="text-ash flex flex-wrap items-center justify-between gap-x-3 font-mono text-[10px]">
-            <span>
-              {purpose} uses <span className="text-ink">{entry.name}</span>
-            </span>
-            <span>
-              {mode === "both"
-                ? `${enterToken.durationMs}ms enter / ${exitToken.durationMs}ms exit`
-                : `${token.durationMs}ms`}
-              {token.easing.kind === "spring" ? " settling" : ""}
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-ink/[0.03] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
-          <Stage purpose={purpose} progressAt={progressAt} />
-        </div>
-
-        <div className="border-line flex items-center gap-3 border-t px-3 py-2">
-          <div className="bg-ink/10 relative h-1 flex-1 overflow-hidden rounded-full">
-            <div
-              className="bg-ink absolute inset-y-0 left-0 rounded-full"
-              style={{ width: `${Math.min(100, (elapsed / total) * 100)}%` }}
-            />
-          </div>
-          <span className="text-ash w-16 shrink-0 text-right font-mono text-[10px]">
-            {Math.round(elapsed)}ms
-          </span>
         </div>
       </div>
     </section>
