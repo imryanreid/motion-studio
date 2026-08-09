@@ -37,6 +37,14 @@ export type MenuItem = {
   checked?: boolean
   /** Trailing grey text — used to say who currently owns a togglable item. */
   note?: string
+  /**
+   * Trailing text revealed on hover or focus — what picking this will do.
+   *
+   * Hidden until pointed at because it is the same for every row: shown on all
+   * of them at once it is a column of repeated text, and the one thing it
+   * needs to say is "this row, this outcome".
+   */
+  hoverNote?: string
   /** Stay open after this one, so a multi-select can be worked through. */
   keepOpen?: boolean
   /**
@@ -220,7 +228,7 @@ export default function Menu({
                         if (!item.keepOpen) setOpen(false)
                       }}
                       className={cn(
-                        "hover:bg-ink/[0.06] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                        "group hover:bg-ink/[0.06] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                         item.separated && "border-line/60 border-t",
                         item.danger ? "text-red-500" : "text-ink",
                       )}
@@ -252,6 +260,14 @@ export default function Menu({
                       {item.note && (
                         <span className="text-ash ml-auto shrink-0 text-[11px]">
                           {item.note}
+                        </span>
+                      )}
+                      {/* Focus as well as hover: a keyboard user arrowing
+                          through the list has the same question a pointer
+                          user does. */}
+                      {item.hoverNote && (
+                        <span className="text-ash ml-auto shrink-0 font-mono text-[11px] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                          {item.hoverNote}
                         </span>
                       )}
                       {item.submenu && (

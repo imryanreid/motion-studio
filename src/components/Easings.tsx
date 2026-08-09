@@ -322,10 +322,12 @@ export default function Easings({
             width="w-72"
             groups={[
               {
-                heading: "Create a new set of easings based on one of your existing variants:",
+                heading:
+                  "Generate new variants on each side of an existing variant. The one you pick becomes the new \u201cstandard\u201d.",
                 items: state.entries.map((e) => ({
                   id: e.id,
                   label: e.name,
+                  hoverNote: "\u2192 standard",
                   title: `Build subtle / standard / emphasized from ${e.name}. Siblings inherit its type and differ in duration only.`,
                   onSelect: () => generateFrom(e),
                 })),
