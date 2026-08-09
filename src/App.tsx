@@ -25,7 +25,7 @@ import Preview from "./components/Preview"
 import { SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import { DEFAULT_STATE, type MotionState } from "./lib/tokens"
+import { DEFAULT_STATE, type MotionState, type PurposeId } from "./lib/tokens"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
@@ -45,6 +45,10 @@ export default function App() {
   // that doesn't happen to contain "std" would have opened with everything
   // collapsed and the preview marking nothing.
   const [selectedId, setSelectedId] = useState(() => state.entries[0].id)
+  // The component on the preview stage. Lives here rather than in Preview
+  // because Easings marks the motion it uses, and Preview marks the components
+  // the open motion owns — the same relationship read from either end.
+  const [purpose, setPurpose] = useState<PurposeId>("list")
 
   // What reset threw away, kept just long enough to offer it back.
   const undoSnapshot = useRef<MotionState | null>(null)
@@ -116,10 +120,16 @@ export default function App() {
             onChange={setState}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            previewPurpose={purpose}
           />
         </div>
 
-        <Preview state={state} editingId={selectedId} />
+        <Preview
+          state={state}
+          editingId={selectedId}
+          purpose={purpose}
+          onPurposeChange={setPurpose}
+        />
       </div>
 
       <SemanticTable state={state} onChange={setState}>
