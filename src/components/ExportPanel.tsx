@@ -12,7 +12,10 @@
 // this is where they surface.
 // ==============================================
 import { cn } from "../shared/utils"
-import SharedExportPanel, { type ExportFormat } from "../shared/components/ExportPanel"
+import SharedExportPanel, {
+  TerminalNote,
+  type ExportFormat,
+} from "../shared/components/ExportPanel"
 import {
   toCss,
   toTailwind,
@@ -34,10 +37,87 @@ const TOLERANCES = [
   { value: 0.003, label: "0.3%" },
 ]
 
+/**
+ * The one explanation the tool owes for a control that changes nothing you can
+ * see. Kept out of the component body so the JSX stays readable.
+ */
+const ACCURACY_NOTE = (
+  <div className="space-y-2">
+    <p>
+      Springs only, and only here — CSS, Tailwind and DTCG. Your tokens don't change, the Framer
+      Motion export doesn't change, and neither does the preview.
+    </p>
+    <p>
+      CSS has no spring. A <code className="font-mono">cubic-bezier()</code> is one curve with
+      two control points; a spring can overshoot and come back, which no bezier can draw. So the
+      export samples the real physics and writes a <code className="font-mono">linear()</code>{" "}
+      polyline that traces it, spending points where the curve bends and coasting through the
+      settle.
+    </p>
+    <p>
+      Accuracy is the error budget for that tracing: at 1% the polyline stays within 1% of the
+      element's total travel at every moment. Tighter costs string length, and a bouncy spring
+      costs far more than a calm one — roughly 150 characters at 1% for a critically damped
+      spring against 400 for a lively one. 1% is right almost always.
+    </p>
+    <p>
+      The consequence worth knowing: Framer Motion runs the real physics and is exact, so the
+      same token animates slightly differently depending on which export you took. This is how
+      far apart you'll let them drift.
+    </p>
+  </div>
+)
+
 const asNote = (f: FormatFidelity) =>
   f
     ? { summary: f.summary, detail: <p className="whitespace-pre-line">{f.detail}</p> }
     : undefined
+
+/**
+ * The accuracy control and the sentence explaining it.
+ *
+ * Accuracy changes only what the CSS, Tailwind and DTCG exports emit, never
+ * the tokens themselves — so it lives in the panel rather than on the page.
+ * Its own component because a control whose effect is invisible is exactly the
+ * one that needs its explanation to travel with it.
+ */
+export function AccuracyControl({
+  state,
+  onChange,
+}: {
+  state: MotionState
+  onChange: (s: MotionState) => void
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[11px] text-white/45">Accuracy</span>
+        <div className="inline-flex rounded border border-white/15 p-0.5">
+          {TOLERANCES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => onChange({ ...state, tolerance: t.value })}
+              title={`Keep the sampled curve within ${t.label} of the true one`}
+              className={cn(
+                "rounded px-2 py-0.5 font-mono text-[10px] transition-colors",
+                state.tolerance === t.value
+                  ? "text-paper bg-white/15"
+                  : "text-white/45 hover:text-white/80",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {/* Same disclosure as a fidelity note, because it answers the same kind
+          of question — what is this costing me — and a second visual language
+          for that would be one too many. */}
+        <TerminalNote summary="what this changes" detail={ACCURACY_NOTE} />
+      </div>
+    </div>
+  )
+}
 
 export default function ExportPanel({
   state,
@@ -48,31 +128,7 @@ export default function ExportPanel({
   onChange: (s: MotionState) => void
   shareHref: string
 }) {
-  // Accuracy changes only what the CSS and DTCG exports emit, never the tokens
-  // themselves — so it lives in the panel rather than on the page.
-  const accuracy = (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="font-mono text-[11px] text-white/45">Accuracy</span>
-      <div className="inline-flex rounded border border-white/15 p-0.5">
-        {TOLERANCES.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => onChange({ ...state, tolerance: t.value })}
-            title={`Keep the sampled curve within ${t.label} of the true one`}
-            className={cn(
-              "rounded px-2 py-0.5 font-mono text-[10px] transition-colors",
-              state.tolerance === t.value
-                ? "text-paper bg-white/15"
-                : "text-white/45 hover:text-white/80",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
+  const accuracy = <AccuracyControl state={state} onChange={onChange} />
 
   const formats: ExportFormat[] = [
     {
