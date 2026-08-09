@@ -151,6 +151,7 @@ export default function Menu({
         {open && (
           <motion.div
             role="menu"
+            layout
             initial={{ opacity: 0, scale: 0.97, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: -2 }}
@@ -162,74 +163,89 @@ export default function Menu({
               align === "right" ? "right-0" : "left-0",
             )}
           >
-            {(drilled ? [drilled] : groups).map((g, gi) => (
-              <div key={g.heading ?? gi}>
-                {g.heading &&
-                  (drilled ? (
-                    <button
-                      type="button"
-                      onClick={() => setDrilled(null)}
-                      className="text-ash hover:text-ink border-line/60 flex w-full items-center gap-1.5 border-b px-3 py-2 text-left text-[12px] leading-snug transition-colors"
-                    >
-                      <CaretLeft size={10} weight="bold" aria-hidden="true" className="shrink-0" />
-                      {g.heading}
-                    </button>
-                  ) : (
-                    <div className="text-ash border-line/60 border-b px-3 py-2 text-[12px] leading-snug">
-                      {g.heading}
-                    </div>
-                  ))}
-                {g.items.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="menuitem"
-                    disabled={item.disabled}
-                    title={item.title}
-                    onClick={() => {
-                      if (item.submenu) {
-                        setDrilled(item.submenu)
-                        return
-                      }
-                      item.onSelect()
-                      if (drilled) setDrilled(null)
-                      if (!item.keepOpen) setOpen(false)
-                    }}
-                    className={cn(
-                      "hover:bg-ink/[0.06] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                      item.separated && "border-line/60 border-t",
-                      item.danger ? "text-red-500" : "text-ink",
-                    )}
-                  >
-                    {item.checked !== undefined && (
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors",
-                          item.checked ? "border-ink bg-ink text-paper" : "border-line",
-                        )}
+            <AnimatePresence mode="popLayout" initial={false}>
+              {(drilled ? [drilled] : groups).map((g, gi) => (
+                <motion.div
+                  key={(drilled ? "drilled:" : "root:") + (g.heading ?? gi)}
+                  initial={{ opacity: 0, x: drilled ? 12 : -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: drilled ? -12 : 12 }}
+                  transition={{ duration: DUR.swap, ease: EASE_PANEL }}
+                >
+                  {g.heading &&
+                    (drilled ? (
+                      <button
+                        type="button"
+                        onClick={() => setDrilled(null)}
+                        className="text-ash hover:text-ink border-line/60 flex w-full items-center gap-1.5 border-b px-3 py-2 text-left text-[12px] leading-snug transition-colors"
                       >
-                        {item.checked && <Check size={9} weight="bold" />}
-                      </span>
-                    )}
-                    <span className="truncate">{item.label}</span>
-                    {/* Who owns it now — a checkbox that silently unticks
+                        <CaretLeft
+                          size={10}
+                          weight="bold"
+                          aria-hidden="true"
+                          className="shrink-0"
+                        />
+                        {g.heading}
+                      </button>
+                    ) : (
+                      <div className="text-ash border-line/60 border-b px-3 py-2 text-[12px] leading-snug">
+                        {g.heading}
+                      </div>
+                    ))}
+                  {g.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="menuitem"
+                      disabled={item.disabled}
+                      title={item.title}
+                      onClick={() => {
+                        if (item.submenu) {
+                          setDrilled(item.submenu)
+                          return
+                        }
+                        item.onSelect()
+                        if (drilled) setDrilled(null)
+                        if (!item.keepOpen) setOpen(false)
+                      }}
+                      className={cn(
+                        "hover:bg-ink/[0.06] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                        item.separated && "border-line/60 border-t",
+                        item.danger ? "text-red-500" : "text-ink",
+                      )}
+                    >
+                      {item.checked !== undefined && (
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors",
+                            item.checked ? "border-ink bg-ink text-paper" : "border-line",
+                          )}
+                        >
+                          {item.checked && <Check size={9} weight="bold" />}
+                        </span>
+                      )}
+                      <span className="truncate">{item.label}</span>
+                      {/* Who owns it now — a checkbox that silently unticks
                         itself elsewhere is a checkbox lying about what it does. */}
-                    {item.note && (
-                      <span className="text-ash ml-auto shrink-0 text-[11px]">{item.note}</span>
-                    )}
-                    {item.submenu && (
-                      <CaretRight
-                        size={10}
-                        weight="bold"
-                        aria-hidden="true"
-                        className={cn("text-ash shrink-0", !item.note && "ml-auto")}
-                      />
-                    )}
-                  </button>
-                ))}
-              </div>
-            ))}
+                      {item.note && (
+                        <span className="text-ash ml-auto shrink-0 text-[11px]">
+                          {item.note}
+                        </span>
+                      )}
+                      {item.submenu && (
+                        <CaretRight
+                          size={10}
+                          weight="bold"
+                          aria-hidden="true"
+                          className={cn("text-ash shrink-0", !item.note && "ml-auto")}
+                        />
+                      )}
+                    </button>
+                  ))}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

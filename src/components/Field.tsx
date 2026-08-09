@@ -19,7 +19,7 @@ export const FIELD_NUM = "w-[5.5rem]"
 export const FIELD_TEXT = "w-40"
 
 const BOX =
-  "border-line bg-paper hover:border-ink/30 focus-within:border-ink/40 flex h-8 items-center gap-1 rounded-md border px-2 font-mono text-xs transition-colors"
+  "border-line bg-paper hover:border-ink/30 focus-within:border-ink/40 flex h-8 items-center gap-1 rounded-md border px-2 font-mono text-xs transition-[color,background-color,border-color,border-radius] duration-200"
 
 /** Readouts right-align too, so a column of values shares a decimal edge. */
 /*
