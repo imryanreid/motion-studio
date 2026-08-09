@@ -25,7 +25,7 @@ import Preview from "./components/Preview"
 import { SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import { DEFAULT_STATE, PURPOSE_FALLBACK, type MotionState } from "./lib/tokens"
+import { DEFAULT_STATE, type MotionState } from "./lib/tokens"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
@@ -40,7 +40,11 @@ export default function App() {
   const [exportOpen, setExportOpen] = useState(false)
   // Which row is expanded in the Easings list. Also marks the preview
   // scenarios it affects. "" means every row is collapsed.
-  const [selectedId, setSelectedId] = useState(PURPOSE_FALLBACK)
+  //
+  // The first entry, not a fixed id: a shared link can carry any set, and one
+  // that doesn't happen to contain "std" would have opened with everything
+  // collapsed and the preview marking nothing.
+  const [selectedId, setSelectedId] = useState(() => state.entries[0].id)
 
   // What reset threw away, kept just long enough to offer it back.
   const undoSnapshot = useRef<MotionState | null>(null)
