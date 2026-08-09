@@ -31,7 +31,7 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import Segmented from "../shared/components/Segmented"
-import { ChipGroup } from "./Menu"
+import Menu, { ChipGroup } from "./Menu"
 import { PanelTitle } from "../shared/components/Label"
 import {
   PURPOSE_IDS,
@@ -158,6 +158,14 @@ function Scrubber({
   )
 }
 
+/**
+ * How large to draw the component, for reading it on the screen you're on.
+ *
+ * A view setting, not a token: it never reaches the URL or an export, the same
+ * as speed, loop and which scenario is showing.
+ */
+const ZOOMS = [0.5, 0.75, 1, 1.5, 2]
+
 const TRANSPORT =
   "border-line bg-paper text-ink hover:border-ink/30 hover:bg-ink/[0.08] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors"
 
@@ -198,6 +206,7 @@ export default function Preview({
   const [speed, setSpeed] = useState<"1" | "0.5" | "0.25">("1")
   const [playing, setPlaying] = useState(true)
   const [loop, setLoop] = useState(true)
+  const [zoom, setZoom] = useState(1)
   const [elapsed, setElapsed] = useState(0)
 
   const entry = entryForPurpose(state, purpose)
@@ -267,6 +276,32 @@ export default function Preview({
       <div className="border-line flex min-h-[3.25rem] flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
         <PanelTitle>Preview</PanelTitle>
         {/*
+          Zoom scales the component, not the panel. Worth saying out loud in
+          the tooltip, because it moves the one variable this tool exists to
+          make legible: the same curve over twice the travel reads slower, so
+          100% is the honest one and the rest are for seeing detail.
+        */}
+        <Menu
+          label="Zoom"
+          triggerLabel={`${Math.round(zoom * 100)}%`}
+          width="w-44"
+          groups={[
+            {
+              heading: "Draw the component at",
+              items: ZOOMS.map((z) => ({
+                id: String(z),
+                label: `${Math.round(z * 100)}%`,
+                checked: z === zoom,
+                title:
+                  z === 1
+                    ? "Actual size — the only one that reads at true travel distance"
+                    : `${Math.round(z * 100)}% — easier to see, but the travel scales with it`,
+                onSelect: () => setZoom(z),
+              })),
+            },
+          ]}
+        />
+        {/*
           Everything else moved: what to play sits with what you're playing it
           on, and the transport sits with the timeline it drives. A control
           belongs next to the thing it changes, not in a header because there
@@ -307,7 +342,17 @@ export default function Preview({
         </div>
 
         <div className="bg-ink/[0.03] relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden p-6">
-          <Stage purpose={purpose} progressAt={progressAt} />
+          {/*
+            The wrapper keeps the flex context Stage relies on — the drawer,
+            modal and toast scenarios size themselves against it with h-full —
+            so scaling can't quietly collapse them.
+          */}
+          <div
+            className="flex h-full w-full items-center justify-center transition-transform duration-200"
+            style={{ transform: `scale(${zoom})` }}
+          >
+            <Stage purpose={purpose} progressAt={progressAt} />
+          </div>
         </div>
 
         {/* Transport, timeline and playback settings in one strip, in the
