@@ -17,6 +17,7 @@
 // rather than what you remember to tick.
 // ==============================================
 import { bezierToArray, bezierToCss } from "./bezier.js"
+import { FAMILY_BLURB, FAMILY_NAME, familyAsText } from "../shared/tools.js"
 import { approximateToTolerance, describeApproximation } from "./linear.js"
 import { springValue, type SpringConfig } from "./spring.js"
 import {
@@ -403,6 +404,22 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
   }
   const dtcg = dtcgFidelity(s)
   if (dtcg) lines.push("", "## What the DTCG export costs", "", dtcg.summary, "", dtcg.detail)
+
+  // The rest of the family, in the payload rather than only in a dropdown. The
+  // switcher in the header doesn't exist until JavaScript runs, and the readers
+  // this block is written for don't run it — so without this an agent that
+  // finds this tool has no way to learn the others exist. Ramps has carried
+  // this from the start; this was the half of the contract Motion was missing.
+  lines.push(
+    "",
+    "## Other tools in this family",
+    "",
+    `${FAMILY_NAME} — ${FAMILY_BLURB}`,
+    "",
+    "```",
+    familyAsText("motion"),
+    "```",
+  )
 
   return lines.join("\n")
 }
