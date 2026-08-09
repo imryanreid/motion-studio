@@ -10,8 +10,7 @@ flatter exit derived from it — previewed on real UI rather than on a dot on a
 track, and exports for CSS, Tailwind, Framer Motion and DTCG
 — with the cross-platform differences stated rather than hidden.
 
-**Status: live** at https://motion-studio-silk.vercel.app, on a placeholder
-domain and noindex until a real one is chosen. See [`NEXT-UP.md`](NEXT-UP.md).
+**Status: live** at https://www.springs.studio. See [`NEXT-UP.md`](NEXT-UP.md).
 
 ## Local development
 

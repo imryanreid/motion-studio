@@ -105,19 +105,23 @@ can't be faithfully represented, the export UI must say so and show what the
 approximation costs. Shipping a quiet lie here would defeat the point of the
 tool. Targets are web and Figma only; see §2 and §10.1 of `SPEC.md`.
 
-**4. There is no domain yet.** `index.html` deliberately carries no canonical,
-no `og:url` and `noindex`, and the tools manifest gives `motion` no `domain`.
-When the domain is registered, all of those change together — plus
-`public/robots.txt`, `public/sitemap.xml`, and the manifest entry in **Ramps
-Studio** (then `pnpm sync`).
+**4. The domain is live: `www.springs.studio`.** The tool is called Motion; the
+domain is springs.studio. Both are correct — the family names what a tool makes,
+and "springs" names a mechanism that is only one of the two easing types this
+produces. `SITE_URL`, the canonical tag, `og:url`, `public/robots.txt`,
+`public/sitemap.xml` and the manifest entry in **Ramps Studio** all say
+`www.springs.studio` and must stay in step.
+
+There is deliberately **no `og:image`** — Ramps points at its own `/api/og`,
+Motion has no such route yet, and a card tag aimed at a 404 is worse than no
+card tag. Add it and switch `twitter:card` to `summary_large_image` when the
+agent surfaces land.
 
 ## Pushing
 
-No custom domain yet, so pushes go straight to `main`. **That changes the moment
-a domain is live**: from then on this repo follows the family rule — branch, push,
-Vercel preview, Ryan looks, then merge. Add that rule to this file at the same
-time as the canonical tag, sitemap, robots and manifest entry (see §4 above), and
-copy the wording from Ramps Studio's `CLAUDE.md`.
+This site is live on a custom domain, so it follows the family rule: **branch,
+push, Vercel preview, Ryan looks, then merge.** No direct pushes to `main` —
+what's on `main` is what's in front of the world.
 
 ## Ask before
 

@@ -9,14 +9,35 @@
       name="description"
       content="The motion token generator built for handing off: every set is readable by an agent as plain text or JSON. Cubic-bezier and spring easings previewed on real UI rather than on a dot, each with its own duration and a derived, deliberately faster exit. Exports to CSS, Tailwind, Framer Motion and DTCG — with the cost of each conversion measured rather than hidden."
     />
+    <link rel="canonical" href="https://www.springs.studio/" />
+    <meta name="robots" content="index, follow" />
+
     <!--
-      No canonical, og:url or sitemap yet: the domain isn't registered. A
-      canonical tag is invisible and, pointed at the wrong place, quietly tells
-      search engines this page belongs to someone else. Add all of them together
-      when the domain is live — see "The three things that are easy to break" in
-      CLAUDE.md.
+      No og:image. Ramps points at its own /api/og; Motion has no such route
+      yet, and an og:image tag aimed at a 404 is worse than none — a card with
+      a broken image reads as a broken site. Add it, and switch the twitter
+      card to summary_large_image, when the agent-surfaces work lands.
     -->
-    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.springs.studio/" />
+    <meta property="og:site_name" content="Motion" />
+    <meta
+      property="og:title"
+      content="Motion · Easings and semantic tokens your agent can read"
+    />
+    <meta
+      property="og:description"
+      content="Cubic-bezier and spring easings previewed on real UI, each with its own duration and a derived, faster exit. Exports to CSS, Tailwind, Framer Motion and DTCG, with the cost of each conversion measured rather than hidden."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta
+      name="twitter:title"
+      content="Motion · Easings and semantic tokens your agent can read"
+    />
+    <meta
+      name="twitter:description"
+      content="Easings and semantic tokens, previewed on real UI, built to start a project and hand to your agent."
+    />
     <meta name="author" content="Ryan Reid" />
     <meta name="theme-color" content="#fdfdfc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)" />

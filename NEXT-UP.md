@@ -8,8 +8,7 @@
 
 ## Current state
 
-**Rough version live** at https://motion-studio-silk.vercel.app — still
-`noindex` with `robots.txt` disallowed, because there is no domain yet.
+**Live** at https://www.springs.studio, indexable, since 2026-08-09.
 
 Working: a list of named motions, each a bezier (draggable, or picked from
 presets) or a spring (five presets by damping ratio, or raw physics), each with
@@ -188,42 +187,17 @@ Called out rather than quietly dropped:
 
 ## Blockers / open questions
 
-- **Domain: `springs.studio`.** Bought, not yet configured — `motion.studio`
-  was taken. Nothing is crawlable until it is pointed here, so the site stays
-  `noindex` with `robots.txt` disallowing everything in the meantime.
-
-  When it is hooked up, flip together:
-  - `index.html` — canonical, `og:url`, and the robots meta
-  - `public/robots.txt` — allow, and point agents at `/llms.txt`
-  - `public/sitemap.xml`
-  - `src/lib/site.ts` — `SITE_URL`
-  - the manifest entry in **Ramps Studio** (`src/shared/tools.ts`): set
-    `domain: "springs.studio"` and flip `status` from `"soon"` to `"live"` —
-    then `pnpm sync` so every tool's switcher links out. That one is a Ramps
-    change, so it needs a branch.
-
-  Already done (2026-08-09): `wordmark: "springs.studio"` is in the manifest and
-  live, so the header chip and the switcher's current row already name the
-  address. The `domain` was deliberately left off — a wordmark can be true
-  before the link is, but a `domain` that doesn't resolve is a dead link in
-  every copy of the manifest.
-
-  The name question is settled as **Motion the tool, springs.studio the
-  address**: the family names output domains (Ramps, Shape, Type) and "springs"
-  names a mechanism that is only one of two easing types here — the shipped
-  default set is three beziers. The token namespace stays `motion.*` and the
-  titles stay `Motion · …`.
-- **The preview animation has not been observed running.** Root cause confirmed
-  2026-08-09: the browser pane renders the page as a *hidden* tab
-  (`visibilityState: "hidden"`), so `requestAnimationFrame` fires zero frames
-  and `setTimeout` is clamped to ~1/sec. Shimming rAF does not help. This also
-  means any UI behind an `AnimatePresence mode="wait"` swap — the export modal's
-  chooser → code stage, for one — cannot be reached in that pane at all, and it
-  presents as a dead click rather than a frozen animation. Verify layout with
-  `getBoundingClientRect` or by server-rendering the component; use a real
-  browser for anything that must actually move. The timeline maths is unit-tested in
-  `lib/preview.ts`, but nobody has watched it move — worth a human eyeballing
-  before anything is built on top of it.
+- **`og:image`.** Motion has no `/api/og`, so there is no card image. Ramps has
+  one; the family looks uneven until this lands. Belongs with the agent-surfaces
+  work.
+- **Browser-pane caveat, for agents only.** The in-app browser pane renders
+  pages as a *hidden* tab: `requestAnimationFrame` fires zero frames and
+  `setTimeout` is clamped to ~1/sec, so nothing animates and any UI behind an
+  `AnimatePresence mode="wait"` swap (the export modal's chooser → code stage)
+  cannot be reached there at all — it presents as a dead click. Verify layout
+  with `getBoundingClientRect` or by server-rendering the component. This is a
+  limitation of that pane, not of the app: the preview animation works, and has
+  been in daily use throughout the build.
 
 ## Session log
 

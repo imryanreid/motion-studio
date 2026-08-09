@@ -5,11 +5,10 @@
 // link copied from a preview deploy still points
 // somewhere stable.
 //
-// No custom domain yet, so this is the Vercel URL.
-// It changes together with the canonical tag, the
-// sitemap, robots.txt and the manifest entry in Ramps
-// Studio — see "There is no domain yet" in CLAUDE.md.
+// Override per-environment with VITE_SITE_URL. Falls
+// back to production so a plain `pnpm build` is always
+// correct.
 // ==============================================
 export const SITE_URL: string = (
-  import.meta.env.VITE_SITE_URL ?? "https://motion-studio-silk.vercel.app"
+  import.meta.env.VITE_SITE_URL ?? "https://www.springs.studio"
 ).replace(/\/+$/, "")
