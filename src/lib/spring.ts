@@ -55,11 +55,36 @@ export const SPRING_PRESETS: {
   /** The damping ratio these were picked for, shown in the UI. */
   zeta: number
 }[] = [
-  { id: "gentle", label: "Gentle", zeta: 1.19, value: { stiffness: 120, damping: 26, mass: 1, velocity: 0 } },
-  { id: "smooth", label: "Smooth", zeta: 1.0, value: { stiffness: 210, damping: 29, mass: 1, velocity: 0 } },
-  { id: "lively", label: "Lively", zeta: 0.73, value: { stiffness: 320, damping: 26, mass: 1, velocity: 0 } },
-  { id: "bouncy", label: "Bouncy", zeta: 0.4, value: { stiffness: 400, damping: 16, mass: 1, velocity: 0 } },
-  { id: "wobbly", label: "Wobbly", zeta: 0.27, value: { stiffness: 500, damping: 12, mass: 1, velocity: 0 } },
+  {
+    id: "gentle",
+    label: "Gentle",
+    zeta: 1.19,
+    value: { stiffness: 120, damping: 26, mass: 1, velocity: 0 },
+  },
+  {
+    id: "smooth",
+    label: "Smooth",
+    zeta: 1.0,
+    value: { stiffness: 210, damping: 29, mass: 1, velocity: 0 },
+  },
+  {
+    id: "lively",
+    label: "Lively",
+    zeta: 0.73,
+    value: { stiffness: 320, damping: 26, mass: 1, velocity: 0 },
+  },
+  {
+    id: "bouncy",
+    label: "Bouncy",
+    zeta: 0.4,
+    value: { stiffness: 400, damping: 16, mass: 1, velocity: 0 },
+  },
+  {
+    id: "wobbly",
+    label: "Wobbly",
+    zeta: 0.27,
+    value: { stiffness: 500, damping: 12, mass: 1, velocity: 0 },
+  },
 ]
 
 /**

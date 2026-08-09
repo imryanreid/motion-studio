@@ -384,10 +384,15 @@ describe("the exit link", () => {
 })
 
 describe("URL state", () => {
-  const withEntries = (entries: MotionEntry[], over: Partial<MotionState> = {}): MotionState => ({
+  const withEntries = (
+    entries: MotionEntry[],
+    over: Partial<MotionState> = {},
+  ): MotionState => ({
     ...DEFAULT_STATE,
     entries,
-    purposeEntry: Object.fromEntries(PURPOSE_IDS.map((p) => [p, entries[0].id])) as MotionState["purposeEntry"],
+    purposeEntry: Object.fromEntries(
+      PURPOSE_IDS.map((p) => [p, entries[0].id]),
+    ) as MotionState["purposeEntry"],
     ...over,
   })
 
@@ -396,7 +401,10 @@ describe("URL state", () => {
     { name: "one motion", s: withEntries([entry({ id: "a", name: "only" })]) },
     {
       name: "renamed",
-      s: withEntries([entry({ id: "a", name: "Snappy Thing" }), entry({ id: "b", name: "Calm" })]),
+      s: withEntries([
+        entry({ id: "a", name: "Snappy Thing" }),
+        entry({ id: "b", name: "Calm" }),
+      ]),
     },
     {
       name: "mixed types",
@@ -410,7 +418,13 @@ describe("URL state", () => {
       name: "per-motion stagger and an unlinked exit",
       s: withEntries([
         entry({ id: "a", name: "tight", staggerMs: 15 }),
-        entry({ id: "b", name: "loose", staggerMs: 120, exitLinked: false, exitAbsoluteMs: 90 }),
+        entry({
+          id: "b",
+          name: "loose",
+          staggerMs: 120,
+          exitLinked: false,
+          exitAbsoluteMs: 90,
+        }),
       ]),
     },
     { name: "tight tolerance", s: { ...DEFAULT_STATE, tolerance: 0.002 } },

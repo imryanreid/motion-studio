@@ -22,8 +22,10 @@ import { springValue, type SpringConfig } from "./spring.js"
 import {
   PURPOSE_IDS,
   STAGGER_DECAY,
+  type PurposeId,
   entryForPurpose,
-  resolveSemantics,
+  exportedSemantics,
+  purposeExports,
   slugs,
   type Easing,
   type MotionState,
@@ -49,19 +51,31 @@ function easingCss(easing: Easing, durationMs: number, tolerance: number): strin
 const kebab = (id: string) => id.replace(".", "-")
 
 /** The duration token a semantic pair points at. */
-const durationKey = (t: SemanticToken) =>
-  t.direction === "exit" ? `${t.slug}-exit` : t.slug
+const durationKey = (t: SemanticToken) => (t.direction === "exit" ? `${t.slug}-exit` : t.slug)
 
-/** Which purpose aliases point where, by slug. */
-function purposeAliases(s: MotionState): { id: string; slug: string }[] {
+/**
+ * Which purpose aliases point where, and which directions still exist.
+ *
+ * An alias to an excluded token is a dangling reference — `var()` pointing at
+ * nothing in CSS, and a variable Figma rejects on import in the DTCG file. So
+ * a purpose publishes only the directions its motion still does.
+ */
+function purposeAliases(
+  s: MotionState,
+): { id: PurposeId; slug: string; enter: boolean; exit: boolean }[] {
   const slug = slugs(s.entries)
-  return PURPOSE_IDS.map((id) => ({ id, slug: slug[entryForPurpose(s, id).id] }))
+  return PURPOSE_IDS.map((id) => ({
+    id,
+    slug: slug[entryForPurpose(s, id).id],
+    enter: purposeExports(s, id, "enter"),
+    exit: purposeExports(s, id, "exit"),
+  })).filter((p) => p.enter || p.exit)
 }
 
 // ---------- CSS ----------
 
 export function toCss(s: MotionState): string {
-  const semantics = resolveSemantics(s)
+  const semantics = exportedSemantics(s)
 
   const lines: string[] = [":root {", "  /* Durations */"]
   for (const t of semantics) lines.push(`  --duration-${durationKey(t)}: ${t.durationMs}ms;`)
@@ -82,6 +96,7 @@ export function toCss(s: MotionState): string {
   lines.push("", "  /* Purposes — aliases, not copies */")
   for (const p of purposeAliases(s)) {
     for (const dir of ["enter", "exit"] as const) {
+      if (!p[dir]) continue
       lines.push(`  --motion-${p.id}-${dir}: var(--motion-${p.slug}-${dir});`)
     }
   }
@@ -90,6 +105,7 @@ export function toCss(s: MotionState): string {
   // motion's children it was spacing.
   lines.push("", "  /* Stagger — per-child offset when a motion enters as a group */")
   for (const e of s.entries) {
+    if (!semantics.some((t) => t.entryId === e.id)) continue
     lines.push(`  --motion-${slugs(s.entries)[e.id]}-stagger: ${e.staggerMs}ms;`)
   }
   for (const p of purposeAliases(s)) {
@@ -111,6 +127,7 @@ export function toCss(s: MotionState): string {
   for (const t of semantics) lines.push(`    --duration-${durationKey(t)}: 1ms;`)
   for (const t of semantics) lines.push(`    --motion-${kebab(t.id)}: 1ms linear;`)
   for (const e of s.entries) {
+    if (!semantics.some((t) => t.entryId === e.id)) continue
     lines.push(`    --motion-${slugs(s.entries)[e.id]}-stagger: 0ms;`)
   }
   lines.push("  }", "}")
@@ -121,7 +138,7 @@ export function toCss(s: MotionState): string {
 // ---------- Tailwind ----------
 
 export function toTailwind(s: MotionState): string {
-  const semantics = resolveSemantics(s)
+  const semantics = exportedSemantics(s)
   const lines = ["@theme {", "  /* Generates ease-* utilities. */"]
   for (const t of semantics) {
     lines.push(`  --ease-${kebab(t.id)}: ${easingCss(t.easing, t.durationMs, s.tolerance)};`)
@@ -153,7 +170,7 @@ function framerTransition(t: SemanticToken): string {
 const jsKey = (slug: string) => (/^[A-Za-z_$][\w$]*$/.test(slug) ? slug : `"${slug}"`)
 
 export function toFramer(s: MotionState): string {
-  const semantics = resolveSemantics(s)
+  const semantics = exportedSemantics(s)
   const slug = slugs(s.entries)
   const lines = [
     "// Durations are in SECONDS here — Motion's unit, not CSS's.",
@@ -162,23 +179,27 @@ export function toFramer(s: MotionState): string {
     "export const motion = {",
   ]
   for (const e of s.entries) {
-    const enter = semantics.find((t) => t.entryId === e.id && t.direction === "enter")!
-    const exit = semantics.find((t) => t.entryId === e.id && t.direction === "exit")!
+    const enter = semantics.find((t) => t.entryId === e.id && t.direction === "enter")
+    const exit = semantics.find((t) => t.entryId === e.id && t.direction === "exit")
+    if (!enter && !exit) continue
     lines.push(`  ${jsKey(slug[e.id])}: {`)
-    lines.push(`    enter: ${framerTransition(enter)},`)
-    lines.push(`    exit: ${framerTransition(exit)},`)
+    if (enter) lines.push(`    enter: ${framerTransition(enter)},`)
+    if (exit) lines.push(`    exit: ${framerTransition(exit)},`)
     lines.push("  },")
   }
   lines.push("} as const", "")
   lines.push("// Aliases, pointing at the same objects.")
   lines.push("export const purpose = {")
   for (const p of purposeAliases(s)) {
-    lines.push(`  ${p.id}: motion${/^[A-Za-z_$][\w$]*$/.test(p.slug) ? `.${p.slug}` : `["${p.slug}"]`},`)
+    lines.push(
+      `  ${p.id}: motion${/^[A-Za-z_$][\w$]*$/.test(p.slug) ? `.${p.slug}` : `["${p.slug}"]`},`,
+    )
   }
   lines.push("} as const", "")
   lines.push("// Per-child offsets, in seconds, and the falloff they share.")
   lines.push("export const stagger = {")
   for (const e of s.entries) {
+    if (!semantics.some((t) => t.entryId === e.id)) continue
     lines.push(`  ${jsKey(slug[e.id])}: ${(e.staggerMs / 1000).toFixed(3)},`)
   }
   lines.push("} as const")
@@ -189,7 +210,7 @@ export function toFramer(s: MotionState): string {
 // ---------- DTCG ----------
 
 export function toDtcg(s: MotionState): string {
-  const semantics = resolveSemantics(s)
+  const semantics = exportedSemantics(s)
 
   const duration: Record<string, unknown> = {}
   for (const t of semantics) {
@@ -240,10 +261,10 @@ export function toDtcg(s: MotionState): string {
 
   const purpose: Record<string, unknown> = {}
   for (const p of purposeAliases(s)) {
-    purpose[p.id] = {
-      enter: { $type: "transition", $value: `{motion.${p.slug}.enter}` },
-      exit: { $type: "transition", $value: `{motion.${p.slug}.exit}` },
-    }
+    const entry: Record<string, unknown> = {}
+    if (p.enter) entry.enter = { $type: "transition", $value: `{motion.${p.slug}.enter}` }
+    if (p.exit) entry.exit = { $type: "transition", $value: `{motion.${p.slug}.exit}` }
+    purpose[p.id] = entry
   }
 
   return JSON.stringify({ duration, easing, motion, purpose }, null, 2)
@@ -255,7 +276,7 @@ export type FormatFidelity = { summary: string; detail: string } | undefined
 
 /** What the CSS export costs, or nothing when every conversion was exact. */
 export function cssFidelity(s: MotionState): FormatFidelity {
-  const semantics = resolveSemantics(s)
+  const semantics = exportedSemantics(s)
   const springs = semantics.filter((t) => t.easing.kind === "spring")
   if (!springs.length) return undefined
 
@@ -304,7 +325,7 @@ export function tailwindFidelity(s: MotionState): FormatFidelity {
 }
 
 export function dtcgFidelity(s: MotionState): FormatFidelity {
-  const hasSpring = resolveSemantics(s).some((t) => t.easing.kind === "spring")
+  const hasSpring = exportedSemantics(s).some((t) => t.easing.kind === "spring")
   if (!hasSpring) return undefined
   return {
     summary: "DTCG has no spring type · springs carry an extension",
@@ -321,7 +342,7 @@ export function dtcgFidelity(s: MotionState): FormatFidelity {
 
 /** Plain-language rules plus values, written to drop into a CLAUDE.md. */
 export function toAgentMarkdown(s: MotionState, url: string): string {
-  const semantics = resolveSemantics(s)
+  const semantics = exportedSemantics(s)
   const lines: string[] = [
     "# Motion tokens",
     "",
@@ -330,6 +351,12 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
     "## The set",
     "",
     `${s.entries.length} motion${s.entries.length === 1 ? "" : "s"}, each shipping an entrance and an exit.`,
+    ...(s.excluded.length
+      ? [
+          "",
+          `${s.excluded.length} token${s.excluded.length === 1 ? " was" : "s were"} deliberately excluded from this export and ${s.excluded.length === 1 ? "is" : "are"} not listed below. Purposes that pointed at ${s.excluded.length === 1 ? "it" : "them"} lost that direction rather than aliasing something absent.`,
+        ]
+      : []),
     "",
   ]
   for (const t of semantics) {
@@ -343,7 +370,10 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
   }
 
   lines.push("", "## Purposes", "", "Aliases, not copies. Prefer these at call sites.", "")
-  for (const p of purposeAliases(s)) lines.push(`- \`${p.id}\` → \`${p.slug}\``)
+  for (const p of purposeAliases(s)) {
+    const dirs = [p.enter && "enter", p.exit && "exit"].filter(Boolean).join(" and ")
+    lines.push(`- \`${p.id}\` → \`${p.slug}\` (${dirs})`)
+  }
 
   lines.push(
     "",

@@ -157,6 +157,11 @@ export function encodeState(s: MotionState): string {
   const p = new URLSearchParams()
   for (const e of s.entries) p.append("e", encodeEntry(e))
   p.set("pu", PURPOSE_IDS.map((id) => s.purposeEntry[id]).join("."))
+  // "std*enter.emp*exit" — "*" separates the two halves of a key and "." the
+  // list, because an entry id can contain neither.
+  if (s.excluded.length) {
+    p.set("xt", s.excluded.map((k) => k.replace(".", "*")).join("."))
+  }
   if (s.tolerance !== DEFAULT_STATE.tolerance) {
     p.set("tol", String(Math.round(s.tolerance * 10000)))
   }
@@ -195,6 +200,18 @@ export function decodeState(search: string): Partial<MotionState> {
     ) as Record<PurposeId, string>
   }
 
+  const xt = p.get("xt")
+  if (xt) {
+    const held = xt
+      .split(".")
+      .map((raw) => {
+        const [id, dir] = raw.split("*")
+        return seenIds.has(id) && (dir === "enter" || dir === "exit") ? `${id}.${dir}` : null
+      })
+      .filter((k): k is string => k !== null)
+    if (held.length) out.excluded = held
+  }
+
   const tol = num(p.get("tol"), 1, 2000)
   if (tol !== undefined) out.tolerance = tol / 10000
 
@@ -209,6 +226,7 @@ export function resolveState(search: string): MotionState {
     ...decoded,
     entries: decoded.entries ?? DEFAULT_STATE.entries,
     purposeEntry: decoded.purposeEntry ?? DEFAULT_STATE.purposeEntry,
+    excluded: decoded.excluded ?? [],
   }
 }
 

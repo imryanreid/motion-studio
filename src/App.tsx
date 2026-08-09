@@ -122,7 +122,7 @@ export default function App() {
         <Preview state={state} editingId={selectedId} />
       </div>
 
-      <SemanticTable state={state}>
+      <SemanticTable state={state} onChange={setState}>
         <AgentData state={state} url={shareHref} />
       </SemanticTable>
     </ToolShell>

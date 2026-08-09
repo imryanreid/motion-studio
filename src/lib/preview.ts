@@ -10,8 +10,13 @@
 // that a curve is being evaluated past its duration
 // or that a stagger offset is off by one.
 // ==============================================
-import { easingProgress, entryById,
-  staggerDelay, type MotionState, type SemanticToken } from "./tokens.js"
+import {
+  easingProgress,
+  entryById,
+  staggerDelay,
+  type MotionState,
+  type SemanticToken,
+} from "./tokens.js"
 
 /**
  * Beats of stillness around the motion.

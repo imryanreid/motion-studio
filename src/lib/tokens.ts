@@ -58,8 +58,7 @@ const NAME_ALLOWED = /[^A-Za-z0-9 _-]/g
 export type Direction = "enter" | "exit"
 
 export type Easing =
-  | { kind: "bezier"; bezier: Bezier }
-  | { kind: "spring"; spring: SpringConfig }
+  { kind: "bezier"; bezier: Bezier } | { kind: "spring"; spring: SpringConfig }
 
 export type EasingKind = Easing["kind"]
 
@@ -106,6 +105,13 @@ export type MotionState = {
   entries: MotionEntry[]
   /** Which entry each purpose reaches for, by entry id. */
   purposeEntry: Record<PurposeId, string>
+  /**
+   * Tokens held out of every export, as `${entryId}.${direction}`.
+   *
+   * Keyed on the entry id rather than the slug, so renaming a motion doesn't
+   * silently un-exclude it.
+   */
+  excluded: string[]
   /** Target max deviation for the CSS linear() approximation. */
   tolerance: number
 }
@@ -386,6 +392,7 @@ export const DEFAULT_STATE: MotionState = {
     modal: "emp",
     toast: "emp",
   },
+  excluded: [],
   tolerance: 0.01,
 }
 
@@ -423,10 +430,7 @@ export function enterMs(e: MotionEntry): number {
 
 export function exitMs(e: MotionEntry): number {
   if (e.easing.kind === "bezier") {
-    return Math.max(
-      1,
-      Math.round(e.exitLinked ? e.durationMs * e.exitRatio : e.exitAbsoluteMs),
-    )
+    return Math.max(1, Math.round(e.exitLinked ? e.durationMs * e.exitRatio : e.exitAbsoluteMs))
   }
   const exit = deriveExit(e.easing)
   // Always a spring — deriveExit preserves the kind — but narrow it rather
@@ -489,6 +493,9 @@ export function deriveExit(enter: Easing): Easing {
   }
 }
 
+/** The stable key for one direction of one motion. */
+export const tokenKey = (entryId: string, direction: Direction) => `${entryId}.${direction}`
+
 export type SemanticToken = {
   /** e.g. "standard.enter", built from the export slug. */
   id: string
@@ -496,6 +503,8 @@ export type SemanticToken = {
   name: string
   slug: string
   direction: Direction
+  /** False when this one is held out of the exports. */
+  exported: boolean
   /**
    * For a bezier this is the transition duration. For a spring it is the
    * settling time Framer Motion will actually use — a spring has no duration
@@ -509,6 +518,7 @@ export type SemanticToken = {
 /** Two tokens per entry. What you see on the page is what exports. */
 export function resolveSemantics(s: MotionState): SemanticToken[] {
   const slug = slugs(s.entries)
+  const held = new Set(s.excluded)
   const out: SemanticToken[] = []
   for (const e of s.entries) {
     out.push({
@@ -517,6 +527,7 @@ export function resolveSemantics(s: MotionState): SemanticToken[] {
       name: e.name,
       slug: slug[e.id],
       direction: "enter",
+      exported: !held.has(tokenKey(e.id, "enter")),
       durationMs: enterMs(e),
       easing: e.easing,
     })
@@ -526,11 +537,34 @@ export function resolveSemantics(s: MotionState): SemanticToken[] {
       name: e.name,
       slug: slug[e.id],
       direction: "exit",
+      exported: !held.has(tokenKey(e.id, "exit")),
       durationMs: exitMs(e),
       easing: deriveExit(e.easing),
     })
   }
   return out
+}
+
+/**
+ * Only what actually ships.
+ *
+ * Every exporter reads this rather than `resolveSemantics`, so a deselected
+ * token cannot reappear in one format because that exporter forgot to filter.
+ */
+export function exportedSemantics(s: MotionState): SemanticToken[] {
+  return resolveSemantics(s).filter((t) => t.exported)
+}
+
+/**
+ * Whether a purpose can alias a given direction.
+ *
+ * An alias whose target has been excluded is a dangling reference — a
+ * `var()` pointing at nothing in CSS, and something Figma rejects outright on
+ * import in the DTCG file. So a purpose loses the direction its motion is no
+ * longer publishing, rather than the export quietly emitting a broken link.
+ */
+export function purposeExports(s: MotionState, p: PurposeId, direction: Direction): boolean {
+  return !new Set(s.excluded).has(tokenKey(entryForPurpose(s, p).id, direction))
 }
 
 /** Progress 0→1 for any easing at a moment in ms. The one entry point. */

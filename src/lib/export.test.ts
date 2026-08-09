@@ -11,8 +11,10 @@ import {
   entryForPurpose,
   resolveSemantics,
   slugs,
+  tokenKey,
   type MotionState,
 } from "./tokens.js"
+import { encodeState, resolveState } from "./params.js"
 import {
   toCss,
   toTailwind,
@@ -72,7 +74,9 @@ describe("CSS", () => {
 
   it("aliases purposes rather than copying values", () => {
     for (const p of PURPOSE_IDS) {
-      expect(css).toContain(`--motion-${p}-enter: var(--motion-${alias(WITH_SPRING, p)}-enter);`)
+      expect(css).toContain(
+        `--motion-${p}-enter: var(--motion-${alias(WITH_SPRING, p)}-enter);`,
+      )
     }
   })
 
@@ -97,7 +101,9 @@ describe("CSS", () => {
   it("gives every motion its own stagger, and aliases it too", () => {
     // One global --stagger couldn't say whose children it was spacing.
     for (const e of WITH_SPRING.entries) {
-      expect(css).toContain(`--motion-${slugs(WITH_SPRING.entries)[e.id]}-stagger: ${e.staggerMs}ms;`)
+      expect(css).toContain(
+        `--motion-${slugs(WITH_SPRING.entries)[e.id]}-stagger: ${e.staggerMs}ms;`,
+      )
     }
     expect(css).toContain("--motion-list-stagger: var(--motion-standard-stagger);")
     expect(css).not.toContain("--stagger:")
@@ -215,7 +221,10 @@ describe("fidelity is reported only when there is something to report", () => {
 })
 
 describe("agent markdown", () => {
-  const md = toAgentMarkdown(WITH_SPRING, "https://example.test/?e=std*standard*b.20.0.0.100*200*70")
+  const md = toAgentMarkdown(
+    WITH_SPRING,
+    "https://example.test/?e=std*standard*b.20.0.0.100*200*70",
+  )
 
   it("carries every token", () => {
     for (const t of resolveSemantics(WITH_SPRING)) expect(md).toContain(`motion.${t.id}`)
@@ -254,5 +263,74 @@ describe("agent markdown", () => {
     expect(p).toContain("https://example.test/?e=1")
     expect(p.length).toBeLessThan(1200)
     expect(p).toMatch(/Exits must stay faster/)
+  })
+})
+
+// ==============================================
+// EXCLUDED TOKENS
+// The hazard is not the missing token — it's the alias left pointing at it.
+// ==============================================
+describe("excluding a token", () => {
+  const held = (state: MotionState, ...keys: string[]): MotionState => ({
+    ...state,
+    excluded: keys,
+  })
+
+  it("keeps it out of every format", () => {
+    const s = held(DEFAULT_STATE, tokenKey(DEFAULT_STATE.entries[0].id, "exit"))
+    const slug = slugs(s.entries)[s.entries[0].id]
+    for (const out of [toCss(s), toTailwind(s), toFramer(s), toDtcg(s), toAgentMarkdown(s, "https://x")]) {
+      expect(out).not.toContain(`${slug}-exit`)
+      expect(out).not.toContain(`${slug}.exit`)
+    }
+  })
+
+  it("leaves the other direction alone", () => {
+    const s = held(DEFAULT_STATE, tokenKey(DEFAULT_STATE.entries[0].id, "exit"))
+    const slug = slugs(s.entries)[s.entries[0].id]
+    expect(toCss(s)).toContain(`--motion-${slug}-enter`)
+  })
+
+  it("never emits an alias to something it didn't emit", () => {
+    // Every var() on the right-hand side has to have been declared above it,
+    // or the stylesheet resolves to nothing at runtime and says nothing about it.
+    const s = held(DEFAULT_STATE, ...DEFAULT_STATE.entries.map((e) => tokenKey(e.id, "exit")))
+    const css = toCss(s)
+    const declared = new Set([...css.matchAll(/^\s*(--[\w-]+):/gm)].map((m) => m[1]))
+    for (const [, ref] of css.matchAll(/var\((--[\w-]+)\)/g)) {
+      expect(declared.has(ref), `${ref} is referenced but never declared`).toBe(true)
+    }
+  })
+
+  it("drops the alias key rather than dangling it in DTCG", () => {
+    const s = held(DEFAULT_STATE, tokenKey(entryForPurpose(DEFAULT_STATE, "drawer").id, "exit"))
+    const dtcg = JSON.parse(toDtcg(s)) as {
+      purpose: Record<string, Record<string, unknown>>
+    }
+    expect(dtcg.purpose.drawer).not.toHaveProperty("exit")
+    expect(dtcg.purpose.drawer).toHaveProperty("enter")
+  })
+
+  it("says what it held back rather than quietly shipping less", () => {
+    const s = held(DEFAULT_STATE, tokenKey(DEFAULT_STATE.entries[0].id, "exit"))
+    expect(toAgentMarkdown(s, "https://x")).toMatch(/1 token was deliberately excluded/)
+  })
+
+  it("survives a round trip through the URL", () => {
+    const s = held(
+      DEFAULT_STATE,
+      tokenKey(DEFAULT_STATE.entries[0].id, "exit"),
+      tokenKey(DEFAULT_STATE.entries[1].id, "enter"),
+    )
+    const back = resolveState(encodeState(s))
+    expect(back.excluded.sort()).toEqual(s.excluded.sort())
+  })
+
+  it("forgets an exclusion whose entry is gone", () => {
+    // Otherwise a deleted motion leaves a key that silently re-applies if an
+    // id is ever reused.
+    const p = new URLSearchParams(encodeState(DEFAULT_STATE))
+    p.set("xt", "ghost*exit")
+    expect(resolveState(p.toString()).excluded).toEqual([])
   })
 })
