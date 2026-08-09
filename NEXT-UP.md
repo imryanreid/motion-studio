@@ -16,7 +16,23 @@ presets) or a spring (five presets by damping ratio, or raw physics), each with
 a derived exit; Generate builds the three-level set from any one of them; seven
 preview scenarios with component-first assignment; the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes; the
-machine-readable block; and URL state. 199 tests.
+machine-readable block; per-token export selection; and URL state. 216 tests.
+
+## Choosing what ships
+
+Each row of the output table has an Export checkbox. `MotionState.excluded`
+holds `${entryId}.${direction}` keys — entry id, not slug, so a rename doesn't
+un-exclude anything. URL param `xt`, `*` between the halves of a key and `.`
+between keys.
+
+The part worth remembering: **the risk was never the missing token, it was the
+alias left pointing at it.** A purpose aliasing an excluded direction emits a
+`var()` that resolves to nothing in CSS and a variable Figma rejects on DTCG
+import. So `purposeExports()` drops the direction, and a test walks the CSS
+asserting every referenced custom property was also declared. Every exporter
+reads `exportedSemantics()` rather than filtering for itself, so a new format
+can't forget. Preview deliberately still uses `resolveSemantics()` — you should
+be able to watch a motion you're deciding whether to ship.
 
 ## The model rewrite
 
