@@ -45,6 +45,9 @@ export default function Menu({
   label,
   groups,
   triggerLabel,
+  triggerClassName,
+  bare = false,
+  wrapperClassName,
   align = "right",
   width = "w-48",
 }: {
@@ -53,6 +56,17 @@ export default function Menu({
   groups: { heading?: string; items: MenuItem[] }[]
   /** Set to render a labelled chip instead of the dots icon. */
   triggerLabel?: string
+  /** Sizing for the trigger itself — a width to truncate a long label into. */
+  triggerClassName?: string
+  /**
+   * Drop the bordered box and render the glyph alone.
+   *
+   * For a trigger that has to sit on a line of 10px labels: a 28px box can
+   * only ever centre on the fields below, never on the labels beside it.
+   */
+  bare?: boolean
+  /** Positioning for the whole control within its parent row. */
+  wrapperClassName?: string
   align?: "left" | "right"
   /** Widen it when a heading is a sentence rather than a label. */
   width?: string
@@ -78,8 +92,11 @@ export default function Menu({
     }
   }, [open])
 
+  // flex, not block: an inline-flex trigger inside a block wrapper sits on a
+  // text baseline, which left the glyph two pixels above the label line it was
+  // supposed to share.
   return (
-    <div ref={root} className="relative shrink-0">
+    <div ref={root} className={cn("relative flex shrink-0 items-center", wrapperClassName)}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -88,18 +105,20 @@ export default function Menu({
         aria-label={label}
         title={label}
         className={cn(
-          "border-line text-ash hover:border-ink/30 hover:text-ink inline-flex h-7 items-center justify-center rounded-md border transition-colors",
-          triggerLabel ? "gap-1 px-2 font-mono text-[10px]" : "w-7",
-          open && "border-ink/30 text-ink bg-ink/[0.04]",
+          "text-ash hover:text-ink inline-flex items-center justify-center transition-colors",
+          bare ? "h-4 w-4" : "border-line hover:border-ink/30 h-7 rounded-md border",
+          !bare && (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-[10px]" : "w-7"),
+          triggerClassName,
+          open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.04]"),
         )}
       >
         {triggerLabel ? (
           <>
-            {triggerLabel}
-            <CaretDown size={9} weight="bold" aria-hidden="true" />
+            <span className="truncate">{triggerLabel}</span>
+            <CaretDown size={9} weight="bold" aria-hidden="true" className="shrink-0" />
           </>
         ) : (
-          <DotsThree size={14} weight="bold" aria-hidden="true" />
+          <DotsThree size={bare ? 16 : 14} weight="bold" aria-hidden="true" />
         )}
       </button>
 

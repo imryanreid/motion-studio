@@ -65,6 +65,7 @@ export function NumberField({
   step,
   suffix,
   width = FIELD_NUM,
+  boxClassName,
   title,
   ariaLabel,
 }: {
@@ -76,6 +77,8 @@ export function NumberField({
   step?: number
   suffix?: string
   width?: string
+  /** Border and radius overrides — used to join two fields into one group. */
+  boxClassName?: string
   title?: string
   ariaLabel: string
 }) {
@@ -88,7 +91,7 @@ export function NumberField({
   }
 
   return (
-    <div className={cn(BOX, width)} title={title}>
+    <div className={cn(BOX, width, boxClassName)} title={title}>
       <input
         // Text, not number: no spinner eating half the box, and no
         // browser-specific handling of a half-typed value.

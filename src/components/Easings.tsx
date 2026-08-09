@@ -46,7 +46,7 @@ import { DUR, EASE_PANEL } from "../shared/motion"
 import Segmented from "../shared/components/Segmented"
 import { PanelTitle } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
-import { FieldStack, NumberField, ReadOut, TextField } from "./Field"
+import { FIELD_TEXT, FieldStack, NumberField, ReadOut, TextField } from "./Field"
 import Menu, { ChipGroup } from "./Menu"
 import { BEZIER_PRESETS } from "../lib/bezier"
 import { SPRING_PRESETS, derive, overshoot, motionSettlingTime } from "../lib/spring"
@@ -290,18 +290,21 @@ export default function Easings({
             )}
           >
             {/*
-              Absolutely placed at a fixed offset, so it lands on exactly the
-              same pixel open or closed. Tucking it into each branch's flow
-              meant it tracked whatever that branch's first line happened to
-              be — a 20px summary line closed, a 48px label-and-field stack
-              open — and it jumped every time you toggled a row.
+              Centred in a band whose height this knows, rather than nudged to
+              a magic offset: open, the band is the 16px label row; closed, the
+              24px summary row. Both are placed so their centres land on the
+              same y, which is what keeps the chevron still when you toggle a
+              row AND centred within whatever it sits beside.
             */}
             <button
               type="button"
               onClick={() => onSelect(open ? "" : e.id)}
               aria-expanded={open}
               aria-label={open ? `Collapse ${e.name}` : `Edit ${e.name}`}
-              className="text-ash hover:text-ink absolute top-[0.95rem] left-3 z-10 transition-colors"
+              className={cn(
+                "text-ash hover:text-ink absolute left-3 z-10 flex items-center transition-colors",
+                open ? "top-3 h-4" : "top-2 h-6",
+              )}
             >
               {open ? (
                 <CaretDown size={11} weight="bold" />
@@ -312,67 +315,20 @@ export default function Easings({
 
             {open ? (
               <div className="flex flex-col gap-3 py-3 pr-3 pl-8">
-                {/* Identity: what it's called and what reaches for it. */}
-                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-                  <FieldStack label="Name">
-                    <TextField
-                      ariaLabel="Motion name"
-                      value={e.name}
-                      maxLength={NAME_MAX}
-                      onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
-                    />
-                  </FieldStack>
-
-                  {/*
-                    Assignment lives on the motion now, collapsed behind a
-                    count. A component belongs to exactly one motion, so
-                    ticking it here takes it from wherever it was — which the
-                    note on each row says out loud, because a checkbox that
-                    silently unticks itself somewhere else is a checkbox
-                    lying about what it does.
-                  */}
-                  <FieldStack label="Components">
-                    <Menu
-                      label={`Components using ${e.name}`}
-                      triggerLabel={
-                        used.length === 0
-                          ? "None"
-                          : `${used.length} component${used.length === 1 ? "" : "s"}`
-                      }
-                      align="left"
-                      width="w-56"
-                      groups={[
-                        {
-                          heading: `Which components use ${e.name}?`,
-                          items: PURPOSE_IDS.map((p) => {
-                            const owner = entryForPurpose(state, p)
-                            const mine = owner.id === e.id
-                            return {
-                              id: p,
-                              label: p,
-                              checked: mine,
-                              note: mine ? undefined : owner.name,
-                              keepOpen: true,
-                              title: mine
-                                ? `${p} uses ${e.name}`
-                                : `${p} currently uses ${owner.name} — this moves it here`,
-                              onSelect: () => {
-                                if (mine) return
-                                onChange({
-                                  ...state,
-                                  purposeEntry: { ...state.purposeEntry, [p]: e.id },
-                                })
-                              },
-                            }
-                          }),
-                        },
-                      ]}
-                    />
-                  </FieldStack>
-
-                  <div className="ml-auto flex h-8 items-center">
+                {/*
+                  Labels, chevron and the overflow icon share one 16px band, so
+                  all three sit on a single centre line; the controls they name
+                  sit under it. The overflow lost its bordered box to make that
+                  possible — at h-7 it could only ever centre on the fields.
+                */}
+                <div>
+                  <div className="text-ash flex h-4 items-center gap-3 font-mono text-[10px] tracking-wide uppercase">
+                    <span className={FIELD_TEXT}>Name</span>
+                    <span className="w-44">Components</span>
                     <Menu
                       width="w-44"
+                      bare
+                      wrapperClassName="ml-auto"
                       label={`Actions for ${e.name}`}
                       groups={[
                         {
@@ -400,6 +356,57 @@ export default function Easings({
                               onSelect: () => remove(e.id),
                             },
                           ],
+                        },
+                      ]}
+                    />
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-3">
+                    <TextField
+                      ariaLabel="Motion name"
+                      value={e.name}
+                      maxLength={NAME_MAX}
+                      onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
+                    />
+                    {/*
+                      A component belongs to exactly one motion, so ticking it
+                      here takes it from wherever it was — which each row says
+                      out loud by naming its current owner. A checkbox that
+                      silently unticks itself somewhere else is a checkbox
+                      lying about what it does.
+                    */}
+                    <Menu
+                      label={`Components using ${e.name}`}
+                      triggerLabel={
+                        used.length ? `${used.length} · ${used.join(", ")}` : "None"
+                      }
+                      triggerClassName="w-44 justify-between"
+                      align="left"
+                      width="w-56"
+                      groups={[
+                        {
+                          heading: `Which components use ${e.name}?`,
+                          items: PURPOSE_IDS.map((p) => {
+                            const owner = entryForPurpose(state, p)
+                            const mine = owner.id === e.id
+                            return {
+                              id: p,
+                              label: p,
+                              checked: mine,
+                              note: mine ? undefined : owner.name,
+                              keepOpen: true,
+                              title: mine
+                                ? `${p} uses ${e.name}`
+                                : `${p} currently uses ${owner.name} — this moves it here`,
+                              onSelect: () => {
+                                if (mine) return
+                                onChange({
+                                  ...state,
+                                  purposeEntry: { ...state.purposeEntry, [p]: e.id },
+                                })
+                              },
+                            }
+                          }),
                         },
                       ]}
                     />
@@ -561,54 +568,34 @@ export default function Easings({
                           </span>
                         </ReadOut>
                       </FieldStack>
+                      <div className="bg-line mx-1 mb-1 h-6 w-px shrink-0" aria-hidden="true" />
                     </>
                   ) : (
                     <>
-                      <FieldStack label="Duration">
-                        <NumberField
-                          ariaLabel={`${e.name} duration in milliseconds`}
-                          value={e.durationMs}
-                          min={20}
-                          max={9000}
-                          step={10}
-                          suffix="ms"
-                          title="How long the entrance runs."
-                          onChange={(durationMs) => patch(e.id, { durationMs })}
-                        />
-                      </FieldStack>
-
                       {/*
-                        Linked, the exit is a share of the entrance and stays
-                        proportional when you retime it — which is the lesson.
-                        Broken, it is its own number. Both values persist, so
-                        toggling back doesn't lose the one you weren't using.
+                        Linked, the two fields join into one control — the same
+                        way Figma joins W and H — and the exit is a share of the
+                        entrance that stays proportional when you retime it.
+                        Broken, they separate and the exit is its own number.
+                        Both values persist, so toggling loses neither.
                       */}
-                      <button
-                        type="button"
-                        onClick={() => patch(e.id, { exitLinked: !e.exitLinked })}
-                        aria-pressed={e.exitLinked}
-                        title={
-                          e.exitLinked
-                            ? "Exit follows the entrance. Click to give it its own duration."
-                            : "Exit stands alone. Click to make it a share of the entrance."
-                        }
-                        className={cn(
-                          "mb-0 flex h-8 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
-                          e.exitLinked
-                            ? "border-ink/30 bg-ink/[0.05] text-ink"
-                            : "border-line text-ash hover:text-ink",
-                        )}
-                      >
-                        {e.exitLinked ? (
-                          <LinkSimple size={12} weight="bold" />
-                        ) : (
-                          <LinkBreak size={12} weight="bold" />
-                        )}
-                      </button>
+                      <div className={cn("flex items-end", e.exitLinked ? "gap-0" : "gap-2")}>
+                        <FieldStack label="Duration">
+                          <NumberField
+                            ariaLabel={`${e.name} duration in milliseconds`}
+                            value={e.durationMs}
+                            min={20}
+                            max={9000}
+                            step={10}
+                            suffix="ms"
+                            boxClassName={e.exitLinked ? "rounded-r-none" : undefined}
+                            title="How long the entrance runs."
+                            onChange={(durationMs) => patch(e.id, { durationMs })}
+                          />
+                        </FieldStack>
 
-                      <FieldStack label="Exit">
-                        {e.exitLinked ? (
-                          <>
+                        <FieldStack label="Exit">
+                          {e.exitLinked ? (
                             <NumberField
                               ariaLabel={`${e.name} exit as a percentage of the entrance`}
                               value={Math.round(e.exitRatio * 100)}
@@ -616,29 +603,52 @@ export default function Easings({
                               max={130}
                               step={5}
                               suffix="%"
+                              boxClassName="-ml-px rounded-l-none"
                               title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
                               onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
                             />
-                            <span
-                              className="text-ash ml-2 font-mono text-xs"
-                              title="Derived — the share applied to the duration beside it."
-                            >
-                              ({exitMs(e)}ms)
-                            </span>
-                          </>
-                        ) : (
-                          <NumberField
-                            ariaLabel={`${e.name} exit duration in milliseconds`}
-                            value={e.exitAbsoluteMs}
-                            min={20}
-                            max={9000}
-                            step={10}
-                            suffix="ms"
-                            title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
-                            onChange={(exitAbsoluteMs) => patch(e.id, { exitAbsoluteMs })}
-                          />
-                        )}
-                      </FieldStack>
+                          ) : (
+                            <NumberField
+                              ariaLabel={`${e.name} exit duration in milliseconds`}
+                              value={e.exitAbsoluteMs}
+                              min={20}
+                              max={9000}
+                              step={10}
+                              suffix="ms"
+                              title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
+                              onChange={(exitAbsoluteMs) => patch(e.id, { exitAbsoluteMs })}
+                            />
+                          )}
+                        </FieldStack>
+
+                        <button
+                          type="button"
+                          onClick={() => patch(e.id, { exitLinked: !e.exitLinked })}
+                          aria-pressed={e.exitLinked}
+                          aria-label={`Link ${e.name} exit to its entrance`}
+                          title={
+                            e.exitLinked
+                              ? `Exit follows the entrance — ${exitMs(e)}ms. Click to give it its own duration.`
+                              : "Exit stands alone. Click to make it a share of the entrance."
+                          }
+                          className={cn(
+                            "ml-1.5 flex h-8 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                            e.exitLinked
+                              ? "border-ink/30 bg-ink/[0.05] text-ink"
+                              : "border-line text-ash hover:border-ink/30 hover:text-ink",
+                          )}
+                        >
+                          {e.exitLinked ? (
+                            <LinkSimple size={12} weight="bold" />
+                          ) : (
+                            <LinkBreak size={12} weight="bold" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Stagger is a different kind of thing from the pair
+                          beside it, so it gets a rule rather than just a gap. */}
+                      <div className="bg-line mx-1 mb-1 h-6 w-px shrink-0" aria-hidden="true" />
                     </>
                   )}
 
@@ -661,7 +671,7 @@ export default function Easings({
                 type="button"
                 onClick={() => onSelect(e.id)}
                 aria-expanded={false}
-                className="hover:bg-ink/[0.03] flex w-full items-center gap-3 py-2.5 pr-3 pl-8 text-left transition-colors"
+                className="hover:bg-ink/[0.03] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
               >
                 <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
                   {e.name}
@@ -672,7 +682,7 @@ export default function Easings({
                   <span className="text-ash">out{spring && " settling"}</span>
                 </span>
                 <span className="text-ash ml-auto truncate pl-2 text-right text-[11px]">
-                  {used.length ? used.join(", ") : "nothing uses this"}
+                  {used.length ? used.join(", ") : "—"}
                 </span>
               </button>
             )}
