@@ -70,6 +70,7 @@ import {
   staggerDelay,
   sanitizeName,
   slugs,
+  type EasingKind,
   type MotionEntry,
   type MotionState,
   type TransformId,
@@ -106,6 +107,35 @@ const DERIVATIONS: { id: TransformId | "duplicate"; label: string; title: string
 ]
 
 const CUSTOM = "custom"
+
+/**
+ * Which kind of easing a collapsed row holds, at a glance.
+ *
+ * Filled rather than outlined: in this family a border over `bg-paper` means
+ * "you can act on this", and a badge is a label. The fill also has to clear
+ * the row's own hover tint, or it would disappear exactly when you're pointing
+ * at it.
+ *
+ * Sat beside the thumbnail rather than ahead of the name, so the name still
+ * starts on the same left edge as the Name field it becomes when the row opens.
+ */
+function TypeBadge({ kind }: { kind: EasingKind }) {
+  const spring = kind === "spring"
+  return (
+    <span
+      role="img"
+      aria-label={spring ? "Spring" : "Bezier"}
+      title={
+        spring
+          ? "Spring — physics, with no duration of its own"
+          : "Bezier — four control points over a duration"
+      }
+      className="bg-ink/[0.08] text-ink flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] font-mono text-[10px] leading-none"
+    >
+      {spring ? "S" : "B"}
+    </span>
+  )
+}
 
 /**
  * Swap one block for another without the layout jumping.
@@ -825,6 +855,7 @@ export default function Easings({
                     <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
                       {e.name}
                     </span>
+                    <TypeBadge kind={e.easing.kind} />
                     <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
                     <span className="text-ink shrink-0 font-mono text-[11px]">
                       {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
