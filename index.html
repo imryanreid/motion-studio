@@ -9,15 +9,86 @@
       name="description"
       content="The motion token generator built for handing off: every set is readable by an agent as plain text or JSON. Cubic-bezier and spring easings previewed on real UI rather than on a dot, each with its own duration and a derived, deliberately faster exit. Exports to CSS, Tailwind, Framer Motion and DTCG — with the cost of each conversion measured rather than hidden."
     />
+    <link rel="canonical" href="https://www.springs.studio/" />
+    <meta name="robots" content="index, follow" />
+
     <!--
-      No canonical, og:url or sitemap yet: the domain isn't registered. A
-      canonical tag is invisible and, pointed at the wrong place, quietly tells
-      search engines this page belongs to someone else. Add all of them together
-      when the domain is live — see "The three things that are easy to break" in
-      CLAUDE.md.
+      No og:image. Ramps points at its own /api/og; Motion has no such route
+      yet, and an og:image tag aimed at a 404 is worse than none — a card with
+      a broken image reads as a broken site. Add it, and switch the twitter
+      card to summary_large_image, when the agent-surfaces work lands.
     -->
-    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.springs.studio/" />
+    <meta property="og:site_name" content="Motion" />
+    <meta
+      property="og:title"
+      content="Motion · Easings and semantic tokens your agent can read"
+    />
+    <meta
+      property="og:description"
+      content="Cubic-bezier and spring easings previewed on real UI, each with its own duration and a derived, faster exit. Exports to CSS, Tailwind, Framer Motion and DTCG, with the cost of each conversion measured rather than hidden."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta
+      name="twitter:title"
+      content="Motion · Easings and semantic tokens your agent can read"
+    />
+    <meta
+      name="twitter:description"
+      content="Easings and semantic tokens, previewed on real UI, built to start a project and hand to your agent."
+    />
     <meta name="author" content="Ryan Reid" />
+
+    <!--
+      JSON-LD, for the crawlers that read structured data rather than prose.
+      Kept out of api/render's rewriting: attribute values are HTML-parsed, the
+      contents of a ld+json script are not.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Motion",
+        "url": "https://www.springs.studio/",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any (web browser)",
+        "description": "Built to be handed to a coding agent: the homepage returns a complete motion set as plain text and JSON without JavaScript, /api/tokens returns it as JSON, and /llms.txt documents every parameter and token name. Generates motion tokens for a design system: named cubic-bezier or spring easings, each with its own duration, a derived and deliberately faster exit, a per-motion stagger, and purpose aliases mapping components onto them. Exports to CSS custom properties, a Tailwind v4 theme block, Framer Motion transitions, or W3C DTCG token files — with the cost of each conversion measured rather than hidden.",
+        "isAccessibleForFree": true,
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "Studio Tools",
+          "description": "Small, free, agent-readable design utilities."
+        },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": {
+          "@type": "Person",
+          "name": "Ryan Reid",
+          "url": "https://www.linkedin.com/in/imryanreid/"
+        },
+        "featureList": [
+          "Named motions, each owning its curve, duration, exit and stagger",
+          "Cubic-bezier easings with draggable handles, or springs specified by stiffness, damping and mass",
+          "Spring presets chosen by damping ratio, with overshoot and settling time derived from the closed form",
+          "Exits derived from their entrance and mirrored, with spring exits critically damped so they never bounce on the way out",
+          "Purpose aliases mapping components (drawer, modal, toast, list...) onto named motions",
+          "Preview on real UI components rather than on a moving dot",
+          "Springs sampled into CSS linear() with the worst-case error measured against the exact closed-form curve",
+          "Export to CSS custom properties, a Tailwind v4 theme, Framer Motion transitions, or W3C DTCG tokens",
+          "Per-token selection — deselected tokens are omitted from every export, and purpose aliases lose the direction rather than dangling",
+          "A copyable prompt that hands the set to a coding agent",
+          "Shareable permalinks that encode the whole set in the URL"
+        ],
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://www.springs.studio/?e={motion_entries}&pu={purpose_mappings}&xt={excluded_tokens}&tol={spring_tolerance}"
+          },
+          "query-input": "required name=motion_entries"
+        }
+      }
+    </script>
     <meta name="theme-color" content="#fdfdfc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)" />
   </head>

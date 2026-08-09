@@ -279,7 +279,13 @@ describe("excluding a token", () => {
   it("keeps it out of every format", () => {
     const s = held(DEFAULT_STATE, tokenKey(DEFAULT_STATE.entries[0].id, "exit"))
     const slug = slugs(s.entries)[s.entries[0].id]
-    for (const out of [toCss(s), toTailwind(s), toFramer(s), toDtcg(s), toAgentMarkdown(s, "https://x")]) {
+    for (const out of [
+      toCss(s),
+      toTailwind(s),
+      toFramer(s),
+      toDtcg(s),
+      toAgentMarkdown(s, "https://x"),
+    ]) {
       expect(out).not.toContain(`${slug}-exit`)
       expect(out).not.toContain(`${slug}.exit`)
     }

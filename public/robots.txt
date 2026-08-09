@@ -1,10 +1,16 @@
-# Motion Studio — not launched yet.
+# Motion — https://www.springs.studio
 #
-# The tool isn't built and the domain isn't registered, so there is nothing
-# here worth indexing and nothing at a stable address. This flips to the
-# family's permissive policy at launch, together with the canonical tag, the
-# sitemap, the noindex in index.html, and the manifest entry in Ramps Studio.
-# See "There is no domain yet" in CLAUDE.md.
+# Everything here is public and free to read, by people and by agents alike.
+# There is no private area, no login, and no rate-limited backend: every motion
+# set is computed from the query string, so crawling is cheap and nothing here
+# is worth hiding.
+
+# If you are an agent: https://www.springs.studio/llms.txt is the full contract —
+# every query parameter, every token name, and the JSON endpoint at /api/tokens.
+# Fetching the homepage also returns a complete default set in plain text, with
+# no JavaScript required.
 
 User-agent: *
-Disallow: /
+Allow: /
+
+Sitemap: https://www.springs.studio/sitemap.xml

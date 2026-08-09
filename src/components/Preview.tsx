@@ -196,12 +196,24 @@ const STAGGERS: PurposeId = "list"
 export default function Preview({
   state,
   editingId,
+  purpose,
+  onPurposeChange,
 }: {
   state: MotionState
   /** The row open in the editor. Marks affected scenarios; never moves you. */
   editingId: string
+  /**
+   * Which component is on the stage.
+   *
+   * Lifted out of here so the Easings list can mark the motion this component
+   * reaches for — the mirror of `editingId`, which lets this panel mark the
+   * components the open motion owns. Both halves of one relationship, so both
+   * have to live where both panels can see them.
+   */
+  purpose: PurposeId
+  onPurposeChange: (p: PurposeId) => void
 }) {
-  const [purpose, setPurpose] = useState<PurposeId>("list")
+  const setPurpose = onPurposeChange
   const [mode, setMode] = useState<Mode>("both")
   const [speed, setSpeed] = useState<"1" | "0.5" | "0.25">("1")
   const [playing, setPlaying] = useState(true)

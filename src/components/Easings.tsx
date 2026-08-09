@@ -47,7 +47,7 @@ import Segmented from "../shared/components/Segmented"
 import { PanelTitle } from "../shared/components/Label"
 import CurvePlot from "./CurvePlot"
 import { FIELD_TEXT, FieldStack, NumberField, ReadOut, TextField } from "./Field"
-import Menu, { ChipGroup } from "./Menu"
+import Menu, { AffectedDot, ChipGroup } from "./Menu"
 import { BEZIER_PRESETS, Y_MAX, Y_MIN } from "../lib/bezier"
 import { SPRING_PRESETS, derive, overshoot, motionSettlingTime } from "../lib/spring"
 import {
@@ -60,6 +60,7 @@ import {
   STAGGER_DECAY,
   baseSlug,
   entryForPurpose,
+  type PurposeId,
   TRANSFORMS,
   enterMs,
   exitMs,
@@ -214,12 +215,15 @@ export default function Easings({
   onChange,
   selectedId,
   onSelect,
+  previewPurpose,
 }: {
   state: MotionState
   onChange: (s: MotionState) => void
   /** Which row is expanded. Also what the preview marks as affected. */
   selectedId: string
   onSelect: (id: string) => void
+  /** The component on the preview stage — the motion it uses gets the dot. */
+  previewPurpose: PurposeId
 }) {
   // Which row has had Custom clicked explicitly. A row whose values match no
   // preset is custom regardless — this only covers "I want the numbers" while
@@ -285,7 +289,14 @@ export default function Easings({
   }
 
   return (
-    <section className="border-line flex flex-col overflow-hidden rounded-lg border">
+    /*
+      No overflow-hidden here. The Regenerate menu is anchored in the header
+      and drops past the panel's bottom edge whenever every row is collapsed —
+      clipping it at the section made the menu unusable at exactly the moment
+      you'd reach for it. The rounding it was protecting is now handled by the
+      list wrapper below, which the menu is not inside.
+    */
+    <section className="border-line flex flex-col rounded-lg border">
       {/*
         A fixed minimum height, matched to the Preview header beside it. The
         two panels sit side by side and their headers were three pixels apart,
@@ -324,17 +335,22 @@ export default function Easings({
         </div>
       </div>
 
-      {state.entries.map((e) => {
-        const open = e.id === selectedId
-        const spring = e.easing.kind === "spring" ? e.easing.spring : null
-        const d = spring ? derive(spring) : null
-        const used = purposesUsing(state, e.id)
-        const presetId = presetIdFor(e.easing)
-        const isCustom = presetId === null || customFor === e.id
-        const presets = spring ? SPRING_PRESETS : BEZIER_PRESETS
+      <div className="overflow-hidden rounded-b-lg">
+        {state.entries.map((e) => {
+          const open = e.id === selectedId
+          const spring = e.easing.kind === "spring" ? e.easing.spring : null
+          const d = spring ? derive(spring) : null
+          const used = purposesUsing(state, e.id)
+          // The other end of the dot on the component chips: that one says "this
+          // component is affected by the motion you have open", this one says
+          // "this is the motion the component you're watching reaches for".
+          const previewed = entryForPurpose(state, previewPurpose).id === e.id
+          const presetId = presetIdFor(e.easing)
+          const isCustom = presetId === null || customFor === e.id
+          const presets = spring ? SPRING_PRESETS : BEZIER_PRESETS
 
-        return (
-          /*
+          return (
+            /*
             `layout` earns two things at once: the row animates its own height
             as it expands, and every row below it slides down rather than
             jumping. overflow-hidden is what turns the height change into a
@@ -344,43 +360,43 @@ export default function Easings({
             MotionConfig reducedMotion="user", and the CSS block in tokens.css
             covers the non-Motion transitions.
           */
-          <div
-            key={e.id}
-            className={cn(
-              "transition-colors",
-              // The section draws its own bottom edge, so the last row must
-              // not draw one too — two 1px strokes on the same line read as a
-              // single heavier one, which is the only place the panel looked
-              // bottom-weighted.
-              "border-line/60 relative border-b last:border-b-0",
-              open && "bg-ink/[0.03]",
-            )}
-          >
-            {/*
+            <div
+              key={e.id}
+              className={cn(
+                "transition-colors",
+                // The section draws its own bottom edge, so the last row must
+                // not draw one too — two 1px strokes on the same line read as a
+                // single heavier one, which is the only place the panel looked
+                // bottom-weighted.
+                "border-line/60 relative border-b last:border-b-0",
+                open && "bg-ink/[0.03]",
+              )}
+            >
+              {/*
               Centred in a band whose height this knows, rather than nudged to
               a magic offset: open, the band is the 16px label row; closed, the
               24px summary row. Both are placed so their centres land on the
               same y, which is what keeps the chevron still when you toggle a
               row AND centred within whatever it sits beside.
             */}
-            <button
-              type="button"
-              onClick={() => onSelect(open ? "" : e.id)}
-              aria-expanded={open}
-              aria-label={open ? `Collapse ${e.name}` : `Edit ${e.name}`}
-              className={cn(
-                "text-ash hover:text-ink absolute left-3 z-10 flex items-center transition-colors",
-                open ? "top-3 h-4" : "top-2 h-6",
-              )}
-            >
-              {open ? (
-                <CaretDown size={11} weight="bold" />
-              ) : (
-                <CaretRight size={11} weight="bold" />
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={() => onSelect(open ? "" : e.id)}
+                aria-expanded={open}
+                aria-label={open ? `Collapse ${e.name}` : `Edit ${e.name}`}
+                className={cn(
+                  "text-ash hover:text-ink absolute left-3 z-10 flex items-center transition-colors",
+                  open ? "top-3 h-4" : "top-2 h-6",
+                )}
+              >
+                {open ? (
+                  <CaretDown size={11} weight="bold" />
+                ) : (
+                  <CaretRight size={11} weight="bold" />
+                )}
+              </button>
 
-            {/*
+              {/*
               Two independent height animations rather than one `layout` on the
               row.
 
@@ -395,74 +411,74 @@ export default function Easings({
               grows and the row's height is continuous. Nothing below needs a
               layout animation to follow: real height reflows the page.
             */}
-            <AnimatePresence initial={false}>
-              {open && (
-                <motion.div
-                  key="body"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{
-                    height: { duration: DUR.panel, ease: EASE_PANEL },
-                    opacity: { duration: DUR.swap, ease: EASE_PANEL },
-                  }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex flex-col gap-3 py-3 pr-3 pl-8">
-                    {/*
+              <AnimatePresence initial={false}>
+                {open && (
+                  <motion.div
+                    key="body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{
+                      height: { duration: DUR.panel, ease: EASE_PANEL },
+                      opacity: { duration: DUR.swap, ease: EASE_PANEL },
+                    }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-col gap-3 py-3 pr-3 pl-8">
+                      {/*
                   Labels, chevron and the overflow icon share one 16px band, so
                   all three sit on a single centre line; the controls they name
                   sit under it. The overflow lost its bordered box to make that
                   possible — at h-7 it could only ever centre on the fields.
                 */}
-                    <div>
-                      <div className="text-ash flex h-4 items-center gap-3 font-mono text-[10px] tracking-wide uppercase">
-                        <span className={FIELD_TEXT}>Name</span>
-                        <span className="w-44">Components</span>
-                        <Menu
-                          width="w-44"
-                          bare
-                          wrapperClassName="ml-auto"
-                          label={`Actions for ${e.name}`}
-                          groups={[
-                            {
-                              heading: "Duplicate variant",
-                              items: DERIVATIONS.map((t) => ({
-                                id: t.id,
-                                label: t.label,
-                                title: full ? `${ENTRY_LIMIT} motions is the limit` : t.title,
-                                disabled: full,
-                                onSelect: () => derived(e, t.id),
-                              })),
-                            },
-                            {
-                              items: [
-                                {
-                                  id: "delete",
-                                  label: "Delete",
-                                  danger: true,
-                                  separated: true,
-                                  disabled: state.entries.length <= 1,
-                                  title:
-                                    state.entries.length <= 1
-                                      ? "The last motion can't be deleted"
-                                      : `Delete ${e.name}`,
-                                  onSelect: () => remove(e.id),
-                                },
-                              ],
-                            },
-                          ]}
-                        />
-                      </div>
+                      <div>
+                        <div className="text-ash flex h-4 items-center gap-3 font-mono text-[10px] tracking-wide uppercase">
+                          <span className={FIELD_TEXT}>Name</span>
+                          <span className="w-44">Components</span>
+                          <Menu
+                            width="w-44"
+                            bare
+                            wrapperClassName="ml-auto"
+                            label={`Actions for ${e.name}`}
+                            groups={[
+                              {
+                                heading: "Duplicate variant",
+                                items: DERIVATIONS.map((t) => ({
+                                  id: t.id,
+                                  label: t.label,
+                                  title: full ? `${ENTRY_LIMIT} motions is the limit` : t.title,
+                                  disabled: full,
+                                  onSelect: () => derived(e, t.id),
+                                })),
+                              },
+                              {
+                                items: [
+                                  {
+                                    id: "delete",
+                                    label: "Delete",
+                                    danger: true,
+                                    separated: true,
+                                    disabled: state.entries.length <= 1,
+                                    title:
+                                      state.entries.length <= 1
+                                        ? "The last motion can't be deleted"
+                                        : `Delete ${e.name}`,
+                                    onSelect: () => remove(e.id),
+                                  },
+                                ],
+                              },
+                            ]}
+                          />
+                        </div>
 
-                      <div className="mt-1 flex items-center gap-3">
-                        <TextField
-                          ariaLabel="Motion name"
-                          value={e.name}
-                          maxLength={NAME_MAX}
-                          onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
-                        />
-                        {/*
+                        <div className="mt-1 flex items-center gap-3">
+                          <TextField
+                            ariaLabel="Motion name"
+                            value={e.name}
+                            maxLength={NAME_MAX}
+                            onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
+                          />
+                          {/*
                       A component belongs to exactly one motion, so the two
                       directions are not the same operation and don't get the
                       same interaction.
@@ -477,120 +493,125 @@ export default function Easings({
                       instead of offering a tick you can't untick. The checkbox
                       was promising an operation that doesn't exist.
                     */}
-                        <Menu
-                          label={`Components using ${e.name}`}
-                          triggerLabel={
-                            used.length ? `${used.length} · ${used.join(", ")}` : "None"
-                          }
-                          triggerClassName="w-44 justify-between"
-                          align="left"
-                          width="w-60"
-                          groups={[
-                            {
-                              heading: `Which components use ${e.name}?`,
-                              items: PURPOSE_IDS.map((p) => {
-                                const owner = entryForPurpose(state, p)
-                                const mine = owner.id === e.id
-                                const assign = (entryId: string) =>
-                                  onChange({
-                                    ...state,
-                                    purposeEntry: { ...state.purposeEntry, [p]: entryId },
-                                  })
-                                return {
-                                  id: p,
-                                  label: p,
-                                  checked: mine,
-                                  note: mine ? undefined : owner.name,
-                                  keepOpen: !mine,
-                                  title: mine
-                                    ? `${p} uses ${e.name} — move it to another motion`
-                                    : `${p} currently uses ${owner.name} — this moves it here`,
-                                  onSelect: () => !mine && assign(e.id),
-                                  submenu: mine
-                                    ? {
-                                        heading: `Move ${p} to…`,
-                                        items: state.entries
-                                          .filter((v) => v.id !== e.id)
-                                          .map((v) => ({
-                                            id: v.id,
-                                            label: v.name,
-                                            title: `${p} will use ${v.name}`,
-                                            onSelect: () => assign(v.id),
-                                          })),
-                                      }
-                                    : undefined,
-                                }
-                              }),
-                            },
-                          ]}
-                        />
-                      </div>
-                    </div>
-
-                    {slug[e.id] !== baseSlug(e.name) && (
-                      <p className="text-ash font-mono text-[10px]">
-                        Exports as <span className="text-ink">motion.{slug[e.id]}</span> —
-                        another motion already claimed{" "}
-                        <span className="text-ink">{baseSlug(e.name)}</span>.
-                      </p>
-                    )}
-
-                    {/* Kind, then which named shape of that kind — adjacent, because
-                    the second is a function of the first. */}
-                    <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-                      <FieldStack label="Type">
-                        <Segmented
-                          ariaLabel={`${e.name} curve type`}
-                          layoutId={`kind-${e.id}`}
-                          size="sm"
-                          value={e.easing.kind}
-                          onChange={(kind) => {
-                            // Both defaults are named presets, so a type switch has
-                            // to drop a sticky Custom or it would land on a preset
-                            // and claim not to be on one.
-                            setCustomFor(null)
-                            patch(e.id, {
-                              easing:
-                                kind === "spring"
-                                  ? { kind: "spring", spring: DEFAULT_SPRING }
-                                  : { kind: "bezier", bezier: DEFAULT_BEZIER },
-                            })
-                          }}
-                          options={MODE_OPTIONS}
-                        />
-                      </FieldStack>
-
-                      <FieldStack label="Shape" className="shrink">
-                        <ChipGroup
-                          ariaLabel={`${e.name} shape`}
-                          value={isCustom ? CUSTOM : presetId}
-                          options={[
-                            ...presets.map((p) => ({
-                              id: p.id,
-                              label: p.label,
-                              title: "zeta" in p ? `damping ratio ${p.zeta}` : undefined,
-                            })),
-                            { id: CUSTOM, label: "Custom", title: "Type the numbers yourself" },
-                          ]}
-                          onChange={(id) => {
-                            if (id === CUSTOM) {
-                              setCustomFor(e.id)
-                              return
+                          <Menu
+                            label={`Components using ${e.name}`}
+                            triggerLabel={
+                              used.length ? `${used.length} · ${used.join(", ")}` : "None"
                             }
-                            setCustomFor(null)
-                            const preset = presets.find((p) => p.id === id)!
-                            patch(e.id, {
-                              easing:
-                                "zeta" in preset
-                                  ? { kind: "spring", spring: preset.value }
-                                  : { kind: "bezier", bezier: preset.value },
-                            })
-                          }}
-                        />
-                      </FieldStack>
-                    </div>
+                            triggerClassName="w-44 justify-between"
+                            align="left"
+                            width="w-60"
+                            groups={[
+                              {
+                                heading: `Which components use ${e.name}?`,
+                                items: PURPOSE_IDS.map((p) => {
+                                  const owner = entryForPurpose(state, p)
+                                  const mine = owner.id === e.id
+                                  const assign = (entryId: string) =>
+                                    onChange({
+                                      ...state,
+                                      purposeEntry: { ...state.purposeEntry, [p]: entryId },
+                                    })
+                                  return {
+                                    id: p,
+                                    label: p,
+                                    checked: mine,
+                                    note: mine ? undefined : owner.name,
+                                    keepOpen: !mine,
+                                    title: mine
+                                      ? `${p} uses ${e.name} — move it to another motion`
+                                      : `${p} currently uses ${owner.name} — this moves it here`,
+                                    onSelect: () => !mine && assign(e.id),
+                                    submenu: mine
+                                      ? {
+                                          heading: `Move ${p} to…`,
+                                          items: state.entries
+                                            .filter((v) => v.id !== e.id)
+                                            .map((v) => ({
+                                              id: v.id,
+                                              label: v.name,
+                                              title: `${p} will use ${v.name}`,
+                                              onSelect: () => assign(v.id),
+                                            })),
+                                        }
+                                      : undefined,
+                                  }
+                                }),
+                              },
+                            ]}
+                          />
+                          {previewed && <AffectedDot />}
+                        </div>
+                      </div>
 
-                    {/*
+                      {slug[e.id] !== baseSlug(e.name) && (
+                        <p className="text-ash font-mono text-[10px]">
+                          Exports as <span className="text-ink">motion.{slug[e.id]}</span> —
+                          another motion already claimed{" "}
+                          <span className="text-ink">{baseSlug(e.name)}</span>.
+                        </p>
+                      )}
+
+                      {/* Kind, then which named shape of that kind — adjacent, because
+                    the second is a function of the first. */}
+                      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                        <FieldStack label="Type">
+                          <Segmented
+                            ariaLabel={`${e.name} curve type`}
+                            layoutId={`kind-${e.id}`}
+                            size="sm"
+                            value={e.easing.kind}
+                            onChange={(kind) => {
+                              // Both defaults are named presets, so a type switch has
+                              // to drop a sticky Custom or it would land on a preset
+                              // and claim not to be on one.
+                              setCustomFor(null)
+                              patch(e.id, {
+                                easing:
+                                  kind === "spring"
+                                    ? { kind: "spring", spring: DEFAULT_SPRING }
+                                    : { kind: "bezier", bezier: DEFAULT_BEZIER },
+                              })
+                            }}
+                            options={MODE_OPTIONS}
+                          />
+                        </FieldStack>
+
+                        <FieldStack label="Shape" className="shrink">
+                          <ChipGroup
+                            ariaLabel={`${e.name} shape`}
+                            value={isCustom ? CUSTOM : presetId}
+                            options={[
+                              ...presets.map((p) => ({
+                                id: p.id,
+                                label: p.label,
+                                title: "zeta" in p ? `damping ratio ${p.zeta}` : undefined,
+                              })),
+                              {
+                                id: CUSTOM,
+                                label: "Custom",
+                                title: "Type the numbers yourself",
+                              },
+                            ]}
+                            onChange={(id) => {
+                              if (id === CUSTOM) {
+                                setCustomFor(e.id)
+                                return
+                              }
+                              setCustomFor(null)
+                              const preset = presets.find((p) => p.id === id)!
+                              patch(e.id, {
+                                easing:
+                                  "zeta" in preset
+                                    ? { kind: "spring", spring: preset.value }
+                                    : { kind: "bezier", bezier: preset.value },
+                              })
+                            }}
+                          />
+                        </FieldStack>
+                      </div>
+
+                      {/*
                   The curve and the numbers that describe it are one thing, so
                   they share one surface. Loose on the panel they had no edges,
                   and the handles could be dragged toward a boundary that was
@@ -608,71 +629,75 @@ export default function Easings({
                   fine as long as one element doesn't sit on a third surface of
                   its own — which is what the partial was doing.
                 */}
-                    <div className="border-line/60 bg-paper flex w-full max-w-[420px] flex-col gap-3 rounded-lg border p-3">
-                      <CurvePlot
-                        easing={e.easing}
-                        onChange={
-                          e.easing.kind === "bezier"
-                            ? (bezier) => patch(e.id, { easing: { kind: "bezier", bezier } })
-                            : undefined
-                        }
-                      />
+                      <div className="border-line/60 bg-paper flex w-full max-w-[420px] flex-col gap-3 rounded-lg border p-3">
+                        <CurvePlot
+                          easing={e.easing}
+                          onChange={
+                            e.easing.kind === "bezier"
+                              ? (bezier) => patch(e.id, { easing: { kind: "bezier", bezier } })
+                              : undefined
+                          }
+                        />
 
-                      {isCustom && (
-                        <FieldStack label={e.easing.kind === "bezier" ? "Handles" : "Physics"}>
-                          <div className="flex gap-2">
-                            {e.easing.kind === "bezier"
-                              ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
-                                  <NumberField
-                                    key={k}
-                                    ariaLabel={`${e.name} ${k}`}
-                                    suffix={k}
-                                    value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
-                                    step={0.01}
-                                    min={k.startsWith("x") ? 0 : Y_MIN}
-                                    max={k.startsWith("x") ? 1 : Y_MAX}
-                                    title={
-                                      k.startsWith("x")
-                                        ? `${k} — handle position in time`
-                                        : `${k} — handle position in progress. Outside 0–1 overshoots.`
-                                    }
-                                    onChange={(v) =>
-                                      e.easing.kind === "bezier" &&
-                                      patch(e.id, {
-                                        easing: {
-                                          kind: "bezier",
-                                          bezier: { ...e.easing.bezier, [k]: v },
-                                        },
-                                      })
-                                    }
-                                  />
-                                ))
-                              : SPRING_FIELDS.map((f) => (
-                                  <NumberField
-                                    key={f.key}
-                                    ariaLabel={`${e.name} ${f.key}`}
-                                    suffix={f.short}
-                                    value={spring![f.key]}
-                                    step={f.step}
-                                    min={f.min}
-                                    max={f.max}
-                                    title={f.title}
-                                    onChange={(v) =>
-                                      patch(e.id, {
-                                        easing: {
-                                          kind: "spring",
-                                          spring: { ...spring!, [f.key]: v },
-                                        },
-                                      })
-                                    }
-                                  />
-                                ))}
-                          </div>
-                        </FieldStack>
-                      )}
-                    </div>
+                        {isCustom && (
+                          <FieldStack
+                            label={e.easing.kind === "bezier" ? "Handles" : "Physics"}
+                          >
+                            <div className="flex gap-2">
+                              {e.easing.kind === "bezier"
+                                ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
+                                    <NumberField
+                                      key={k}
+                                      ariaLabel={`${e.name} ${k}`}
+                                      suffix={k}
+                                      value={
+                                        e.easing.kind === "bezier" ? e.easing.bezier[k] : 0
+                                      }
+                                      step={0.01}
+                                      min={k.startsWith("x") ? 0 : Y_MIN}
+                                      max={k.startsWith("x") ? 1 : Y_MAX}
+                                      title={
+                                        k.startsWith("x")
+                                          ? `${k} — handle position in time`
+                                          : `${k} — handle position in progress. Outside 0–1 overshoots.`
+                                      }
+                                      onChange={(v) =>
+                                        e.easing.kind === "bezier" &&
+                                        patch(e.id, {
+                                          easing: {
+                                            kind: "bezier",
+                                            bezier: { ...e.easing.bezier, [k]: v },
+                                          },
+                                        })
+                                      }
+                                    />
+                                  ))
+                                : SPRING_FIELDS.map((f) => (
+                                    <NumberField
+                                      key={f.key}
+                                      ariaLabel={`${e.name} ${f.key}`}
+                                      suffix={f.short}
+                                      value={spring![f.key]}
+                                      step={f.step}
+                                      min={f.min}
+                                      max={f.max}
+                                      title={f.title}
+                                      onChange={(v) =>
+                                        patch(e.id, {
+                                          easing: {
+                                            kind: "spring",
+                                            spring: { ...spring!, [f.key]: v },
+                                          },
+                                        })
+                                      }
+                                    />
+                                  ))}
+                            </div>
+                          </FieldStack>
+                        )}
+                      </div>
 
-                    {/*
+                      {/*
                   Timing sits last because it modifies a shape you have already
                   chosen. A spring has no duration and no exit share; what it
                   has instead is a settling time, explained on hover rather
@@ -681,196 +706,200 @@ export default function Easings({
                   Stagger is here for both types — it is a delay between
                   children, not a property of the curve.
                 */}
-                    <div className="border-line/60 flex flex-wrap items-end gap-x-3 gap-y-2 border-t pt-3">
-                      {spring ? (
-                        <>
-                          <FieldStack label="Settles">
-                            <ReadOut
-                              title={`A spring has no duration — it approaches its target asymptotically and never arrives. ${motionSettlingTime(spring)}ms is where Framer Motion decides it's close enough. Other runtimes pick a different threshold and will honestly report a different number, which is why there is no duration field here.`}
-                            >
-                              ~{enterMs(e)}ms
-                            </ReadOut>
-                          </FieldStack>
-                          <FieldStack label="ζ damping">
-                            <ReadOut
-                              width="w-32"
-                              title="Damping ratio: c / (2*sqrt(k*m)). Below 1 the spring overshoots and comes back; at 1 it is critical — the quickest arrival with no bounce at all; above 1 it crawls in."
-                            >
-                              {/*
+                      <div className="border-line/60 flex flex-wrap items-end gap-x-3 gap-y-2 border-t pt-3">
+                        {spring ? (
+                          <>
+                            <FieldStack label="Settles">
+                              <ReadOut
+                                title={`A spring has no duration — it approaches its target asymptotically and never arrives. ${motionSettlingTime(spring)}ms is where Framer Motion decides it's close enough. Other runtimes pick a different threshold and will honestly report a different number, which is why there is no duration field here.`}
+                              >
+                                ~{enterMs(e)}ms
+                              </ReadOut>
+                            </FieldStack>
+                            <FieldStack label="ζ damping">
+                              <ReadOut
+                                width="w-32"
+                                title="Damping ratio: c / (2*sqrt(k*m)). Below 1 the spring overshoots and comes back; at 1 it is critical — the quickest arrival with no bounce at all; above 1 it crawls in."
+                              >
+                                {/*
                             Was amber, which was the only hard-coded palette
                             colour in the app — against the family's five-token
                             rule — and scored about 2:1 on a light background.
                             The word already says it bounces; the colour was
                             saying the same thing less legibly.
                           */}
-                              {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
-                            </ReadOut>
-                          </FieldStack>
-                          <div
-                            className="bg-line mx-1 mb-1 h-6 w-px shrink-0"
-                            aria-hidden="true"
-                          />
-                        </>
-                      ) : (
-                        <>
-                          {/*
+                                {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
+                              </ReadOut>
+                            </FieldStack>
+                            <div
+                              className="bg-line mx-1 mb-1 h-6 w-px shrink-0"
+                              aria-hidden="true"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            {/*
                         Linked, the two fields join into one control — the same
                         way Figma joins W and H — and the exit is a share of the
                         entrance that stays proportional when you retime it.
                         Broken, they separate and the exit is its own number.
                         Both values persist, so toggling loses neither.
                       */}
-                          {/*
+                            {/*
                         Fixed width on the pair, with the fields flexing inside
                         it, so the right edge — and therefore the link button —
                         lands on the same pixel whether they are joined or
                         apart. Sized by content, the 8px gap pushed the button
                         sideways every time you toggled the link.
                       */}
-                          <div className="flex w-[11.5rem] items-end">
-                            <div
-                              className={cn(
-                                "flex min-w-0 flex-1 items-end",
-                                e.exitLinked ? "gap-0" : "gap-2",
-                              )}
-                            >
-                              <FieldStack label="Enter" className="min-w-0 flex-1 shrink">
-                                <NumberField
-                                  ariaLabel={`${e.name} duration in milliseconds`}
-                                  value={e.durationMs}
-                                  min={20}
-                                  max={9000}
-                                  step={10}
-                                  suffix="ms"
-                                  width="w-full"
-                                  boxClassName={e.exitLinked ? "rounded-r-none" : undefined}
-                                  title="How long the entrance runs."
-                                  onChange={(durationMs) => patch(e.id, { durationMs })}
-                                />
-                              </FieldStack>
-
-                              <FieldStack label="Exit" className="min-w-0 flex-1 shrink">
-                                {e.exitLinked ? (
+                            <div className="flex w-[11.5rem] items-end">
+                              <div
+                                className={cn(
+                                  "flex min-w-0 flex-1 items-end",
+                                  e.exitLinked ? "gap-0" : "gap-2",
+                                )}
+                              >
+                                <FieldStack label="Enter" className="min-w-0 flex-1 shrink">
                                   <NumberField
-                                    ariaLabel={`${e.name} exit as a percentage of the entrance`}
-                                    value={Math.round(e.exitRatio * 100)}
-                                    min={20}
-                                    max={130}
-                                    step={5}
-                                    suffix="%"
-                                    width="w-full"
-                                    boxClassName="-ml-px rounded-l-none"
-                                    title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
-                                    onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
-                                  />
-                                ) : (
-                                  <NumberField
-                                    ariaLabel={`${e.name} exit duration in milliseconds`}
-                                    value={e.exitAbsoluteMs}
+                                    ariaLabel={`${e.name} duration in milliseconds`}
+                                    value={e.durationMs}
                                     min={20}
                                     max={9000}
                                     step={10}
                                     suffix="ms"
                                     width="w-full"
-                                    title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
-                                    onChange={(exitAbsoluteMs) =>
-                                      patch(e.id, { exitAbsoluteMs })
-                                    }
+                                    boxClassName={e.exitLinked ? "rounded-r-none" : undefined}
+                                    title="How long the entrance runs."
+                                    onChange={(durationMs) => patch(e.id, { durationMs })}
                                   />
+                                </FieldStack>
+
+                                <FieldStack label="Exit" className="min-w-0 flex-1 shrink">
+                                  {e.exitLinked ? (
+                                    <NumberField
+                                      ariaLabel={`${e.name} exit as a percentage of the entrance`}
+                                      value={Math.round(e.exitRatio * 100)}
+                                      min={20}
+                                      max={130}
+                                      step={5}
+                                      suffix="%"
+                                      width="w-full"
+                                      boxClassName="-ml-px rounded-l-none"
+                                      title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
+                                      onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
+                                    />
+                                  ) : (
+                                    <NumberField
+                                      ariaLabel={`${e.name} exit duration in milliseconds`}
+                                      value={e.exitAbsoluteMs}
+                                      min={20}
+                                      max={9000}
+                                      step={10}
+                                      suffix="ms"
+                                      width="w-full"
+                                      title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
+                                      onChange={(exitAbsoluteMs) =>
+                                        patch(e.id, { exitAbsoluteMs })
+                                      }
+                                    />
+                                  )}
+                                </FieldStack>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => patch(e.id, { exitLinked: !e.exitLinked })}
+                                aria-pressed={e.exitLinked}
+                                aria-label={`Link ${e.name} exit to its entrance`}
+                                title={
+                                  e.exitLinked
+                                    ? `Exit follows the entrance — ${exitMs(e)}ms. Click to give it its own duration.`
+                                    : "Exit stands alone. Click to make it a share of the entrance."
+                                }
+                                className={cn(
+                                  "ml-1.5 flex h-8 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                                  e.exitLinked
+                                    ? "border-ink/30 bg-ink/[0.06] text-ink"
+                                    : "border-line text-ash hover:border-ink/30 hover:text-ink",
                                 )}
-                              </FieldStack>
+                              >
+                                {e.exitLinked ? (
+                                  <LinkSimple size={12} weight="bold" />
+                                ) : (
+                                  <LinkBreak size={12} weight="bold" />
+                                )}
+                              </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => patch(e.id, { exitLinked: !e.exitLinked })}
-                              aria-pressed={e.exitLinked}
-                              aria-label={`Link ${e.name} exit to its entrance`}
-                              title={
-                                e.exitLinked
-                                  ? `Exit follows the entrance — ${exitMs(e)}ms. Click to give it its own duration.`
-                                  : "Exit stands alone. Click to make it a share of the entrance."
-                              }
-                              className={cn(
-                                "ml-1.5 flex h-8 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
-                                e.exitLinked
-                                  ? "border-ink/30 bg-ink/[0.06] text-ink"
-                                  : "border-line text-ash hover:border-ink/30 hover:text-ink",
-                              )}
-                            >
-                              {e.exitLinked ? (
-                                <LinkSimple size={12} weight="bold" />
-                              ) : (
-                                <LinkBreak size={12} weight="bold" />
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Stagger is a different kind of thing from the pair
+                            {/* Stagger is a different kind of thing from the pair
                           beside it, so it gets a rule rather than just a gap. */}
-                          <div
-                            className="bg-line mx-1 mb-1 h-6 w-px shrink-0"
-                            aria-hidden="true"
+                            <div
+                              className="bg-line mx-1 mb-1 h-6 w-px shrink-0"
+                              aria-hidden="true"
+                            />
+                          </>
+                        )}
+
+                        <FieldStack label="Stagger">
+                          <NumberField
+                            ariaLabel={`${e.name} stagger in milliseconds`}
+                            value={e.staggerMs}
+                            min={0}
+                            max={400}
+                            step={5}
+                            suffix="ms"
+                            title={`Per-child offset when this motion enters as a group, falling off as index^${STAGGER_DECAY} so a long list doesn't take proportionally longer. Five rows would start at ${[1, 2, 3, 4].map((i) => staggerDelay(e, i)).join(", ")}ms.`}
+                            onChange={(staggerMs) => patch(e.id, { staggerMs })}
                           />
-                        </>
-                      )}
-
-                      <FieldStack label="Stagger">
-                        <NumberField
-                          ariaLabel={`${e.name} stagger in milliseconds`}
-                          value={e.staggerMs}
-                          min={0}
-                          max={400}
-                          step={5}
-                          suffix="ms"
-                          title={`Per-child offset when this motion enters as a group, falling off as index^${STAGGER_DECAY} so a long list doesn't take proportionally longer. Five rows would start at ${[1, 2, 3, 4].map((i) => staggerDelay(e, i)).join(", ")}ms.`}
-                          onChange={(staggerMs) => patch(e.id, { staggerMs })}
-                        />
-                      </FieldStack>
+                        </FieldStack>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            <AnimatePresence initial={false}>
-              {!open && (
-                <motion.div
-                  key="summary"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{
-                    height: { duration: DUR.panel, ease: EASE_PANEL },
-                    opacity: { duration: DUR.swap, ease: EASE_PANEL },
-                  }}
-                  className="overflow-hidden"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelect(e.id)}
-                    aria-expanded={false}
-                    className="hover:bg-ink/[0.05] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
+              <AnimatePresence initial={false}>
+                {!open && (
+                  <motion.div
+                    key="summary"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{
+                      height: { duration: DUR.panel, ease: EASE_PANEL },
+                      opacity: { duration: DUR.swap, ease: EASE_PANEL },
+                    }}
+                    className="overflow-hidden"
                   >
-                    <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
-                      {e.name}
-                    </span>
-                    <TypeBadge kind={e.easing.kind} />
-                    <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
-                    <span className="text-ink shrink-0 font-mono text-[11px]">
-                      {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
-                      <span className="text-ash">exit{spring && " settling"}</span>
-                    </span>
-                    <span className="text-ash ml-auto truncate pl-2 text-right text-[11px]">
-                      {used.length ? used.join(", ") : "—"}
-                    </span>
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )
-      })}
+                    <button
+                      type="button"
+                      onClick={() => onSelect(e.id)}
+                      aria-expanded={false}
+                      className="hover:bg-ink/[0.05] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
+                    >
+                      <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
+                        {e.name}
+                      </span>
+                      <TypeBadge kind={e.easing.kind} />
+                      <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
+                      <span className="text-ink shrink-0 font-mono text-[11px]">
+                        {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
+                        <span className="text-ash">exit{spring && " settling"}</span>
+                      </span>
+                      <span className="ml-auto flex min-w-0 items-center gap-1.5 pl-2">
+                        {previewed && <AffectedDot />}
+                        <span className="text-ash truncate text-right text-[11px]">
+                          {used.length ? used.join(", ") : "—"}
+                        </span>
+                      </span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )
+        })}
+      </div>
     </section>
   )
 }

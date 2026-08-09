@@ -9,12 +9,20 @@
 
 | File             | What it does                                                                                                                      |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `index.html`     | The page shell Vite builds around. Deliberately carries no canonical or `og:url` and is `noindex` until the domain is registered. |
+| `index.html`     | The page shell Vite builds around. Canonical, OG tags and JSON-LD for `www.springs.studio`. `api/render` rewrites parts of this head per URL. |
+| `middleware.ts`  | Sends `/` to `api/render` before the filesystem check, so the homepage isn't served as a static empty shell. |
 | `vite.config.ts` | Build config. React + Tailwind plugins, React deduping, and `base: "./"` so the build also runs opened off disk.                  |
 | `tsconfig.json`  | TypeScript settings. Strict, no emit.                                                                                             |
 | `package.json`   | Dependencies and scripts.                                                                                                         |
 | `.mise.toml`     | Pins the toolchain: Node 22, pnpm 10.                                                                                             |
 | `LICENSE`        | MIT.                                                                                                                              |
+
+## `api/` — serverless, agent-facing
+
+| File        | What it is                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| `render.ts` | `GET /`. Serves index.html with the motion set injected as JSON and as text, so a JavaScript-less fetch returns the tokens. Rewrites the head to self-canonical for a parameterized URL. |
+| `tokens.ts` | `GET /api/tokens`. The same payload as JSON alone, same query contract, CORS-open.                      |
 
 ## `scripts/`
 
@@ -26,7 +34,8 @@
 
 | File            | What it does                                                                        |
 | --------------- | ----------------------------------------------------------------------------------- |
-| `main.tsx`      | Entry point. Mounts `App`, loads the stylesheet, attaches the Vercel beacons.       |
+| `main.tsx`      | Entry point. Mounts `App`, loads the stylesheet, attaches the Vercel beacons, and removes the injected agent block once React is running. |
+| `lib/agent.ts`  | The agent payload — one motion set as structured JSON and as text. Pure, so `api/` can import it without React. |
 | `App.tsx`       | Motion-specific wiring. A placeholder today — renders the shared shell and a note.  |
 | `index.css`     | Imports the shared tokens. Tool-specific rules go here when the previews need them. |
 | `vite-env.d.ts` | This app's ambient types. Shared code brings its own (`src/shared/env.d.ts`).       |

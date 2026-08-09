@@ -308,20 +308,27 @@ export function ChipGroup({
                 "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
           )}
         >
-          {/* A quiet marker for "this one is affected by what you're editing",
-              which is a different axis from being selected. */}
-          {o.dot && (
-            <span
-              aria-hidden="true"
-              className={cn(
-                "mr-1.5 inline-block h-1 w-1 rounded-full",
-                o.id === value ? "bg-paper/70" : "bg-ink/50",
-              )}
-            />
-          )}
+          {o.dot && <AffectedDot className={cn("mr-1.5", o.id === value && "bg-paper/70")} />}
           {o.label}
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * "This one is tied to what you're looking at."
+ *
+ * A different axis from being selected, and used in both directions: on a
+ * component chip it means the open easing owns that component, and on an
+ * easing row it means the component being previewed uses that easing. One
+ * component so the two ends of that relationship can't drift apart visually.
+ */
+export function AffectedDot({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("bg-ink/50 inline-block h-1 w-1 shrink-0 rounded-full", className)}
+    />
   )
 }
