@@ -211,7 +211,9 @@ describe("fidelity is reported only when there is something to report", () => {
   it("CSS reports the measured cost when a spring is present", () => {
     const f = cssFidelity(WITH_SPRING)
     expect(f).toBeDefined()
-    expect(f!.summary).toMatch(/linear\(\) approximation · max error \d+ms/)
+    expect(f!.summary).toMatch(/linear\(\) approximation · within \d+\.\d% of travel/)
+    // The timing figure moved to the detail, where it can explain itself.
+    expect(f!.detail).toMatch(/largest \*timing\* difference/)
     expect(f!.detail).toMatch(/Framer Motion runs the real physics/)
   })
 

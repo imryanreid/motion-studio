@@ -144,6 +144,18 @@ export function buildAgentPayload(search: string, origin: string): AgentPayload 
   const dtcg = dtcgFidelity(state)
 
   const json = {
+    /**
+     * Bumped only when a consumer that parsed the previous shape would now be
+     * wrong — a key removed, retyped, or given a new meaning. Adding keys does
+     * not bump it.
+     *
+     * Worth carrying rather than skipping, because this model has already been
+     * rewritten once: it used to be a five-step duration scale with three
+     * emphasis levels mapped onto it, and anything built against that shape
+     * broke silently. A number that fails loudly beats a payload that
+     * misparses quietly, even though there is no v1 endpoint to fall back to.
+     */
+    version: 1,
     tool: "Motion",
     site: origin,
     source: canonical,
