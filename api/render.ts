@@ -35,7 +35,22 @@ export async function GET(request: Request): Promise<Response> {
 
   // The built shell, fetched as a static asset. "/index.html" isn't matched by
   // the rewrite that sent us here, so this can't recurse.
-  const shell = await fetch(new URL("/index.html", url.origin), {
+  //
+  // Never a cached copy, and this is not paranoia — it shipped broken once.
+  // "/index.html" is a stable URL whose contents change every deployment, so a
+  // CDN hit can hand this function the *previous* build's shell: stale meta
+  // tags, and asset hashes that now 404. The homepage then serves current
+  // tokens grafted onto a document whose JavaScript no longer exists, which
+  // looks fine to an agent and is completely broken for a person.
+  //
+  // Two defences because one of them is a hint: `cache: "no-store"` asks, and
+  // the per-deployment query key guarantees a distinct cache entry even if the
+  // ask is ignored. A query string doesn't change which static file resolves.
+  const shellUrl = new URL("/index.html", url.origin)
+  const build = process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA
+  if (build) shellUrl.searchParams.set("__build", build)
+  const shell = await fetch(shellUrl, {
+    cache: "no-store",
     headers: { "user-agent": "motion-studio-render" },
   })
   if (!shell.ok) {
