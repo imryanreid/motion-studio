@@ -112,6 +112,16 @@ produces. `SITE_URL`, the canonical tag, `og:url`, `public/robots.txt`,
 `public/sitemap.xml` and the manifest entry in **Ramps Studio** all say
 `www.springs.studio` and must stay in step.
 
+**Agent surfaces are the product, not a nicety.** `middleware.ts` sends `/` to
+`api/render`, which injects the motion set into the HTML as both JSON and text,
+so a fetch with JavaScript disabled returns the tokens. `/api/tokens` is the
+same payload as JSON, `/llms.txt` is the contract. Anything touching `api/`,
+`src/lib/agent.ts` or `src/lib/params.ts` must be verified with a **real
+no-JavaScript fetch** — a browser check proves nothing, because the browser
+runs the app, which is the one thing an agent doesn't do. Note that preview
+deployments are SSO-protected, so that verification has to happen against
+production or an unprotected deployment.
+
 There is deliberately **no `og:image`** — Ramps points at its own `/api/og`,
 Motion has no such route yet, and a card tag aimed at a 404 is worse than no
 card tag. Add it and switch `twitter:card` to `summary_large_image` when the

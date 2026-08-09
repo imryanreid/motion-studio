@@ -1,0 +1,82 @@
+# Motion
+
+> Generates a set of motion tokens for a design system: named easings — cubic-bezier
+> or spring — each with its own duration, a derived and deliberately faster exit, a
+> per-motion stagger, and purpose aliases that map components onto them. Exports to
+> CSS, Tailwind v4, Framer Motion and DTCG, with the cost of each conversion measured
+> rather than hidden.
+
+Free, no account, no API key, no rate limit. Every set is a pure function of the URL,
+so the same link always returns the same tokens.
+
+Site: https://www.springs.studio
+
+## Using this as a tool
+
+Fetch the page. The motion set is in the HTML — no JavaScript required.
+
+  https://www.springs.studio/
+
+Two readable blocks sit at the end of the document:
+
+  <script type="application/json" id="motion-studio-tokens">  structured data
+  <pre>                                                       the same set as text
+
+For JSON alone, swap the path:
+
+  https://www.springs.studio/api/tokens
+
+Both accept the same query string, so a share link works on either.
+
+## Query contract
+
+Every parameter is optional. With none, you get the shipped default set.
+
+  e    Repeated once per motion. Six fields, separated by "*":
+         id*name*easing*durationMs*exit*staggerMs
+       easing is either
+         b.<x1>.<y1>.<x2>.<y2>   cubic-bezier, values x100
+         s.<stiffness>.<damping>.<mass>.<velocity>
+       exit is either
+         r<percent>   a share of the entrance, e.g. r70
+         a<ms>        an absolute duration, e.g. a140
+  pu   Repeated. Which motion a purpose points at: <purpose>.<entryId>
+  xt   Tokens held out of the export: <entryId>*<enter|exit>, "." between entries
+  tol  Spring sampling tolerance for the CSS linear() approximation, 1–2000
+       (thousandths). Default 10, i.e. 1%.
+
+Purposes: state, dropdown, tooltip, list, drawer, modal, toast
+
+## What comes back
+
+Each motion publishes two tokens:
+
+  motion.<slug>.enter
+  motion.<slug>.exit
+
+and each purpose aliases one of them:
+
+  motion.<purpose>-enter -> var(--motion-<slug>-enter)
+
+## Rules that matter when applying these
+
+- Prefer the purpose aliases or the named motions over raw durations.
+- Exits stay faster and flatter than entrances. That asymmetry is deliberate;
+  symmetric motion reads as sluggish on the way out.
+- Ship the prefers-reduced-motion block. It is already in the CSS export.
+- A spring has no duration. The `durationMs` on a spring token is a settling
+  estimate, not a fact — copying it onto a CSS transition will not reproduce the
+  motion. Use the sampled `linear()` in the token's `css` field, or the spring
+  parameters with a runtime that does real physics.
+- CSS cannot run spring physics, so springs are sampled into a `linear()`
+  polyline. `conversionCost.css` in the JSON reports the worst-case error across
+  the set, measured against the exact closed-form curve.
+- DTCG has no spring type. `$value` carries a linear fallback and the real
+  parameters travel in `$extensions["studio.motion.spring"]`.
+
+## Other tools in this family
+
+  Ramps   Color scales & semantic tokens   https://www.ramps.studio/
+  Shape   Spacing, radius & elevation      not yet released
+  Type    Fluid scales & text styles       not yet released
+  Icons   SVG cleanup & alignment          not yet released
