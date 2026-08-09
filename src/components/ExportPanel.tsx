@@ -44,8 +44,9 @@ const TOLERANCES = [
 const ACCURACY_NOTE = (
   <div className="space-y-2">
     <p>
-      Springs only, and only here — CSS, Tailwind and DTCG. Your tokens don't change, the Framer
-      Motion export doesn't change, and neither does the preview.
+      Accuracy is the error budget for approximating a spring in CSS. It applies to springs
+      only, and only to these three exports — your tokens don't change, the Framer Motion export
+      doesn't change, and neither does the preview.
     </p>
     <p>
       CSS has no spring. A <code className="font-mono">cubic-bezier()</code> is one curve with
@@ -55,10 +56,10 @@ const ACCURACY_NOTE = (
       settle.
     </p>
     <p>
-      Accuracy is the error budget for that tracing: at 1% the polyline stays within 1% of the
-      element's total travel at every moment. Tighter costs string length, and a bouncy spring
-      costs far more than a calm one — roughly 150 characters at 1% for a critically damped
-      spring against 400 for a lively one. 1% is right almost always.
+      At 1%, that polyline stays within 1% of the element's total travel from the true curve at
+      every moment. Tighter costs string length, and a bouncy spring costs far more than a calm
+      one — roughly 150 characters at 1% for a critically damped spring against 400 for a lively
+      one. 1% is right almost always.
     </p>
     <p>
       The consequence worth knowing: Framer Motion runs the real physics and is exact, so the
@@ -113,7 +114,7 @@ export function AccuracyControl({
         {/* Same disclosure as a fidelity note, because it answers the same kind
           of question — what is this costing me — and a second visual language
           for that would be one too many. */}
-        <TerminalNote summary="what this changes" detail={ACCURACY_NOTE} />
+        <TerminalNote summary="what's this?" detail={ACCURACY_NOTE} />
       </div>
     </div>
   )
