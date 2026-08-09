@@ -21,6 +21,7 @@ import { approximateToTolerance, describeApproximation } from "./linear.js"
 import { springValue, type SpringConfig } from "./spring.js"
 import {
   PURPOSE_IDS,
+  STAGGER_DECAY,
   entryForPurpose,
   resolveSemantics,
   slugs,
@@ -85,7 +86,15 @@ export function toCss(s: MotionState): string {
     }
   }
 
-  lines.push(`  --stagger: ${s.staggerMs}ms;`)
+  // Per-motion, like everything else — a single --stagger couldn't say which
+  // motion's children it was spacing.
+  lines.push("", "  /* Stagger — per-child offset when a motion enters as a group */")
+  for (const e of s.entries) {
+    lines.push(`  --motion-${slugs(s.entries)[e.id]}-stagger: ${e.staggerMs}ms;`)
+  }
+  for (const p of purposeAliases(s)) {
+    lines.push(`  --motion-${p.id}-stagger: var(--motion-${p.slug}-stagger);`)
+  }
   lines.push("}")
 
   lines.push(
@@ -101,7 +110,10 @@ export function toCss(s: MotionState): string {
   )
   for (const t of semantics) lines.push(`    --duration-${durationKey(t)}: 1ms;`)
   for (const t of semantics) lines.push(`    --motion-${kebab(t.id)}: 1ms linear;`)
-  lines.push("    --stagger: 0ms;", "  }", "}")
+  for (const e of s.entries) {
+    lines.push(`    --motion-${slugs(s.entries)[e.id]}-stagger: 0ms;`)
+  }
+  lines.push("  }", "}")
 
   return lines.join("\n")
 }
@@ -164,8 +176,13 @@ export function toFramer(s: MotionState): string {
     lines.push(`  ${p.id}: motion${/^[A-Za-z_$][\w$]*$/.test(p.slug) ? `.${p.slug}` : `["${p.slug}"]`},`)
   }
   lines.push("} as const", "")
-  lines.push(`export const stagger = ${(s.staggerMs / 1000).toFixed(3)}`)
-  lines.push(`export const staggerDecay = ${s.staggerDecay}`)
+  lines.push("// Per-child offsets, in seconds, and the falloff they share.")
+  lines.push("export const stagger = {")
+  for (const e of s.entries) {
+    lines.push(`  ${jsKey(slug[e.id])}: ${(e.staggerMs / 1000).toFixed(3)},`)
+  }
+  lines.push("} as const")
+  lines.push(`export const staggerDecay = ${STAGGER_DECAY}`)
   return lines.join("\n")
 }
 
@@ -335,7 +352,7 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
     `1. **Exits are faster and flatter than entrances.** The exit curve is the mirror of the entrance — a spring exit loses its bounce entirely. An entrance introduces something; an exit removes something the user has already finished with, and lingering reads as lag.`,
     `2. **Reach for a purpose, not a raw duration.** The purpose aliases above say what a motion is for; the durations say only how long it is.`,
     `3. **Duration should grow with travel distance, sub-linearly.** Roughly \`duration x (travel / 160px)^0.5\`, clamped to 0.6x-1.8x. Apply it to motions that actually travel; a checkbox filling has no distance.`,
-    `4. **Stagger falls off.** ${s.staggerMs}ms x index^${s.staggerDecay}, so a long list doesn't take proportionally long.`,
+    `4. **Stagger falls off.** Each motion carries its own per-child offset — ${s.entries.map((e) => `${slugs(s.entries)[e.id]} ${e.staggerMs}ms`).join(", ")} — applied as \`offset x index^${STAGGER_DECAY}\`, so a long list doesn't take proportionally long.`,
     `5. **Always ship the reduced-motion block.** It's in the CSS export already. In Framer Motion use \`<MotionConfig reducedMotion="user">\`.`,
     "",
     "## A spring has no duration",

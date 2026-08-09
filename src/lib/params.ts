@@ -74,23 +74,36 @@ function decodeEasing(raw: string | undefined): Easing | undefined {
   return undefined
 }
 
-/** `id*name*easing[*duration*exit%]`. Springs carry neither of the last two. */
+/**
+ * `id*name*easing*duration*exit*stagger`.
+ *
+ * Exit is self-describing rather than positional: `r70` is 70% of the
+ * entrance, `a140` is a flat 140ms. One field either way, and a link that says
+ * which it is.
+ *
+ * Every field travels for both types, including the two a spring ignores. They
+ * are what it falls back to if you switch it to a bezier, and carrying them
+ * means that switch restores what you had rather than handing you a default.
+ */
 function encodeEntry(e: MotionEntry): string {
-  const head = [e.id, e.name, encodeEasing(e.easing)]
-  if (e.easing.kind === "spring") return head.join("*")
   return [
-    ...head,
+    e.id,
+    e.name,
+    encodeEasing(e.easing),
     String(Math.round(e.durationMs)),
-    String(Math.round(e.exitRatio * 100)),
+    e.exitLinked ? `r${Math.round(e.exitRatio * 100)}` : `a${Math.round(e.exitAbsoluteMs)}`,
+    String(Math.round(e.staggerMs)),
   ].join("*")
 }
 
 const ID_OK = /^[A-Za-z0-9_-]{1,12}$/
 
+const SEED = DEFAULT_STATE.entries[1]
+
 function decodeEntry(raw: string): MotionEntry | undefined {
   const parts = raw.split("*")
   if (parts.length < 3) return undefined
-  const [id, rawName, rawEasing, rawDur, rawExit] = parts
+  const [id, rawName, rawEasing, rawDur, rawExit, rawStagger] = parts
   if (!ID_OK.test(id)) return undefined
 
   const easing = decodeEasing(rawEasing)
@@ -99,19 +112,38 @@ function decodeEntry(raw: string): MotionEntry | undefined {
   const name = sanitizeName(rawName)
   if (!name) return undefined
 
-  if (easing.kind === "spring") {
-    // A spring has no duration and no exit share, so nothing is read for one
-    // even if a hand-edited link supplies them. The values kept here are the
-    // defaults it would fall back to if the type were switched.
-    return { id, name, easing, durationMs: DEFAULT_STATE.entries[1].durationMs, exitRatio: 0.7 }
+  const durationMs = num(rawDur ?? null, 1, 60000) ?? SEED.durationMs
+  const staggerMs = num(rawStagger ?? null, 0, 1000) ?? SEED.staggerMs
+
+  // "r70" or "a140" — the prefix is the link state, so a link that lost the
+  // field falls back to linked rather than to a silent absolute value.
+  let exitLinked = SEED.exitLinked
+  let exitRatio = SEED.exitRatio
+  let exitAbsoluteMs = SEED.exitAbsoluteMs
+  if (rawExit?.startsWith("a")) {
+    const ms = num(rawExit.slice(1), 1, 60000)
+    if (ms !== undefined) {
+      exitLinked = false
+      exitAbsoluteMs = Math.round(ms)
+    }
+  } else if (rawExit?.startsWith("r")) {
+    const pct = num(rawExit.slice(1), 10, 200)
+    if (pct !== undefined) {
+      exitLinked = true
+      exitRatio = pct / 100
+    }
   }
 
-  const durationMs = Number(rawDur)
-  const exitPct = Number(rawExit)
-  if (!Number.isFinite(durationMs) || durationMs < 1 || durationMs > 60000) return undefined
-  if (!Number.isFinite(exitPct) || exitPct < 10 || exitPct > 200) return undefined
-
-  return { id, name, easing, durationMs: Math.round(durationMs), exitRatio: exitPct / 100 }
+  return {
+    id,
+    name,
+    easing,
+    durationMs: Math.round(durationMs),
+    exitRatio,
+    exitAbsoluteMs,
+    exitLinked,
+    staggerMs: Math.round(staggerMs),
+  }
 }
 
 const num = (raw: string | null, min: number, max: number): number | undefined => {
@@ -125,12 +157,6 @@ export function encodeState(s: MotionState): string {
   const p = new URLSearchParams()
   for (const e of s.entries) p.append("e", encodeEntry(e))
   p.set("pu", PURPOSE_IDS.map((id) => s.purposeEntry[id]).join("."))
-  if (
-    s.staggerMs !== DEFAULT_STATE.staggerMs ||
-    s.staggerDecay !== DEFAULT_STATE.staggerDecay
-  ) {
-    p.set("sg", `${Math.round(s.staggerMs)}.${Math.round(s.staggerDecay * B)}`)
-  }
   if (s.tolerance !== DEFAULT_STATE.tolerance) {
     p.set("tol", String(Math.round(s.tolerance * 10000)))
   }
@@ -167,14 +193,6 @@ export function decodeState(search: string): Partial<MotionState> {
     out.purposeEntry = Object.fromEntries(
       PURPOSE_IDS.map((id) => [id, entries[0].id]),
     ) as Record<PurposeId, string>
-  }
-
-  const sg = p.get("sg")?.split(".")
-  if (sg?.length === 2) {
-    const ms = num(sg[0], 0, 1000)
-    const decay = num(sg[1], 0, 200)
-    if (ms !== undefined) out.staggerMs = Math.round(ms)
-    if (decay !== undefined) out.staggerDecay = decay / B
   }
 
   const tol = num(p.get("tol"), 1, 2000)

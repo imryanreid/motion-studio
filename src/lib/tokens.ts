@@ -36,6 +36,15 @@ import { SPRING_PRESETS, motionSettlingTime, type SpringConfig } from "./spring.
 /** Generated durations land on this grid. Values you type are left alone. */
 const ROUND_MS = 10
 
+/**
+ * How stagger falls off across a group: `stagger x index^DECAY`.
+ *
+ * A constant rather than state. It has never had a control, and a sub-linear
+ * falloff is the rule the tool teaches rather than a dial — the thing worth
+ * tuning is the offset itself, which is now per-motion.
+ */
+export const STAGGER_DECAY = 0.85
+
 /** One step of "faster" or "slower". */
 export const STEP = 1.4
 
@@ -61,8 +70,31 @@ export type MotionEntry = {
   easing: Easing
   /** Entrance duration in ms. A spring ignores it: it settles when it settles. */
   durationMs: number
-  /** Exit duration as a fraction of the entrance. A spring ignores it too. */
+  /**
+   * Exit as a share of the entrance. Used when `exitLinked`; kept either way,
+   * so unlinking and relinking doesn't lose what you had.
+   */
   exitRatio: number
+  /** Exit as its own duration in ms. Used when not `exitLinked`. */
+  exitAbsoluteMs: number
+  /**
+   * Whether the exit follows the entrance or stands alone.
+   *
+   * Linked is the default and the lesson: an exit that is a share of its
+   * entrance stays faster automatically when you retime the entrance. Unlink
+   * it when a motion genuinely needs its own number.
+   */
+  exitLinked: boolean
+  /**
+   * Per-child offset when this motion enters as a group, in ms.
+   *
+   * Per-motion rather than global, because how far apart children should start
+   * depends on how long each one takes — a 140ms entrance wants a tighter
+   * stagger than a 400ms one, and one number across the whole set could only
+   * ever be right for one of them. It also leaves nothing global behind: every
+   * value in the model now belongs to a motion.
+   */
+  staggerMs: number
 }
 
 export type MotionState = {
@@ -74,9 +106,6 @@ export type MotionState = {
   entries: MotionEntry[]
   /** Which entry each purpose reaches for, by entry id. */
   purposeEntry: Record<PurposeId, string>
-  staggerMs: number
-  /** Sub-linear falloff so a long list doesn't take proportionally long. */
-  staggerDecay: number
   /** Target max deviation for the CSS linear() approximation. */
   tolerance: number
 }
@@ -338,6 +367,9 @@ const SEED: MotionEntry = {
   easing: { kind: "bezier", bezier: DEFAULT_BEZIER },
   durationMs: 200,
   exitRatio: 0.7,
+  exitAbsoluteMs: 140,
+  exitLinked: true,
+  staggerMs: 40,
 }
 
 /** Where purposes point when the entry they named has gone. */
@@ -354,8 +386,6 @@ export const DEFAULT_STATE: MotionState = {
     modal: "emp",
     toast: "emp",
   },
-  staggerMs: 40,
-  staggerDecay: 0.85,
   tolerance: 0.01,
 }
 
@@ -392,7 +422,12 @@ export function enterMs(e: MotionEntry): number {
 }
 
 export function exitMs(e: MotionEntry): number {
-  if (e.easing.kind === "bezier") return Math.max(1, Math.round(e.durationMs * e.exitRatio))
+  if (e.easing.kind === "bezier") {
+    return Math.max(
+      1,
+      Math.round(e.exitLinked ? e.durationMs * e.exitRatio : e.exitAbsoluteMs),
+    )
+  }
   const exit = deriveExit(e.easing)
   // Always a spring — deriveExit preserves the kind — but narrow it rather
   // than asserting, so a future third kind can't slip through silently.
@@ -512,6 +547,6 @@ import { springValue } from "./spring.js"
 import { bezierAt } from "./bezier.js"
 
 /** Per-child delay, with sub-linear falloff so long lists stay bearable. */
-export function staggerDelay(s: MotionState, index: number): number {
-  return Math.round(s.staggerMs * Math.pow(index, s.staggerDecay))
+export function staggerDelay(e: MotionEntry, index: number): number {
+  return Math.round(e.staggerMs * Math.pow(index, STAGGER_DECAY))
 }

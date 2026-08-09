@@ -19,22 +19,13 @@
 // the true curve. The CSS export is an approximation
 // of it, and the export panel says by how much.
 //
-// One exception to "the left edits, the right watches",
-// and it is deliberate: which emphasis a purpose uses is
-// set HERE, on the purpose. Nobody thinks "I have an
-// emphasized spring, what should use it?" — they think
-// "I'm building a drawer, what should it feel like?"
-// The tool only supported the backwards direction, and
-// asked you to infer the mapping from a grey caption.
-// Assigning a purpose is simultaneously a token decision
-// and a what-am-I-watching decision; they are the same
-// act, and splitting them across the page is what made
-// the tie between easings and preview unreadable.
-//
-// So the split is not "edit vs watch" but "the system
-// vs one component in it". Everything else in this panel
-// — mode, speed, loop, scenario — still only changes
-// what you are looking at.
+// Nothing in here edits a token any more. Assignment
+// briefly lived on the purpose, here, and it has moved
+// onto the motion — where one control sets all of a
+// variant's components at once instead of one at a
+// time from seven different scenarios. What stays is
+// the readout: which motion this scenario plays, and
+// how long it runs.
 // ==============================================
 import { useEffect, useRef, useState } from "react"
 import { ArrowClockwise, Pause, Play } from "@phosphor-icons/react"
@@ -85,13 +76,10 @@ const STAGGERS: PurposeId = "list"
 export default function Preview({
   state,
   editingId,
-  onAssign,
 }: {
   state: MotionState
   /** The row open in the editor. Marks affected scenarios; never moves you. */
   editingId: string
-  /** Point this purpose at a different motion. The one token edit in here. */
-  onAssign: (purpose: PurposeId, entryId: string) => void
 }) {
   const [purpose, setPurpose] = useState<PurposeId>("list")
   const [mode, setMode] = useState<Mode>("both")
@@ -162,7 +150,7 @@ export default function Preview({
 
   return (
     <section className="border-line flex flex-col overflow-hidden rounded-lg border">
-      <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+      <div className="border-line flex min-h-[3.25rem] flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
         <PanelTitle>Preview</PanelTitle>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
@@ -252,29 +240,16 @@ export default function Preview({
             })}
           </div>
 
-          {/* Component first, then motion — the order you actually think in. */}
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-ash font-mono text-[10px]">{purpose} uses</span>
-              {state.entries.map((e) => (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => onAssign(purpose, e.id)}
-                  aria-pressed={e.id === entry.id}
-                  title={`Point ${purpose} at ${e.name}. This is a token change — it lands in the export.`}
-                  className={cn(
-                    "max-w-[8rem] truncate rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
-                    e.id === entry.id
-                      ? "border-ink/30 bg-ink/[0.06] text-ink border"
-                      : "text-ash hover:text-ink border border-transparent",
-                  )}
-                >
-                  {e.name}
-                </button>
-              ))}
-            </div>
-            <span className="text-ash font-mono text-[10px]">
+          {/*
+            Assignment moved onto the motion itself, where one control can set
+            all of a variant's components at once. What stays here is the
+            readout: which motion this scenario is playing, and how long.
+          */}
+          <div className="text-ash flex flex-wrap items-center justify-between gap-x-3 font-mono text-[10px]">
+            <span>
+              {purpose} uses <span className="text-ink">{entry.name}</span>
+            </span>
+            <span>
               {mode === "both"
                 ? `${enterToken.durationMs}ms in / ${exitToken.durationMs}ms out`
                 : `${token.durationMs}ms`}

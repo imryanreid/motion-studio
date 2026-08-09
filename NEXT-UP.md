@@ -51,8 +51,24 @@ selected is *derived* by comparing values, never stored — so dragging a handle
 lands on Custom with nothing having to notice, and a hand-edited link shows the
 truth on arrival.
 
-**The URL contract changed completely** — `e` (repeated, one per motion) and
-`pu`, plus the unchanged `sg` and `tol`. Old links no longer decode; they
+**Nothing in the model is global.** Stagger moved onto the motion (a 140ms
+entrance wants a tighter stagger than a 400ms one), and `staggerDecay` became a
+constant — it never had a control. Exports gained
+`--motion-<slug>-stagger` with purpose aliases, and the Framer output a
+`stagger` object keyed by slug.
+
+**The exit can be unlinked.** A link button between Duration and Exit switches
+it between a share of the entrance and its own ms value; both persist, so
+toggling loses neither. In the URL the exit is self-describing — `r70` or
+`a140` — so a link missing the field falls back to linked rather than to a
+silent absolute that would quietly stop tracking.
+
+**Assignment moved onto the motion**, as a checkbox list behind a count, with
+each row naming the component's current owner since ticking moves it.
+
+**The URL contract changed completely** — `e` (repeated, one per motion,
+now always six fields for both types) and `pu`, plus `tol`. The `sg` global
+stagger param is gone. Old links no longer decode; they
 degrade to defaults rather than erroring. This was the cheap moment: placeholder
 domain, `noindex`, no links in the wild.
 

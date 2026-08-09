@@ -81,25 +81,38 @@ longer and feels identical.
 
 ### 3.2 A motion
 
-| Field        | Applies to     | Notes                                              |
-| ------------ | -------------- | -------------------------------------------------- |
-| `name`       | both           | Yours. Slugified for export, deduplicated.          |
-| `easing`     | both           | A cubic-bezier or a spring.                         |
-| `durationMs` | **bezier only** | A spring has none — it settles.                    |
-| `exitRatio`  | **bezier only** | Share of the entrance. A spring exit is critical.  |
+| Field            | Applies to      | Notes                                             |
+| ---------------- | --------------- | ------------------------------------------------- |
+| `name`           | both            | Yours. Slugified for export, deduplicated.        |
+| `easing`         | both            | A cubic-bezier or a spring.                       |
+| `staggerMs`      | both            | Per-child offset when it enters as a group.       |
+| `durationMs`     | **bezier only** | A spring has none — it settles.                   |
+| `exitLinked`     | **bezier only** | Whether the exit follows the entrance.            |
+| `exitRatio`      | **bezier only** | Share of the entrance, when linked.               |
+| `exitAbsoluteMs` | **bezier only** | Its own duration, when not.                       |
 
-**Duration, exit and the type toggle are all bezier-only**, and a spring row
-simply doesn't render them — not greyed, not footnoted. Every control on screen
-applies to the thing it is on.
+**Duration and exit are bezier-only**, and a spring row simply doesn't render
+them — not greyed, not footnoted. Every control on screen applies to the thing
+it is on. **Stagger is on both**, because it's a delay between children rather
+than a property of the curve.
 
-Each motion produces two tokens:
+**The exit link.** Linked — the default, and the lesson — the exit is a share
+of the entrance and stays proportional when you retime it. Broken, it's its own
+number. Both values persist either way, so toggling the link never loses the
+one you weren't using.
+
+**Nothing in the model is global.** Stagger used to be one number for the whole
+set, which could only ever be right for one duration in it: a 140ms entrance
+wants a tighter stagger than a 400ms one. It's per-motion now, which leaves
+every value in the model belonging to a motion. The falloff it applies —
+`offset x index^0.85` — is a constant, not state; it has never had a control,
+and it's a rule the tool teaches rather than a dial.
+
+Each motion produces two tokens plus its stagger:
 
 ```
-motion.<slug>.enter      motion.<slug>.exit
+motion.<slug>.enter      motion.<slug>.exit      motion.<slug>.stagger
 ```
-
-Plus one standalone: `motion.stagger` — a per-child offset with a decay factor
-(§7.3), the only value in the tool that isn't per-motion.
 
 ### 3.3 Generate
 
@@ -201,11 +214,19 @@ drawer?" is the question people actually have. Seven purposes — `state`,
 `dropdown`, `tooltip`, `list`, `drawer`, `modal`, `toast` — each pointing at a
 motion by id, and each **assigned on the purpose itself, in the preview band**.
 
-Component-first is the real mental model. Nobody thinks *"I have an emphasized
-spring, what should use it?"*; they think *"I'm building a drawer, what should it
-feel like?"* Assigning a purpose is simultaneously a token decision and a
-what-am-I-watching decision — they are one act, and splitting them across the
-page is what made the tie unreadable.
+Assignment lives **on the motion**, collapsed behind a count: one control ticks
+off every component that uses this variant, instead of setting them one at a
+time from seven different preview scenarios.
+
+A component belongs to exactly one motion, so a tick here takes it from
+wherever it was — which each row says out loud by naming its current owner. A
+checkbox that silently unticks itself somewhere else is a checkbox lying about
+what it does.
+
+This replaced a per-purpose picker in the preview band. That was the right
+correction at the time — it fixed a mapping you could only infer from a grey
+caption — but bulk assignment belongs with the thing being assigned, and the
+preview now carries only the readout: which motion this scenario plays.
 
 **Aliases are references, never copies.** In every format that supports
 indirection they emit as references — `var(--motion-emphasized-enter)` in CSS,

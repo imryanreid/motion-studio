@@ -43,6 +43,9 @@ const entry = (over: Partial<MotionEntry> = {}): MotionEntry => ({
   easing: { kind: "bezier", bezier: { x1: 0.2, y1: 0, x2: 0, y2: 1 } },
   durationMs: 200,
   exitRatio: 0.7,
+  exitAbsoluteMs: 140,
+  exitLinked: true,
+  staggerMs: 40,
   ...over,
 })
 
@@ -332,18 +335,51 @@ describe("semantics and purposes", () => {
 })
 
 describe("stagger", () => {
+  const e = entry({ staggerMs: 40 })
+
   it("falls off sub-linearly so long lists stay bearable", () => {
-    const first = staggerDelay(DEFAULT_STATE, 1) - staggerDelay(DEFAULT_STATE, 0)
-    const later = staggerDelay(DEFAULT_STATE, 20) - staggerDelay(DEFAULT_STATE, 19)
+    const first = staggerDelay(e, 1) - staggerDelay(e, 0)
+    const later = staggerDelay(e, 20) - staggerDelay(e, 19)
     expect(later).toBeLessThan(first)
   })
 
   it("still increases", () => {
     for (let i = 1; i < 30; i++) {
-      expect(staggerDelay(DEFAULT_STATE, i)).toBeGreaterThanOrEqual(
-        staggerDelay(DEFAULT_STATE, i - 1),
-      )
+      expect(staggerDelay(e, i)).toBeGreaterThanOrEqual(staggerDelay(e, i - 1))
     }
+  })
+
+  it("belongs to the motion, so two motions space their children differently", () => {
+    // It used to be one global number, which could only ever be right for one
+    // of the durations in the set.
+    const tight = entry({ staggerMs: 20 })
+    const loose = entry({ staggerMs: 80 })
+    expect(staggerDelay(loose, 3)).toBeGreaterThan(staggerDelay(tight, 3))
+  })
+})
+
+describe("the exit link", () => {
+  it("linked, the exit is a share of the entrance and follows a retime", () => {
+    const linked = entry({ durationMs: 200, exitRatio: 0.7, exitLinked: true })
+    expect(exitMs(linked)).toBe(140)
+    expect(exitMs({ ...linked, durationMs: 400 })).toBe(280)
+  })
+
+  it("unlinked, it is its own number and ignores the entrance", () => {
+    const free = entry({ durationMs: 200, exitAbsoluteMs: 90, exitLinked: false })
+    expect(exitMs(free)).toBe(90)
+    expect(exitMs({ ...free, durationMs: 400 })).toBe(90)
+  })
+
+  it("keeps both values, so toggling the link loses neither", () => {
+    const e = entry({ durationMs: 200, exitRatio: 0.5, exitAbsoluteMs: 90, exitLinked: false })
+    expect(exitMs(e)).toBe(90)
+    expect(exitMs({ ...e, exitLinked: true })).toBe(100)
+  })
+
+  it("a spring ignores the link entirely — it settles", () => {
+    const s = springEntry(210, 20)
+    expect(exitMs({ ...s, exitLinked: false, exitAbsoluteMs: 5 })).toBeGreaterThan(100)
   })
 })
 
@@ -370,7 +406,13 @@ describe("URL state", () => {
         entry({ id: "c", name: "other", durationMs: 640, exitRatio: 0.45 }),
       ]),
     },
-    { name: "tuned stagger", s: { ...DEFAULT_STATE, staggerMs: 25, staggerDecay: 0.7 } },
+    {
+      name: "per-motion stagger and an unlinked exit",
+      s: withEntries([
+        entry({ id: "a", name: "tight", staggerMs: 15 }),
+        entry({ id: "b", name: "loose", staggerMs: 120, exitLinked: false, exitAbsoluteMs: 90 }),
+      ]),
+    },
     { name: "tight tolerance", s: { ...DEFAULT_STATE, tolerance: 0.002 } },
     {
       name: "repointed purposes",
@@ -411,12 +453,11 @@ describe("URL state", () => {
       }),
     ).toBe(false)
     const q = encodeState(DEFAULT_STATE)
-    expect(q).not.toContain("sg=")
     expect(q).not.toContain("tol=")
   })
 
   it("degrades a malformed link to defaults instead of erroring", () => {
-    expect(resolveState("e=nonsense&p=&pu=&sg=&tol=-4")).toEqual(DEFAULT_STATE)
+    expect(resolveState("e=nonsense&p=&pu=&tol=-4")).toEqual(DEFAULT_STATE)
     expect(resolveState("")).toEqual(DEFAULT_STATE)
   })
 
@@ -445,6 +486,18 @@ describe("URL state", () => {
     const s = withEntries([entry({ id: "a", name: "one" })])
     const decoded = decodeState(`${encodeState(s)}`.replace("pu=a", "pu=zz"))
     for (const p of PURPOSE_IDS) expect(decoded.purposeEntry![p]).toBe("a")
+  })
+
+  it("says which kind of exit it carries, rather than relying on position", () => {
+    const linked = withEntries([entry({ id: "a", name: "x", exitRatio: 0.55 })])
+    const free = withEntries([
+      entry({ id: "a", name: "x", exitLinked: false, exitAbsoluteMs: 90 }),
+    ])
+    expect(encodeState(linked)).toContain("r55")
+    expect(encodeState(free)).toContain("a90")
+    // And a link that lost the field falls back to linked, never to a silent
+    // absolute value that would quietly stop tracking the entrance.
+    expect(decodeState("e=a*x*b.20.0.0.100*200").entries![0].exitLinked).toBe(true)
   })
 
   it("rejects a spring that could never settle", () => {

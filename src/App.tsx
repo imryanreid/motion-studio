@@ -25,60 +25,12 @@ import Preview from "./components/Preview"
 import { SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
-import {
-  DEFAULT_STATE,
-  PURPOSE_FALLBACK,
-  staggerDelay,
-  type MotionState,
-} from "./lib/tokens"
-import { LIST_ITEMS } from "./lib/preview"
+import { DEFAULT_STATE, PURPOSE_FALLBACK, type MotionState } from "./lib/tokens"
 import { encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
 /** Which entry in the shared tools manifest is this repo. */
 const TOOL_ID = "motion"
-
-/** A labelled slider. Stagger is the only thing left that isn't per-motion. */
-function Slider({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  step,
-  suffix,
-  title,
-}: {
-  label: string
-  value: number
-  onChange: (n: number) => void
-  min: number
-  max: number
-  step: number
-  suffix: string
-  title: string
-}) {
-  return (
-    <label className="flex items-center gap-2" title={title}>
-      <span className="text-ash font-mono text-[11px] tracking-[0.16em] uppercase">
-        {label}
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="accent-ink h-1 w-24"
-      />
-      <span className="text-ink w-12 font-mono text-xs">
-        {value}
-        {suffix}
-      </span>
-    </label>
-  )
-}
 
 export default function App() {
   const { theme, toggle: toggleTheme } = useTheme()
@@ -148,9 +100,10 @@ export default function App() {
         reaches for, and what that looks like.
 
         There used to be a Timing panel above this one, holding a five-step
-        duration scale that the three emphasis levels then mapped onto. Two
-        scales, two names for the same idea, and a mapping to reconcile them.
-        It's gone: a motion owns its own duration.
+        duration scale that the three emphasis levels then mapped onto, and a
+        standalone Stagger bar below it. Both are gone: a motion owns its own
+        duration, its own exit and its own stagger, and nothing in the model is
+        global any more.
       */}
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
@@ -160,46 +113,9 @@ export default function App() {
             selectedId={selectedId}
             onSelect={setSelectedId}
           />
-
-          {/*
-            The last thing that isn't per-motion. The number you set is not the
-            number you care about — 40ms says nothing; "the fifth row starts at
-            130ms" is the decision, and the sequence shows the sub-linear
-            falloff without needing a second control for it.
-          */}
-          <section className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border p-4">
-            <Slider
-              label="Stagger"
-              value={state.staggerMs}
-              min={0}
-              max={160}
-              step={5}
-              suffix="ms"
-              title={`Per-child offset for anything that enters as a group. Exported as --stagger, and zeroed under prefers-reduced-motion. It falls off sub-linearly (index^${state.staggerDecay}) so a long list doesn't take proportionally longer.`}
-              onChange={(staggerMs) => setState({ ...state, staggerMs })}
-            />
-            <span
-              className="text-ash font-mono text-[11px]"
-              title={`Where each of the ${LIST_ITEMS} rows starts, relative to the first.`}
-            >
-              {Array.from({ length: LIST_ITEMS - 1 }, (_, i) => staggerDelay(state, i + 1)).join(
-                " · ",
-              )}
-              ms
-            </span>
-          </section>
         </div>
 
-        <Preview
-          state={state}
-          editingId={selectedId}
-          onAssign={(purpose, entryId) =>
-            setState({
-              ...state,
-              purposeEntry: { ...state.purposeEntry, [purpose]: entryId },
-            })
-          }
-        />
+        <Preview state={state} editingId={selectedId} />
       </div>
 
       <SemanticTable state={state}>

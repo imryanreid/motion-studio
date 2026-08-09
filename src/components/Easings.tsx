@@ -40,7 +40,7 @@
 // ==============================================
 import { useState } from "react"
 import { motion } from "motion/react"
-import { CaretDown, CaretRight } from "@phosphor-icons/react"
+import { CaretDown, CaretRight, LinkBreak, LinkSimple } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import { DUR, EASE_PANEL } from "../shared/motion"
 import Segmented from "../shared/components/Segmented"
@@ -56,7 +56,10 @@ import {
   ENTRY_LIMIT,
   NAME_MAX,
   PURPOSE_FALLBACK,
+  PURPOSE_IDS,
+  STAGGER_DECAY,
   baseSlug,
+  entryForPurpose,
   TRANSFORMS,
   enterMs,
   exitMs,
@@ -64,6 +67,7 @@ import {
   nextId,
   presetIdFor,
   purposesUsing,
+  staggerDelay,
   sanitizeName,
   slugs,
   type MotionEntry,
@@ -218,7 +222,16 @@ export default function Easings({
 
   return (
     <section className="border-line flex flex-col overflow-hidden rounded-lg border">
-      <div className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+      {/*
+        A fixed minimum height, matched to the Preview header beside it. The
+        two panels sit side by side and their headers were three pixels apart,
+        because this one's tallest control is an h-7 button and that one's is a
+        small Segmented, which computes to 31. Pinning the header rather than
+        the controls means whatever lands in either header later, the two still
+        line up. (The underlying mismatch — h-7 everywhere except Segmented sm
+        — is a shared-layer fix that belongs upstream in Ramps.)
+      */}
+      <div className="border-line flex min-h-[3.25rem] flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
         <PanelTitle>
           Easings <span className="text-ash font-normal">({state.entries.length})</span>
         </PanelTitle>
@@ -256,22 +269,6 @@ export default function Easings({
         const isCustom = presetId === null || customFor === e.id
         const presets = spring ? SPRING_PRESETS : BEZIER_PRESETS
 
-        const caret = (
-          <button
-            type="button"
-            onClick={() => onSelect(open ? "" : e.id)}
-            aria-expanded={open}
-            aria-label={open ? `Collapse ${e.name}` : `Edit ${e.name}`}
-            className="text-ash hover:text-ink shrink-0 transition-colors"
-          >
-            {open ? (
-              <CaretDown size={11} weight="bold" />
-            ) : (
-              <CaretRight size={11} weight="bold" />
-            )}
-          </button>
-        )
-
         return (
           /*
             `layout` earns two things at once: the row animates its own height
@@ -281,125 +278,166 @@ export default function Easings({
 
             Reduced motion is handled upstream — ToolShell wraps the app in
             MotionConfig reducedMotion="user", and the CSS block in tokens.css
-            covers the non-Motion transitions. A tool that ships a
-            prefers-reduced-motion block in every export does not get to ignore
-            one in its own UI.
+            covers the non-Motion transitions.
           */
           <motion.div
             key={e.id}
             layout
             transition={{ duration: DUR.panel, ease: EASE_PANEL }}
-            className={cn("border-line/60 overflow-hidden border-b", open && "bg-ink/[0.02]")}
+            className={cn(
+              "border-line/60 relative overflow-hidden border-b",
+              open && "bg-ink/[0.02]",
+            )}
           >
+            {/*
+              Absolutely placed at a fixed offset, so it lands on exactly the
+              same pixel open or closed. Tucking it into each branch's flow
+              meant it tracked whatever that branch's first line happened to
+              be — a 20px summary line closed, a 48px label-and-field stack
+              open — and it jumped every time you toggled a row.
+            */}
+            <button
+              type="button"
+              onClick={() => onSelect(open ? "" : e.id)}
+              aria-expanded={open}
+              aria-label={open ? `Collapse ${e.name}` : `Edit ${e.name}`}
+              className="text-ash hover:text-ink absolute top-[0.95rem] left-3 z-10 transition-colors"
+            >
+              {open ? (
+                <CaretDown size={11} weight="bold" />
+              ) : (
+                <CaretRight size={11} weight="bold" />
+              )}
+            </button>
+
             {open ? (
-              /*
-                A gutter for the chevron and a single column for everything
-                else, so the name, the shape chips, the plot and the timing all
-                start on one left edge. The chevron used to sit inline with the
-                first field, which pushed the name in and left every block
-                below it starting somewhere else.
-              */
-              <div className="flex gap-2 px-3 py-3">
-                {/*
-                  items-start, or the button stretches to the full height of
-                  the column beside it and centres its glyph in the middle of
-                  the whole panel. The offset lands it on the first control
-                  row: a 12px label, a 4px gap, then half of an h-8 box.
-                */}
-                <div className="flex w-4 shrink-0 items-start justify-center pt-[1.65rem]">
-                  {caret}
+              <div className="flex flex-col gap-3 py-3 pr-3 pl-8">
+                {/* Identity: what it's called and what reaches for it. */}
+                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                  <FieldStack label="Name">
+                    <TextField
+                      ariaLabel="Motion name"
+                      value={e.name}
+                      maxLength={NAME_MAX}
+                      onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
+                    />
+                  </FieldStack>
+
+                  {/*
+                    Assignment lives on the motion now, collapsed behind a
+                    count. A component belongs to exactly one motion, so
+                    ticking it here takes it from wherever it was — which the
+                    note on each row says out loud, because a checkbox that
+                    silently unticks itself somewhere else is a checkbox
+                    lying about what it does.
+                  */}
+                  <FieldStack label="Components">
+                    <Menu
+                      label={`Components using ${e.name}`}
+                      triggerLabel={
+                        used.length === 0
+                          ? "None"
+                          : `${used.length} component${used.length === 1 ? "" : "s"}`
+                      }
+                      align="left"
+                      width="w-56"
+                      groups={[
+                        {
+                          heading: `Which components use ${e.name}?`,
+                          items: PURPOSE_IDS.map((p) => {
+                            const owner = entryForPurpose(state, p)
+                            const mine = owner.id === e.id
+                            return {
+                              id: p,
+                              label: p,
+                              checked: mine,
+                              note: mine ? undefined : owner.name,
+                              keepOpen: true,
+                              title: mine
+                                ? `${p} uses ${e.name}`
+                                : `${p} currently uses ${owner.name} — this moves it here`,
+                              onSelect: () => {
+                                if (mine) return
+                                onChange({
+                                  ...state,
+                                  purposeEntry: { ...state.purposeEntry, [p]: e.id },
+                                })
+                              },
+                            }
+                          }),
+                        },
+                      ]}
+                    />
+                  </FieldStack>
+
+                  <div className="ml-auto flex h-8 items-center">
+                    <Menu
+                      width="w-44"
+                      label={`Actions for ${e.name}`}
+                      groups={[
+                        {
+                          heading: "Duplicate variant",
+                          items: DERIVATIONS.map((t) => ({
+                            id: t.id,
+                            label: t.label,
+                            title: full ? `${ENTRY_LIMIT} motions is the limit` : t.title,
+                            disabled: full,
+                            onSelect: () => derived(e, t.id),
+                          })),
+                        },
+                        {
+                          items: [
+                            {
+                              id: "delete",
+                              label: "Delete",
+                              danger: true,
+                              separated: true,
+                              disabled: state.entries.length <= 1,
+                              title:
+                                state.entries.length <= 1
+                                  ? "The last motion can't be deleted"
+                                  : `Delete ${e.name}`,
+                              onSelect: () => remove(e.id),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  </div>
                 </div>
 
-                <div className="flex min-w-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-                    <FieldStack label="Name">
-                      <TextField
-                        ariaLabel="Motion name"
-                        value={e.name}
-                        maxLength={NAME_MAX}
-                        onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
-                      />
-                    </FieldStack>
+                {slug[e.id] !== baseSlug(e.name) && (
+                  <p className="text-ash font-mono text-[10px]">
+                    Exports as <span className="text-ink">motion.{slug[e.id]}</span> — another
+                    motion already claimed <span className="text-ink">{baseSlug(e.name)}</span>.
+                  </p>
+                )}
 
-                    {/* Type is the decision the presets below hang off. */}
-                    <FieldStack label="Type">
-                      <Segmented
-                        ariaLabel={`${e.name} curve type`}
-                        layoutId={`kind-${e.id}`}
-                        size="sm"
-                        value={e.easing.kind}
-                        onChange={(kind) => {
-                          // Both defaults are named presets, so a type switch has
-                          // to drop a sticky Custom or it would land on a preset
-                          // and claim not to be on one.
-                          setCustomFor(null)
-                          patch(e.id, {
-                            easing:
-                              kind === "spring"
-                                ? { kind: "spring", spring: DEFAULT_SPRING }
-                                : { kind: "bezier", bezier: DEFAULT_BEZIER },
-                          })
-                        }}
-                        options={MODE_OPTIONS}
-                      />
-                    </FieldStack>
+                {/* Kind, then which named shape of that kind — adjacent, because
+                    the second is a function of the first. */}
+                <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                  <FieldStack label="Type">
+                    <Segmented
+                      ariaLabel={`${e.name} curve type`}
+                      layoutId={`kind-${e.id}`}
+                      size="sm"
+                      value={e.easing.kind}
+                      onChange={(kind) => {
+                        // Both defaults are named presets, so a type switch has
+                        // to drop a sticky Custom or it would land on a preset
+                        // and claim not to be on one.
+                        setCustomFor(null)
+                        patch(e.id, {
+                          easing:
+                            kind === "spring"
+                              ? { kind: "spring", spring: DEFAULT_SPRING }
+                              : { kind: "bezier", bezier: DEFAULT_BEZIER },
+                        })
+                      }}
+                      options={MODE_OPTIONS}
+                    />
+                  </FieldStack>
 
-                    <div className="ml-auto flex h-8 items-center">
-                      <Menu
-                        width="w-44"
-                        label={`Actions for ${e.name}`}
-                        groups={[
-                          {
-                            heading: "Duplicate variant",
-                            items: DERIVATIONS.map((t) => ({
-                              id: t.id,
-                              label: t.label,
-                              title: full ? `${ENTRY_LIMIT} motions is the limit` : t.title,
-                              disabled: full,
-                              onSelect: () => derived(e, t.id),
-                            })),
-                          },
-                          {
-                            items: [
-                              {
-                                id: "delete",
-                                label: "Delete",
-                                danger: true,
-                                separated: true,
-                                disabled: state.entries.length <= 1,
-                                title:
-                                  state.entries.length <= 1
-                                    ? "The last motion can't be deleted"
-                                    : `Delete ${e.name}`,
-                                onSelect: () => remove(e.id),
-                              },
-                            ],
-                          },
-                        ]}
-                      />
-                    </div>
-                  </div>
-                  {/*
-                  The export name is only worth saying when it isn't the one
-                  you'd guess — which is exactly when two motions share a name
-                  and the second gets a suffix. Otherwise it repeated what the
-                  Name field already says, next to a purpose list the collapsed
-                  row and the Output table both already carry.
-                */}
-                  {slug[e.id] !== baseSlug(e.name) && (
-                    <p className="text-ash font-mono text-[10px]">
-                      Exports as <span className="text-ink">motion.{slug[e.id]}</span> — another
-                      motion already claimed{" "}
-                      <span className="text-ink">{baseSlug(e.name)}</span>.
-                    </p>
-                  )}
-
-                  {/*
-                  The shape, chosen by name, and a function of the type above.
-                  Which chip is lit comes from comparing the current values to
-                  each preset, so dragging a handle lands on Custom without
-                  anything having to notice.
-                */}
                   <FieldStack label="Shape" className="shrink">
                     <ChipGroup
                       ariaLabel={`${e.name} shape`}
@@ -428,150 +466,194 @@ export default function Easings({
                       }}
                     />
                   </FieldStack>
+                </div>
 
-                  {/* Left-aligned with everything else, not centred in the row. */}
-                  <div className="w-full max-w-[380px]">
-                    <CurvePlot
-                      easing={e.easing}
-                      onChange={
-                        e.easing.kind === "bezier"
-                          ? (bezier) => patch(e.id, { easing: { kind: "bezier", bezier } })
-                          : undefined
-                      }
-                    />
-                  </div>
+                <div className="w-full max-w-[380px]">
+                  <CurvePlot
+                    easing={e.easing}
+                    onChange={
+                      e.easing.kind === "bezier"
+                        ? (bezier) => patch(e.id, { easing: { kind: "bezier", bezier } })
+                        : undefined
+                    }
+                  />
+                </div>
 
-                  {isCustom && (
-                    <FieldStack label={e.easing.kind === "bezier" ? "Handles" : "Physics"}>
-                      <div className="flex gap-2">
-                        {e.easing.kind === "bezier"
-                          ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
-                              <NumberField
-                                key={k}
-                                ariaLabel={`${e.name} ${k}`}
-                                suffix={k}
-                                value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
-                                step={0.01}
-                                min={k.startsWith("x") ? 0 : undefined}
-                                max={k.startsWith("x") ? 1 : undefined}
-                                title={
-                                  k.startsWith("x")
-                                    ? `${k} — handle position in time`
-                                    : `${k} — handle position in progress. Outside 0–1 overshoots.`
-                                }
-                                onChange={(v) =>
-                                  e.easing.kind === "bezier" &&
-                                  patch(e.id, {
-                                    easing: {
-                                      kind: "bezier",
-                                      bezier: { ...e.easing.bezier, [k]: v },
-                                    },
-                                  })
-                                }
-                              />
-                            ))
-                          : SPRING_FIELDS.map((f) => (
-                              <NumberField
-                                key={f.key}
-                                ariaLabel={`${e.name} ${f.key}`}
-                                suffix={f.short}
-                                value={spring![f.key]}
-                                step={f.step}
-                                min={f.min}
-                                max={f.max}
-                                title={f.title}
-                                onChange={(v) =>
-                                  patch(e.id, {
-                                    easing: {
-                                      kind: "spring",
-                                      spring: { ...spring!, [f.key]: v },
-                                    },
-                                  })
-                                }
-                              />
-                            ))}
-                      </div>
-                    </FieldStack>
-                  )}
+                {isCustom && (
+                  <FieldStack label={e.easing.kind === "bezier" ? "Handles" : "Physics"}>
+                    <div className="flex gap-2">
+                      {e.easing.kind === "bezier"
+                        ? (["x1", "y1", "x2", "y2"] as const).map((k) => (
+                            <NumberField
+                              key={k}
+                              ariaLabel={`${e.name} ${k}`}
+                              suffix={k}
+                              value={e.easing.kind === "bezier" ? e.easing.bezier[k] : 0}
+                              step={0.01}
+                              min={k.startsWith("x") ? 0 : undefined}
+                              max={k.startsWith("x") ? 1 : undefined}
+                              title={
+                                k.startsWith("x")
+                                  ? `${k} — handle position in time`
+                                  : `${k} — handle position in progress. Outside 0–1 overshoots.`
+                              }
+                              onChange={(v) =>
+                                e.easing.kind === "bezier" &&
+                                patch(e.id, {
+                                  easing: {
+                                    kind: "bezier",
+                                    bezier: { ...e.easing.bezier, [k]: v },
+                                  },
+                                })
+                              }
+                            />
+                          ))
+                        : SPRING_FIELDS.map((f) => (
+                            <NumberField
+                              key={f.key}
+                              ariaLabel={`${e.name} ${f.key}`}
+                              suffix={f.short}
+                              value={spring![f.key]}
+                              step={f.step}
+                              min={f.min}
+                              max={f.max}
+                              title={f.title}
+                              onChange={(v) =>
+                                patch(e.id, {
+                                  easing: {
+                                    kind: "spring",
+                                    spring: { ...spring!, [f.key]: v },
+                                  },
+                                })
+                              }
+                            />
+                          ))}
+                    </div>
+                  </FieldStack>
+                )}
 
-                  {/*
+                {/*
                   Timing sits last because it modifies a shape you have already
-                  chosen: kind, then which one, then what it looks like, then
-                  how long it runs.
+                  chosen. A spring has no duration and no exit share; what it
+                  has instead is a settling time, explained on hover rather
+                  than in a paragraph permanently restating the caveat.
 
-                  A spring has none of it. What it has instead is a settling
-                  time — and the explanation for that lives on hover here
-                  rather than in a paragraph that was permanently shouting a
-                  caveat at someone who had already read it.
+                  Stagger is here for both types — it is a delay between
+                  children, not a property of the curve.
                 */}
-                  <div className="border-line/60 flex flex-wrap items-end gap-x-3 gap-y-2 border-t pt-3">
-                    {spring ? (
-                      <>
-                        <FieldStack label="Settles">
-                          <ReadOut
-                            title={`A spring has no duration — it approaches its target asymptotically and never arrives. ${motionSettlingTime(spring)}ms is where Framer Motion decides it's close enough. Other runtimes pick a different threshold and will honestly report a different number, which is why there is no duration field here.`}
-                          >
-                            ~{enterMs(e)}ms
-                          </ReadOut>
-                        </FieldStack>
-                        <FieldStack label="ζ damping">
-                          <ReadOut
-                            width="w-32"
-                            title={`Damping ratio: c / (2*sqrt(k*m)). Below 1 the spring overshoots and comes back; at 1 it is critical — the quickest arrival with no bounce at all; above 1 it crawls in.`}
-                          >
+                <div className="border-line/60 flex flex-wrap items-end gap-x-3 gap-y-2 border-t pt-3">
+                  {spring ? (
+                    <>
+                      <FieldStack label="Settles">
+                        <ReadOut
+                          title={`A spring has no duration — it approaches its target asymptotically and never arrives. ${motionSettlingTime(spring)}ms is where Framer Motion decides it's close enough. Other runtimes pick a different threshold and will honestly report a different number, which is why there is no duration field here.`}
+                        >
+                          ~{enterMs(e)}ms
+                        </ReadOut>
+                      </FieldStack>
+                      <FieldStack label="ζ damping">
+                        <ReadOut
+                          width="w-32"
+                          title="Damping ratio: c / (2*sqrt(k*m)). Below 1 the spring overshoots and comes back; at 1 it is critical — the quickest arrival with no bounce at all; above 1 it crawls in."
+                        >
+                          <span className={cn(d!.regime === "underdamped" && "text-amber-500")}>
+                            {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
+                          </span>
+                        </ReadOut>
+                      </FieldStack>
+                    </>
+                  ) : (
+                    <>
+                      <FieldStack label="Duration">
+                        <NumberField
+                          ariaLabel={`${e.name} duration in milliseconds`}
+                          value={e.durationMs}
+                          min={20}
+                          max={9000}
+                          step={10}
+                          suffix="ms"
+                          title="How long the entrance runs."
+                          onChange={(durationMs) => patch(e.id, { durationMs })}
+                        />
+                      </FieldStack>
+
+                      {/*
+                        Linked, the exit is a share of the entrance and stays
+                        proportional when you retime it — which is the lesson.
+                        Broken, it is its own number. Both values persist, so
+                        toggling back doesn't lose the one you weren't using.
+                      */}
+                      <button
+                        type="button"
+                        onClick={() => patch(e.id, { exitLinked: !e.exitLinked })}
+                        aria-pressed={e.exitLinked}
+                        title={
+                          e.exitLinked
+                            ? "Exit follows the entrance. Click to give it its own duration."
+                            : "Exit stands alone. Click to make it a share of the entrance."
+                        }
+                        className={cn(
+                          "mb-0 flex h-8 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                          e.exitLinked
+                            ? "border-ink/30 bg-ink/[0.05] text-ink"
+                            : "border-line text-ash hover:text-ink",
+                        )}
+                      >
+                        {e.exitLinked ? (
+                          <LinkSimple size={12} weight="bold" />
+                        ) : (
+                          <LinkBreak size={12} weight="bold" />
+                        )}
+                      </button>
+
+                      <FieldStack label="Exit">
+                        {e.exitLinked ? (
+                          <>
+                            <NumberField
+                              ariaLabel={`${e.name} exit as a percentage of the entrance`}
+                              value={Math.round(e.exitRatio * 100)}
+                              min={20}
+                              max={130}
+                              step={5}
+                              suffix="%"
+                              title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
+                              onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
+                            />
                             <span
-                              className={cn(d!.regime === "underdamped" && "text-amber-500")}
+                              className="text-ash ml-2 font-mono text-xs"
+                              title="Derived — the share applied to the duration beside it."
                             >
-                              {d!.dampingRatio.toFixed(2)} {REGIME_LABEL[d!.regime]}
+                              ({exitMs(e)}ms)
                             </span>
-                          </ReadOut>
-                        </FieldStack>
-                        <FieldStack label="Peak">
-                          <ReadOut title="How far past its target the spring travels at the top of its first overshoot. 1.0 means it never passes it.">
-                            {overshoot(spring).peak.toFixed(3)}
-                          </ReadOut>
-                        </FieldStack>
-                      </>
-                    ) : (
-                      <>
-                        <FieldStack label="Duration">
+                          </>
+                        ) : (
                           <NumberField
-                            ariaLabel={`${e.name} duration in milliseconds`}
-                            value={e.durationMs}
+                            ariaLabel={`${e.name} exit duration in milliseconds`}
+                            value={e.exitAbsoluteMs}
                             min={20}
                             max={9000}
                             step={10}
                             suffix="ms"
-                            title="How long the entrance runs."
-                            onChange={(durationMs) => patch(e.id, { durationMs })}
+                            title="The exit's own duration, on the mirrored curve. It no longer follows the entrance."
+                            onChange={(exitAbsoluteMs) => patch(e.id, { exitAbsoluteMs })}
                           />
-                        </FieldStack>
-                        <FieldStack label="Exit">
-                          <NumberField
-                            ariaLabel={`${e.name} exit as a percentage of the entrance`}
-                            value={Math.round(e.exitRatio * 100)}
-                            min={20}
-                            max={130}
-                            step={5}
-                            suffix="%"
-                            title="The exit is this share of the entrance, on the mirrored curve. Exits should be quicker — lingering on something you've finished with reads as lag."
-                            onChange={(pct) => patch(e.id, { exitRatio: pct / 100 })}
-                          />
-                          {/*
-                            What the share works out to, as an aside rather
-                            than a field of its own — with a box and a label it
-                            read as a third thing you set.
-                          */}
-                          <span
-                            className="text-ash ml-2 font-mono text-xs"
-                            title="Derived, not authored — the share applied to the duration beside it."
-                          >
-                            ({exitMs(e)}ms)
-                          </span>
-                        </FieldStack>
-                      </>
-                    )}
-                  </div>
+                        )}
+                      </FieldStack>
+                    </>
+                  )}
+
+                  <FieldStack label="Stagger">
+                    <NumberField
+                      ariaLabel={`${e.name} stagger in milliseconds`}
+                      value={e.staggerMs}
+                      min={0}
+                      max={400}
+                      step={5}
+                      suffix="ms"
+                      title={`Per-child offset when this motion enters as a group, falling off as index^${STAGGER_DECAY} so a long list doesn't take proportionally longer. Five rows would start at ${[1, 2, 3, 4].map((i) => staggerDelay(e, i)).join(", ")}ms.`}
+                      onChange={(staggerMs) => patch(e.id, { staggerMs })}
+                    />
+                  </FieldStack>
                 </div>
               </div>
             ) : (
@@ -579,15 +661,12 @@ export default function Easings({
                 type="button"
                 onClick={() => onSelect(e.id)}
                 aria-expanded={false}
-                className="hover:bg-ink/[0.03] flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors"
+                className="hover:bg-ink/[0.03] flex w-full items-center gap-3 py-2.5 pr-3 pl-8 text-left transition-colors"
               >
-                <CaretRight size={11} weight="bold" className="text-ash shrink-0" />
                 <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
                   {e.name}
                 </span>
                 <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
-                {/* Matches the preview band's phrasing exactly — "98 out" left
-                    you to infer that the first number was the entrance. */}
                 <span className="text-ink shrink-0 font-mono text-[11px]">
                   {enterMs(e)}ms <span className="text-ash">in</span> / {exitMs(e)}ms{" "}
                   <span className="text-ash">out{spring && " settling"}</span>

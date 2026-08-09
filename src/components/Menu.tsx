@@ -20,7 +20,7 @@
 // ==============================================
 import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { CaretDown, DotsThree } from "@phosphor-icons/react"
+import { CaretDown, Check, DotsThree } from "@phosphor-icons/react"
 import { cn } from "../shared/utils"
 import { DUR, EASE_PANEL } from "../shared/motion"
 
@@ -33,6 +33,12 @@ export type MenuItem = {
   /** Draws a rule above this item — for a destructive action at the bottom. */
   separated?: boolean
   danger?: boolean
+  /** Renders a tick column. Omit entirely for a plain action list. */
+  checked?: boolean
+  /** Trailing grey text — used to say who currently owns a togglable item. */
+  note?: string
+  /** Stay open after this one, so a multi-select can be worked through. */
+  keepOpen?: boolean
 }
 
 export default function Menu({
@@ -132,15 +138,31 @@ export default function Menu({
                     title={item.title}
                     onClick={() => {
                       item.onSelect()
-                      setOpen(false)
+                      if (!item.keepOpen) setOpen(false)
                     }}
                     className={cn(
-                      "hover:bg-ink/[0.05] block w-full px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                      "hover:bg-ink/[0.05] flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                       item.separated && "border-line/60 border-t",
                       item.danger ? "text-red-500" : "text-ink",
                     )}
                   >
-                    {item.label}
+                    {item.checked !== undefined && (
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors",
+                          item.checked ? "border-ink bg-ink text-paper" : "border-line",
+                        )}
+                      >
+                        {item.checked && <Check size={9} weight="bold" />}
+                      </span>
+                    )}
+                    <span className="truncate">{item.label}</span>
+                    {/* Who owns it now — a checkbox that silently unticks
+                        itself elsewhere is a checkbox lying about what it does. */}
+                    {item.note && (
+                      <span className="text-ash ml-auto shrink-0 text-[11px]">{item.note}</span>
+                    )}
                   </button>
                 ))}
               </div>

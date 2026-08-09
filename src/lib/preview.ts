@@ -10,7 +10,8 @@
 // that a curve is being evaluated past its duration
 // or that a stagger offset is off by one.
 // ==============================================
-import { easingProgress, staggerDelay, type MotionState, type SemanticToken } from "./tokens.js"
+import { easingProgress, entryById,
+  staggerDelay, type MotionState, type SemanticToken } from "./tokens.js"
 
 /**
  * Beats of stillness around the motion.
@@ -69,9 +70,20 @@ export function timelineTotal(
   return lead + phaseSpan(state, token, childCount) + tail
 }
 
+/**
+ * The stagger belonging to the motion this token came from.
+ *
+ * Per-motion now, so the list scenario spaces its rows by whatever the `list`
+ * purpose actually points at rather than by one number for the whole set.
+ */
+function staggerFor(state: MotionState, token: SemanticToken, index: number): number {
+  const entry = entryById(state, token.entryId)
+  return entry ? staggerDelay(entry, index) : 0
+}
+
 /** How long one direction takes, including the last staggered child. */
 function phaseSpan(state: MotionState, token: SemanticToken, childCount: number): number {
-  const lastChildDelay = childCount > 1 ? staggerDelay(state, childCount - 1) : 0
+  const lastChildDelay = childCount > 1 ? staggerFor(state, token, childCount - 1) : 0
   return token.durationMs + lastChildDelay
 }
 
@@ -139,7 +151,7 @@ export function childProgress(
   index = 0,
   staggered = false,
 ): number {
-  const delay = staggered ? staggerDelay(state, index) : 0
+  const delay = staggered ? staggerFor(state, token, index) : 0
   const local = elapsedMs - delay
   if (local <= 0) return token.direction === "exit" ? 1 : 0
 

@@ -94,6 +94,21 @@ describe("CSS", () => {
     expect((css.match(/\(/g) ?? []).length).toBe((css.match(/\)/g) ?? []).length)
   })
 
+  it("gives every motion its own stagger, and aliases it too", () => {
+    // One global --stagger couldn't say whose children it was spacing.
+    for (const e of WITH_SPRING.entries) {
+      expect(css).toContain(`--motion-${slugs(WITH_SPRING.entries)[e.id]}-stagger: ${e.staggerMs}ms;`)
+    }
+    expect(css).toContain("--motion-list-stagger: var(--motion-standard-stagger);")
+    expect(css).not.toContain("--stagger:")
+  })
+
+  it("zeroes every stagger under reduced motion", () => {
+    for (const e of WITH_SPRING.entries) {
+      expect(css).toContain(`--motion-${slugs(WITH_SPRING.entries)[e.id]}-stagger: 0ms;`)
+    }
+  })
+
   it("uses the name you gave a motion", () => {
     const renamed: MotionState = {
       ...DEFAULT_STATE,
@@ -144,6 +159,11 @@ describe("Framer Motion", () => {
     expect(out).toContain('"snappy-thing": {')
     expect(out).toContain('motion["snappy-thing"]')
     expect(out).not.toContain("motion.snappy-thing")
+  })
+
+  it("exports stagger per motion, in seconds", () => {
+    expect(js).toContain("export const stagger = {")
+    expect(js).toContain("standard: 0.040,")
   })
 
   it("says how reduced motion is handled in this runtime", () => {
