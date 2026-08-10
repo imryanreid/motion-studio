@@ -128,7 +128,21 @@ export function approximate(
   budget = 24,
 ): LinearApproximation {
   const dense = denseSamples(progress)
-  const points = pickPoints(dense, budget)
+  return measure(dense, pickPoints(dense, budget), durationMs)
+}
+
+/**
+ * What a chosen set of points costs against the curve it approximates.
+ *
+ * Shared by both callers on purpose: `approximateToTolerance` finds its point
+ * set by a different route, and routing both through one measurement is what
+ * makes "byte-identical" a property of the code rather than of a test.
+ */
+function measure(
+  dense: LinearPoint[],
+  points: LinearPoint[],
+  durationMs: number,
+): LinearApproximation {
   const css = toLinearCss(points)
 
   let maxDeviation = 0
@@ -173,18 +187,94 @@ export function approximate(
  * follows. `atCap` is true when the cap bound the result rather than the
  * tolerance, which is the case the fidelity note has to be honest about.
  */
+/**
+ * The greedy insertion order, and the error remaining after each insertion.
+ *
+ * `pickPoints` is deterministic worst-error-first, so the set for budget b+1
+ * is the set for b plus one index — budgets are nested, not independent. The
+ * sweep below used to rebuild the whole chain for every budget it tried,
+ * throwing away 4, 6, 8 … points of identical work on the way to 96.
+ *
+ * The error each set leaves behind comes free: the scan that picks the next
+ * point already measures the worst error across every segment, which *is* the
+ * current set's `maxDeviation`. So one pass yields both the order and the
+ * deviation at every size.
+ */
+type GreedyChain = {
+  /** Indices in the order the greedy added them, after the two endpoints. */
+  order: number[]
+  /** `dev[n]` is the maxDeviation of the set of size `n`. */
+  dev: number[]
+  /** The largest set the curve can use; beyond this the fit is already exact. */
+  maxSize: number
+}
+
+function greedyChain(dense: LinearPoint[], cap: number): GreedyChain {
+  const chosen = [0, dense.length - 1]
+  const order: number[] = []
+  const dev: number[] = []
+
+  for (;;) {
+    let worstIdx = -1
+    let worstErr = 0
+    for (let seg = 0; seg < chosen.length - 1; seg++) {
+      const a = dense[chosen[seg]]
+      const b = dense[chosen[seg + 1]]
+      const span = b.at - a.at
+      for (let i = chosen[seg] + 1; i < chosen[seg + 1]; i++) {
+        const p = dense[i]
+        const lerp =
+          span === 0 ? a.value : a.value + ((p.at - a.at) / span) * (b.value - a.value)
+        const err = Math.abs(p.value - lerp)
+        if (err > worstErr) {
+          worstErr = err
+          worstIdx = i
+        }
+      }
+    }
+    dev[chosen.length] = worstErr
+    // Nothing left to improve, or the cap is reached.
+    if (worstIdx < 0 || chosen.length >= cap) {
+      return { order, dev, maxSize: chosen.length }
+    }
+    order.push(worstIdx)
+    chosen.push(worstIdx)
+    chosen.sort((x, y) => x - y)
+  }
+}
+
+/** The set of a given size, which is the two endpoints plus the first n-2 picks. */
+function setOfSize(dense: LinearPoint[], chain: GreedyChain, size: number): LinearPoint[] {
+  const n = Math.min(size, chain.maxSize)
+  const idx = [0, dense.length - 1, ...chain.order.slice(0, Math.max(0, n - 2))]
+  idx.sort((x, y) => x - y)
+  return idx.map((i) => dense[i])
+}
+
+/**
+ * Spend as many samples as it takes to hit a target error, up to a cap.
+ *
+ * Byte-identical to sweeping `approximate` over every even budget, because the
+ * greedy is nested — the set this returns for budget b is the same set that
+ * rebuilding from scratch at b would produce. `linear.test.ts` asserts that
+ * against the old path across a spread of curves.
+ */
 export function approximateToTolerance(
   progress: (t: number) => number,
   durationMs: number,
   tolerance = 0.01,
   cap = 96,
 ): LinearApproximation & { atCap: boolean } {
-  let best = approximate(progress, durationMs, 4)
+  const dense = denseSamples(progress)
+  const chain = greedyChain(dense, cap)
+  const deviationAt = (size: number) => chain.dev[Math.min(size, chain.maxSize)]
+
   for (let budget = 4; budget <= cap; budget += 2) {
-    best = approximate(progress, durationMs, budget)
-    if (best.maxDeviation <= tolerance) return { ...best, atCap: false }
+    if (deviationAt(budget) <= tolerance) {
+      return { ...measure(dense, setOfSize(dense, chain, budget), durationMs), atCap: false }
+    }
   }
-  return { ...best, atCap: true }
+  return { ...measure(dense, setOfSize(dense, chain, cap), durationMs), atCap: true }
 }
 
 /** One line for the export panel's fidelity note. */
