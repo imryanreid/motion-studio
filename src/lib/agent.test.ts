@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest"
 import { buildAgentPayload, publicOrigin } from "./agent.js"
 import { DEFAULT_STATE, PURPOSE_IDS, tokenKey } from "./tokens.js"
 import { encodeState, resolveState } from "./params.js"
+import { TOOLS } from "../shared/tools.js"
 import { readFileSync, existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { GET as render } from "../../api/render.js"
@@ -273,9 +274,14 @@ describe("family discovery", () => {
     // carried this from the start; Motion shipped without it for a few hours.
     const { text } = buildAgentPayload("", ORIGIN)
     expect(text).toContain("Other tools in this family")
-    for (const name of ["Ramps", "Shape", "Type", "Icons", "Sound"]) {
-      expect(text, `${name} missing from the family listing`).toContain(name)
+    // Derived from the manifest, not a hardcoded list. The names are editorial
+    // and do change — "Sound" became "Beeps" — and a test that pins them
+    // fails for a rename rather than for the thing it is guarding, which is
+    // that every tool in the family reaches the payload.
+    for (const tool of TOOLS) {
+      expect(text, `${tool.name} missing from the family listing`).toContain(tool.name)
     }
+    expect(TOOLS.length).toBeGreaterThan(1)
     // And it says which one you are looking at.
     expect(text).toMatch(/\(this tool\)/)
   })

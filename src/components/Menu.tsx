@@ -149,7 +149,8 @@ export default function Menu({
               // band by the negative margin.
               "hover:bg-ink/[0.08] -my-2 h-9 w-9 rounded sm:-my-1 sm:h-6 sm:w-6"
             : "border-line bg-paper hover:border-ink/30 h-9 rounded-md border sm:h-7",
-          !bare && (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-[10px]" : "w-7"),
+          !bare &&
+            (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-sm sm:text-[10px]" : "w-7"),
           triggerClassName,
           open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.06]"),
         )}
@@ -292,7 +293,15 @@ export default function Menu({
   )
 }
 
-/** A row of mutually exclusive chips. The family's small-selector treatment. */
+/**
+ * A row of mutually exclusive chips. The family's small-selector treatment.
+ *
+ * Below `sm` it collapses to a native select. Six preset chips and seven
+ * component chips were most of the noise on a phone: each row wrapped to two
+ * or three lines, and together they made the panel read as a pile of buttons
+ * rather than a form. A select is one line, one target, and hands the list to
+ * the OS picker.
+ */
 export function ChipGroup({
   ariaLabel,
   options,
@@ -306,31 +315,46 @@ export function ChipGroup({
   onChange: (id: string) => void
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap gap-1">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          role="radio"
-          aria-checked={o.id === value}
-          title={o.title}
-          onClick={() => onChange(o.id)}
-          className={cn(
-            // h-7 everywhere: same height as the menu trigger and every other
-            // small button, so a row of them shares one rhythm.
-            "inline-flex h-9 items-center rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
-            o.id === value
-              ? "border-ink bg-ink text-paper"
-              : // Same surface as an input: transparent on a tinted panel, an
-                // unselected option reads as disabled rather than as a choice.
-                "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
-          )}
-        >
-          {o.dot && <AffectedDot className={cn("mr-1.5", o.id === value && "bg-paper/70")} />}
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <>
+      <select
+        aria-label={ariaLabel}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="border-line bg-paper text-ink h-9 w-full min-w-0 rounded-md border px-2 font-mono text-sm sm:hidden"
+      >
+        {value === null && <option value="">Custom</option>}
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <div role="radiogroup" aria-label={ariaLabel} className="hidden flex-wrap gap-1 sm:flex">
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={o.id === value}
+            title={o.title}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              // h-7 everywhere: same height as the menu trigger and every other
+              // small button, so a row of them shares one rhythm.
+              "inline-flex h-9 items-center rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
+              o.id === value
+                ? "border-ink bg-ink text-paper"
+                : // Same surface as an input: transparent on a tinted panel, an
+                  // unselected option reads as disabled rather than as a choice.
+                  "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
+            )}
+          >
+            {o.dot && <AffectedDot className={cn("mr-1.5", o.id === value && "bg-paper/70")} />}
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </>
   )
 }
 

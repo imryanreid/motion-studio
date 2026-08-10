@@ -50,7 +50,7 @@ export function FieldStack({
 }) {
   return (
     <div className={cn("flex shrink-0 flex-col gap-1", className)}>
-      <span className="text-ash h-3 font-mono text-[10px] leading-3 tracking-wide uppercase">
+      <span className="text-ash h-3 font-mono text-[11px] leading-3 tracking-wide uppercase sm:text-[10px]">
         {label}
       </span>
       <div className="flex h-10 items-center sm:h-8">{children}</div>

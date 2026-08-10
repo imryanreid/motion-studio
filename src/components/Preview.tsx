@@ -371,7 +371,7 @@ export default function Preview({
 
         {/* Transport, timeline and playback settings in one strip, in the
             order a media control has them. */}
-        <div className="border-line flex flex-wrap items-center gap-2 border-t px-3 py-2 max-sm:gap-y-3">
+        <div className="border-line flex flex-wrap items-center gap-2 border-t px-3 py-2 max-sm:justify-between max-sm:gap-y-3">
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
@@ -409,7 +409,7 @@ export default function Preview({
             />
           </div>
 
-          <span className="text-ash w-14 shrink-0 text-right font-mono text-[10px] tabular-nums">
+          <span className="text-ash w-14 shrink-0 text-right font-mono text-[13px] tabular-nums sm:text-[10px]">
             {Math.round(elapsed)}ms
           </span>
 
@@ -427,7 +427,7 @@ export default function Preview({
             aria-pressed={loop}
             title={loop ? "Looping — click to play once" : "Plays once — click to loop"}
             className={cn(
-              "h-9 rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
+              "h-9 rounded-md border px-2 font-mono text-sm transition-colors sm:h-7 sm:text-[10px]",
               loop
                 ? "border-ink/30 bg-ink/[0.06] text-ink"
                 : "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
