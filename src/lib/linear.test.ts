@@ -237,3 +237,73 @@ describe("adaptive vs Motion's uniform sampling", () => {
     ).toBeLessThan(theirError)
   })
 })
+
+// ==============================================
+// The nested-greedy rewrite must change nothing
+// ==============================================
+describe("approximateToTolerance is byte-identical to sweeping approximate", () => {
+  /** Exactly what the function used to do: rebuild from scratch per budget. */
+  const oldWay = (
+    progress: (t: number) => number,
+    durationMs: number,
+    tolerance: number,
+    cap = 96,
+  ) => {
+    let best = approximate(progress, durationMs, 4)
+    for (let budget = 4; budget <= cap; budget += 2) {
+      best = approximate(progress, durationMs, budget)
+      if (best.maxDeviation <= tolerance) return { ...best, atCap: false }
+    }
+    return { ...best, atCap: true }
+  }
+
+  const springs: [string, SpringConfig][] = [
+    ["critical", { stiffness: 210, damping: 29, mass: 1, velocity: 0 }],
+    ["gentle", { stiffness: 120, damping: 26, mass: 1, velocity: 0 }],
+    ["underdamped", { stiffness: 320, damping: 26, mass: 1, velocity: 0 }],
+    ["bouncy", { stiffness: 400, damping: 16, mass: 1, velocity: 0 }],
+    ["wobbly", { stiffness: 500, damping: 12, mass: 1, velocity: 0 }],
+    ["near-undamped", { stiffness: 1900, damping: 6, mass: 1, velocity: 0 }],
+    ["overdamped", { stiffness: 90, damping: 60, mass: 1, velocity: 0 }],
+    ["heavy", { stiffness: 300, damping: 20, mass: 4, velocity: 0 }],
+    ["kicked", { stiffness: 300, damping: 20, mass: 1, velocity: 8 }],
+  ]
+
+  for (const [label, spring] of springs) {
+    for (const tolerance of [0.03, 0.01, 0.003, 0.0001]) {
+      it(`${label} @ ${tolerance}`, () => {
+        const dur = 400
+        const fn = (t: number) => springValue(spring, t * dur)
+        const a = oldWay(fn, dur, tolerance)
+        const b = approximateToTolerance(fn, dur, tolerance)
+        expect(b.css).toBe(a.css)
+        expect(b.points.length).toBe(a.points.length)
+        expect(b.maxDeviation).toBe(a.maxDeviation)
+        expect(b.maxTemporalMs).toBe(a.maxTemporalMs)
+        expect(b.bytes).toBe(a.bytes)
+        expect(b.atCap).toBe(a.atCap)
+      })
+    }
+  }
+
+  it("agrees on beziers too, including one that overshoots", () => {
+    for (const bez of [...CURVES]) {
+      const fn = (t: number) => bezierValue(bez, t)
+      const a = oldWay(fn, 300, 0.01)
+      const b = approximateToTolerance(fn, 300, 0.01)
+      expect(b.css).toBe(a.css)
+      expect(b.atCap).toBe(a.atCap)
+      expect(b.maxDeviation).toBe(a.maxDeviation)
+    }
+  })
+
+  it("agrees on a curve the greedy can fit exactly before the cap", () => {
+    // A straight line needs two points; the old sweep returned early with a
+    // set smaller than the budget it asked for, and so must this.
+    const fn = (t: number) => t
+    const a = oldWay(fn, 200, 0.01)
+    const b = approximateToTolerance(fn, 200, 0.01)
+    expect(b.points.length).toBe(a.points.length)
+    expect(b.css).toBe(a.css)
+  })
+})
