@@ -357,8 +357,11 @@ describe("springs are comparable to beziers", () => {
     const { json } = buildAgentPayload(url, ORIGIN)
     const m = (json.motions as { enter: { durationMs: number; settlesMs?: number } }[])[0]
     expect(m.enter.settlesMs).toBeDefined()
-    // Framer's window overstates it; both numbers ship so neither misleads alone.
-    expect(m.enter.settlesMs!).toBeLessThan(m.enter.durationMs)
+    // Framer's window overstates it; both numbers ship so neither misleads
+    // alone. Meaningfully less, not incidentally: the first version measured
+    // against MOTION_REST, whose velocity test dragged the answer to within
+    // 1.4% of the window it was supposed to correct.
+    expect(m.enter.settlesMs!).toBeLessThan(m.enter.durationMs * 0.85)
   })
 
   it("never reports a spring exit as slower than its entrance", () => {

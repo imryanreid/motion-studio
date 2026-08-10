@@ -211,6 +211,22 @@ export type RestThreshold = {
 
 export const MOTION_REST: RestThreshold = { restDelta: 0.01, restSpeed: 0.01 }
 
+/**
+ * When the motion is over to the eye: within 1% of its target, whatever its
+ * speed.
+ *
+ * MOTION_REST also requires the velocity under 0.01, which is a runtime
+ * concern — do not halt something still travelling — and not a perceptual one.
+ * You cannot see the last 1% of travel however fast it is being crossed, and
+ * including the speed test pushes a spring(320, 26) from 370ms to 493ms.
+ * Against a 500ms window that made the "honest settle" almost identical to the
+ * runtime figure it was meant to correct.
+ */
+export const PERCEPTUAL_REST: RestThreshold = {
+  restDelta: 0.01,
+  restSpeed: Number.POSITIVE_INFINITY,
+}
+
 /** Motion refuses to run a generator longer than this; match it. */
 export const MAX_DURATION_MS = 20000
 

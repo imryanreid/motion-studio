@@ -109,8 +109,9 @@ rather than to guess.
 - A spring has no duration. `durationMs` on a spring token is the window Framer
   Motion plays, and the CSS `linear()` is sampled across it, so it must not be
   shortened — but it overstates when the motion is perceptually over. Spring
-  tokens carry `settlesMs` beside it, a 1% threshold, which is the number to
-  compare against a bezier's duration. A settling estimate, not a fact — copying it onto a CSS transition will not reproduce the
+  tokens carry `settlesMs` beside it — within 1% of target, whatever the
+  velocity at that moment — which is the number to compare against a bezier's
+  duration. A settling estimate, not a fact — copying it onto a CSS transition will not reproduce the
   motion. Use the sampled `linear()` in the token's `css` field, or the spring
   parameters with a runtime that does real physics.
 - CSS cannot run spring physics, so springs are sampled into a `linear()`

@@ -31,7 +31,7 @@ import {
   type SemanticToken,
 } from "./tokens.js"
 import { bezierToCss } from "./bezier.js"
-import { MOTION_REST, settlingTime } from "./spring.js"
+import { PERCEPTUAL_REST, settlingTime } from "./spring.js"
 import {
   toAgentMarkdown,
   toCss,
@@ -94,7 +94,7 @@ function tokenJson(t: SemanticToken, cssValue: string): TokenJson {
           // linear() is sampled across it — it must not be shortened. But it
           // overstates when the motion is perceptually over, so the honest
           // figure travels beside it rather than replacing it.
-          settlesMs: settlingTime(t.easing.spring, MOTION_REST, "last"),
+          settlesMs: settlingTime(t.easing.spring, PERCEPTUAL_REST, "last"),
         }
       : {}),
   }
