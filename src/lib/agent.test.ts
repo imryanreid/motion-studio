@@ -328,6 +328,8 @@ describe("a link that lost motions in transit", () => {
     expect(warnings[0]).toContain("emp")
     // And it says how many are missing, so the reader can check the source URL.
     expect(warnings[0]).toContain("at least 3")
+    // Plural agreement — it read "2 motions that isn't in it" on the first pass.
+    expect(warnings[0]).toContain("2 motions that aren't in it")
     expect(text).toContain("did not arrive intact")
   })
 

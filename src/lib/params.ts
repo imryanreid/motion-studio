@@ -270,7 +270,7 @@ export function decodeWarnings(search: string): string[] {
   const missing = [...new Set(pu.filter((id) => id && !seen.has(id)))]
   if (missing.length) {
     out.push(
-      `This link's component map points at ${missing.length} motion${missing.length === 1 ? "" : "s"} that isn't in it (${missing.join(", ")}). ` +
+      `This link's component map points at ${missing.length} motion${missing.length === 1 ? " that isn't" : "s that aren't"} in it (${missing.join(", ")}). ` +
         `Either the link is stale, or repeated "e" parameters were dropped in transit — some fetchers keep only the first. ` +
         `Those components have been repointed at "${[...seen][0]}", so what you are reading is not the set that was shared. ` +
         `The original had at least ${seen.size + missing.length} motions; this shows ${seen.size}.`,
