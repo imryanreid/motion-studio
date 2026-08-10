@@ -26,7 +26,7 @@ import { SemanticTable } from "./components/Tokens"
 import ExportPanel from "./components/ExportPanel"
 import AgentData from "./components/AgentData"
 import { DEFAULT_STATE, type MotionState, type PurposeId } from "./lib/tokens"
-import { encodeState, isDefaultState, resolveState } from "./lib/params"
+import { decodeWarnings, encodeState, isDefaultState, resolveState } from "./lib/params"
 import { SITE_URL } from "./lib/site"
 
 /** Which entry in the shared tools manifest is this repo. */
@@ -36,6 +36,12 @@ export default function App() {
   const { theme, toggle: toggleTheme } = useTheme()
   const [state, setState] = useState<MotionState>(() =>
     resolveState(typeof window === "undefined" ? "" : window.location.search),
+  )
+  // Read once, from the URL the visitor arrived on. Editing anything replaces
+  // that URL with a coherent one, so this must not be recomputed — the warning
+  // is about the link that was opened, not about the current state.
+  const [arrivalWarnings] = useState(() =>
+    decodeWarnings(typeof window === "undefined" ? "" : window.location.search),
   )
   const [exportOpen, setExportOpen] = useState(false)
   // Which row is expanded in the Easings list. Also marks the preview
@@ -113,6 +119,21 @@ export default function App() {
         duration, its own exit and its own stagger, and nothing in the model is
         global any more.
       */}
+      {/*
+        A link that lost motions in transit still renders a perfectly coherent
+        smaller system, which is the problem: there is nothing to notice. The
+        decoder knows, so it says so.
+      */}
+      {arrivalWarnings.length > 0 && (
+        <div
+          role="status"
+          className="border-line bg-ink/[0.03] mb-4 rounded-lg border p-3 text-xs leading-relaxed"
+        >
+          <span className="text-ink font-medium">This link didn't arrive intact.</span>{" "}
+          <span className="text-ash">{arrivalWarnings.join(" ")}</span>
+        </div>
+      )}
+
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <Easings

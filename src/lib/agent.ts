@@ -16,13 +16,14 @@
 // nothing: the browser runs the app, which is exactly
 // the thing an agent doesn't do.
 // ==============================================
-import { resolveState, encodeState } from "./params.js"
+import { decodeWarnings, resolveState, encodeState } from "./params.js"
 import {
   PURPOSE_IDS,
   STAGGER_DECAY,
   entryForPurpose,
   exportedSemantics,
   purposeExports,
+  curveDirection,
   purposesUsing,
   slugs,
   staggerDelay,
@@ -30,6 +31,7 @@ import {
   type SemanticToken,
 } from "./tokens.js"
 import { bezierToCss } from "./bezier.js"
+import { MOTION_REST, settlingTime } from "./spring.js"
 import {
   toAgentMarkdown,
   toCss,
@@ -62,7 +64,11 @@ type TokenJson = {
   type: "bezier" | "spring"
   /** Directly usable in CSS. For a spring this is the sampled approximation. */
   css: string
+  /** How the curve spends its time. Entrances should decelerate. */
+  direction: "decelerating" | "accelerating" | "linear"
   spring?: { stiffness: number; damping: number; mass: number; velocity: number }
+  /** Springs only: when the motion is perceptually over, at a 1% threshold. */
+  settlesMs?: number
 }
 
 export type AgentPayload = {
@@ -76,8 +82,21 @@ function tokenJson(t: SemanticToken, cssValue: string): TokenJson {
     token: `motion.${t.id}`,
     durationMs: t.durationMs,
     type: t.easing.kind,
+    // Front-loaded or back-loaded. An entrance that accelerates into rest is
+    // the classic motion error and nothing here used to name the axis, so a
+    // set built that way validated clean.
+    direction: curveDirection(t.easing, t.durationMs),
     css: cssValue,
-    ...(t.easing.kind === "spring" ? { spring: t.easing.spring } : {}),
+    ...(t.easing.kind === "spring"
+      ? {
+          spring: t.easing.spring,
+          // durationMs is the window Framer Motion plays, and the CSS
+          // linear() is sampled across it — it must not be shortened. But it
+          // overstates when the motion is perceptually over, so the honest
+          // figure travels beside it rather than replacing it.
+          settlesMs: settlingTime(t.easing.spring, MOTION_REST, "last"),
+        }
+      : {}),
   }
 }
 
@@ -173,6 +192,7 @@ export function buildAgentPayload(search: string, origin: string): AgentPayload 
       ? Array.from({ length: 5 }, (_, i) => staggerDelay(state.entries[0], i))
       : [],
     rules: [
+      "Entrances decelerate: fast at the start, settling into rest. An entrance that accelerates into its resting place is the most common way a set feels wrong, and every token below reports its `direction` so this is checkable.",
       "Prefer the purpose aliases or the named motions over raw durations.",
       "Exits stay faster and flatter than entrances. Symmetric motion reads as sluggish on the way out.",
       "Ship the prefers-reduced-motion block; it is already in the CSS export.",
@@ -194,5 +214,8 @@ export function buildAgentPayload(search: string, origin: string): AgentPayload 
     ...(state.excluded.length ? { excludedTokens: state.excluded } : {}),
   }
 
-  return { state, json, text: toAgentMarkdown(state, canonical) }
+  const warnings = decodeWarnings(search)
+  if (warnings.length) (json as Record<string, unknown>).warnings = warnings
+
+  return { state, json, text: toAgentMarkdown(state, canonical, warnings) }
 }

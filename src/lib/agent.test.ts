@@ -307,3 +307,80 @@ describe("payload stability", () => {
     expect(text).toContain("prefers-reduced-motion")
   })
 })
+
+// ==============================================
+// FROM A TESTING AGENT'S REVIEW
+// Four symptoms it hit reading the site as markdown. Each one is a test
+// because each was invisible from inside the app.
+// ==============================================
+describe("a link that lost motions in transit", () => {
+  const full =
+    "e=sub*subtle*b.20.0.0.100*140*r70*40&e=std*standard*b.20.0.0.100*200*r70*40" +
+    "&e=emp*emphasized*b.20.0.0.100*280*r70*40&pu=sub.std.std.std.emp.emp.emp"
+  // What a fetcher that keeps only the first repeated key leaves behind.
+  const clipped = full.split("&e=")[0] + "&pu=sub.std.std.std.emp.emp.emp"
+
+  it("says so, instead of rendering a coherent smaller system", () => {
+    const { json, text } = buildAgentPayload(clipped, ORIGIN)
+    const warnings = json.warnings as string[]
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain("std")
+    expect(warnings[0]).toContain("emp")
+    // And it says how many are missing, so the reader can check the source URL.
+    expect(warnings[0]).toContain("at least 3")
+    expect(text).toContain("did not arrive intact")
+  })
+
+  it("stays quiet when the link is whole", () => {
+    expect(buildAgentPayload(full, ORIGIN).json.warnings).toBeUndefined()
+    expect(buildAgentPayload("", ORIGIN).json.warnings).toBeUndefined()
+  })
+})
+
+describe("the URL contract travels with the page", () => {
+  it("explains the encoding it prints in the Source line", () => {
+    const { text } = buildAgentPayload("", ORIGIN)
+    expect(text).toContain("## Changing this set")
+    // The x100 scaling is the trap: a reasonable guess is silently wrong.
+    expect(text).toMatch(/mass and\s+velocity x100/)
+    expect(text).toContain("b.20.0.0.100")
+    expect(text).toContain("/llms.txt")
+  })
+})
+
+describe("springs are comparable to beziers", () => {
+  const url = "e=b*mid*s.320.26.100.0*200*r70*0&pu=b.b.b.b.b.b.b"
+
+  it("reports when the motion is perceptually over, not just the runtime window", () => {
+    const { json } = buildAgentPayload(url, ORIGIN)
+    const m = (json.motions as { enter: { durationMs: number; settlesMs?: number } }[])[0]
+    expect(m.enter.settlesMs).toBeDefined()
+    // Framer's window overstates it; both numbers ship so neither misleads alone.
+    expect(m.enter.settlesMs!).toBeLessThan(m.enter.durationMs)
+  })
+
+  it("never reports a spring exit as slower than its entrance", () => {
+    const { json } = buildAgentPayload(url, ORIGIN)
+    const m = (
+      json.motions as { enter: { durationMs: number }; exit: { durationMs: number } }[]
+    )[0]
+    expect(m.exit.durationMs).toBeLessThan(m.enter.durationMs)
+  })
+})
+
+describe("curve direction", () => {
+  it("names the axis, and flags an entrance that accelerates", () => {
+    const { json, text } = buildAgentPayload("", ORIGIN)
+    const m = (json.motions as { enter: { direction: string } }[])[0]
+    expect(m.enter.direction).toBe("decelerating")
+    expect(text).toContain("Entrances decelerate")
+
+    // CSS ease-in as an entrance: the set the reviewer said validated clean.
+    const easeIn = buildAgentPayload(
+      "e=x*bad*b.42.0.100.100*300*r70*0&pu=x.x.x.x.x.x.x",
+      ORIGIN,
+    )
+    const bad = (easeIn.json.motions as { enter: { direction: string } }[])[0]
+    expect(bad.enter.direction).toBe("accelerating")
+  })
+})

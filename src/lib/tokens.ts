@@ -31,7 +31,13 @@
 // feels identical.
 // ==============================================
 import { BEZIER_PRESETS, clampBezier, type Bezier } from "./bezier.js"
-import { SPRING_PRESETS, motionSettlingTime, type SpringConfig } from "./spring.js"
+import {
+  MOTION_REST,
+  SPRING_PRESETS,
+  motionSettlingTime,
+  settlingTime,
+  type SpringConfig,
+} from "./spring.js"
 
 /** Generated durations land on this grid. Values you type are left alone. */
 const ROUND_MS = 10
@@ -428,14 +434,27 @@ export function enterMs(e: MotionEntry): number {
     : Math.max(1, Math.round(e.durationMs))
 }
 
+/**
+ * The exit budget, for both kinds.
+ *
+ * This used to ask the derived spring how long it took, which is how a spring
+ * exit ended up slower than its entrance. Now it states the budget and
+ * `springExitFor` builds a spring that fits, so "exits are faster" holds by
+ * construction rather than by luck.
+ */
+export function exitBudgetMs(e: MotionEntry): number {
+  const base = e.exitLinked ? enterMs(e) * e.exitRatio : e.exitAbsoluteMs
+  return Math.max(1, Math.round(base))
+}
+
 export function exitMs(e: MotionEntry): number {
-  if (e.easing.kind === "bezier") {
-    return Math.max(1, Math.round(e.exitLinked ? e.durationMs * e.exitRatio : e.exitAbsoluteMs))
-  }
-  const exit = deriveExit(e.easing)
-  // Always a spring — deriveExit preserves the kind — but narrow it rather
-  // than asserting, so a future third kind can't slip through silently.
-  return exit.kind === "spring" ? motionSettlingTime(exit.spring) : enterMs(e)
+  if (e.easing.kind === "bezier") return exitBudgetMs(e)
+  // The spring's own settle, not the budget it was built from. The two land
+  // within a few percent, and reporting the budget would let the emitted
+  // duration fall *under* the real motion — the CSS linear() window is this
+  // number, so a short one truncates travel the JS runtime still plays.
+  const exit = deriveExitFor(e)
+  return exit.kind === "spring" ? motionSettlingTime(exit.spring) : exitBudgetMs(e)
 }
 
 // ---------- derivation, the one live relationship ----------
@@ -480,17 +499,92 @@ export function criticalDamping(s: SpringConfig): number {
  * lag — so exits are pushed toward the linear end: beziers mirror, and springs
  * lose their bounce by going critical.
  */
-export function deriveExit(enter: Easing): Easing {
-  if (enter.kind === "bezier") return { kind: "bezier", bezier: mirrorBezier(enter.bezier) }
-  const critical = criticalDamping(enter.spring)
+/** A critically damped spring at a given natural frequency. */
+function criticalAt(w0: number, mass: number): SpringConfig {
+  const stiffness = clamp(Math.round(mass * w0 * w0), 1, 20000)
   return {
-    kind: "spring",
-    spring: {
-      ...enter.spring,
-      damping: Math.max(enter.spring.damping, critical),
-      velocity: 0,
-    },
+    stiffness,
+    damping: Number((2 * Math.sqrt(stiffness * mass)).toFixed(2)),
+    mass,
+    velocity: 0,
   }
+}
+
+/**
+ * A critically damped spring sized to settle in roughly `targetMs`.
+ *
+ * Critically damping alone does not make an exit quicker — it buys flatness by
+ * spending time, and a spring exit could settle *slower* than its entrance,
+ * contradicting the first rule this tool teaches. So the exit is also stiffened
+ * until it actually lands inside the budget.
+ *
+ * Sized by search rather than formula. Settling would scale as 1/ω₀ if the
+ * threshold were position alone, but `isAtRest` also tests an absolute
+ * velocity, and velocity has units of 1/time — so a stiffer spring is
+ * relatively slower to fall under it. Measured across k=80..1280 the implied
+ * constant drifts 9.0 → 10.6, enough that a closed form under-stiffens by
+ * about half. One correction step against the real measure removes that.
+ */
+function springExitFor(enter: SpringConfig, targetMs: number): SpringConfig {
+  const target = Math.max(1, targetMs)
+  // Mid-range of the measured constant, then corrected by how far it lands.
+  let w0 = (10.0 / target) * 1000
+  let out = criticalAt(w0, enter.mass)
+  for (let i = 0; i < 2; i++) {
+    const got = motionSettlingTime(out)
+    if (!got) break
+    w0 *= got / target
+    out = criticalAt(w0, enter.mass)
+  }
+  return out
+}
+
+/**
+ * @param targetMs What the exit should take. Omitted, the spring is only
+ * calmed, not shortened — used where the shape matters and the clock doesn't.
+ */
+export function deriveExit(enter: Easing, targetMs?: number): Easing {
+  if (enter.kind === "bezier") return { kind: "bezier", bezier: mirrorBezier(enter.bezier) }
+  if (targetMs === undefined) {
+    const critical = criticalDamping(enter.spring)
+    return {
+      kind: "spring",
+      spring: {
+        ...enter.spring,
+        damping: Math.max(enter.spring.damping, critical),
+        velocity: 0,
+      },
+    }
+  }
+  return { kind: "spring", spring: springExitFor(enter.spring, targetMs) }
+}
+
+/** The exit easing for one entry, sized against that entry's own budget. */
+export function deriveExitFor(e: MotionEntry): Easing {
+  return deriveExit(e.easing, exitBudgetMs(e))
+}
+
+/**
+ * How the curve spends its time: front-loaded reads as decelerating.
+ *
+ * Measured by when it crosses half its travel rather than by the slope at t=0,
+ * because a spring starts from a standstill and would read as accelerating on
+ * that test while plainly decelerating to the eye.
+ */
+export function curveDirection(
+  easing: Easing,
+  durationMs: number,
+): "decelerating" | "accelerating" | "linear" {
+  let half = 1
+  for (let i = 1; i <= 100; i++) {
+    if (easingProgress(easing, (i / 100) * durationMs, durationMs) >= 0.5) {
+      half = i / 100
+      break
+    }
+  }
+  if (half < 0.47) return "decelerating"
+  if (half > 0.53) return "accelerating"
+  return "linear"
 }
 
 /** The stable key for one direction of one motion. */
@@ -539,7 +633,7 @@ export function resolveSemantics(s: MotionState): SemanticToken[] {
       direction: "exit",
       exported: !held.has(tokenKey(e.id, "exit")),
       durationMs: exitMs(e),
-      easing: deriveExit(e.easing),
+      easing: deriveExitFor(e),
     })
   }
   return out
