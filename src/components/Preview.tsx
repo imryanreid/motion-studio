@@ -371,7 +371,7 @@ export default function Preview({
 
         {/* Transport, timeline and playback settings in one strip, in the
             order a media control has them. */}
-        <div className="border-line flex flex-wrap items-center gap-2 border-t px-3 py-2">
+        <div className="border-line flex flex-wrap items-center gap-2 border-t px-3 py-2 max-sm:gap-y-3">
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
@@ -391,21 +391,23 @@ export default function Preview({
             <ArrowClockwise size={12} weight="bold" />
           </button>
 
-          <Scrubber
-            elapsed={elapsed}
-            total={total}
-            onSeek={(ms) => {
-              setElapsed(ms)
-              // Keep the clock's origin under the new position, or resuming
-              // would snap back to wherever it had got to on its own.
-              start.current = performance.now() - ms / rate
-            }}
-            onScrubStart={() => {
-              resumeAfterScrub.current = playing
-              setPlaying(false)
-            }}
-            onScrubEnd={() => setPlaying(resumeAfterScrub.current)}
-          />
+          <div className="flex min-w-0 flex-1 items-center max-sm:order-last max-sm:w-full max-sm:flex-none">
+            <Scrubber
+              elapsed={elapsed}
+              total={total}
+              onSeek={(ms) => {
+                setElapsed(ms)
+                // Keep the clock's origin under the new position, or resuming
+                // would snap back to wherever it had got to on its own.
+                start.current = performance.now() - ms / rate
+              }}
+              onScrubStart={() => {
+                resumeAfterScrub.current = playing
+                setPlaying(false)
+              }}
+              onScrubEnd={() => setPlaying(resumeAfterScrub.current)}
+            />
+          </div>
 
           <span className="text-ash w-14 shrink-0 text-right font-mono text-[10px] tabular-nums">
             {Math.round(elapsed)}ms
@@ -425,7 +427,7 @@ export default function Preview({
             aria-pressed={loop}
             title={loop ? "Looping — click to play once" : "Plays once — click to loop"}
             className={cn(
-              "h-7 rounded-md border px-2 font-mono text-[10px] transition-colors",
+              "h-9 rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
               loop
                 ? "border-ink/30 bg-ink/[0.06] text-ink"
                 : "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",

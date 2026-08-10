@@ -246,7 +246,14 @@ export default function CurvePlot({
       viewBox={
         thumb ? `0 0 ${W} ${VB_H}` : `${-EDGE} ${-EDGE} ${W + EDGE * 2} ${VB_H + EDGE * 2}`
       }
-      className={cn("w-full touch-none select-none", editable && "cursor-crosshair", className)}
+      className={cn(
+        "w-full touch-none select-none",
+        // No dragging on a phone. The hit target measured 18px against
+        // Apple's 44, and a fingertip covers the handle it is placing — the
+        // presets and numeric fields make the same edits without the fight.
+        editable && "max-sm:pointer-events-none sm:cursor-crosshair",
+        className,
+      )}
       onPointerMove={move}
       onPointerUp={endDrag}
       onPointerLeave={endDrag}
@@ -331,7 +338,10 @@ export default function CurvePlot({
               onPointerEnter={() => editable && setHovered(n)}
               onPointerLeave={() => setHovered((h) => (h === n ? null : h))}
               onPointerDown={handle(n)}
-              className={cn(editable && (active ? "cursor-grabbing" : "cursor-grab"))}
+              className={cn(
+                "max-sm:hidden",
+                editable && (active ? "cursor-grabbing" : "cursor-grab"),
+              )}
             >
               <circle cx={toX(x)} cy={toY(y, view)} r={11} fill="transparent" />
               <circle

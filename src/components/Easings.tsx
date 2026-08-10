@@ -391,7 +391,14 @@ export default function Easings({
                 aria-label={open ? `Collapse ${e.name}` : `Edit ${e.name}`}
                 className={cn(
                   "text-ash hover:text-ink absolute left-3 z-10 flex items-center transition-colors",
-                  open ? "top-3 h-4" : "top-2 h-6",
+                  // Grown on a phone around the same centre line. This was an
+                  // 11x16 target, and when a row is open it is the only way to
+                  // close it again — the summary row that also toggles does
+                  // not exist in that state.
+                  "max-sm:-ml-3 max-sm:w-10 max-sm:justify-center",
+                  open
+                    ? "top-3 h-4 max-sm:-mt-3 max-sm:h-10"
+                    : "top-2 h-6 max-sm:-mt-2 max-sm:h-10",
                 )}
               >
                 {open ? (
@@ -562,7 +569,7 @@ export default function Easings({
                               ]}
                             />
                           </div>
-                          {previewed && <AffectedDot />}
+                          {previewed && <AffectedDot className="max-sm:hidden" />}
                         </div>
                       </div>
 
@@ -728,7 +735,7 @@ export default function Easings({
                   Stagger is here for both types — it is a delay between
                   children, not a property of the curve.
                 */}
-                      <div className="border-line/60 flex flex-wrap items-end gap-x-3 gap-y-2 border-t pt-3">
+                      <div className="border-line/60 grid grid-cols-2 items-end gap-x-3 gap-y-3 border-t pt-3 sm:flex sm:flex-wrap sm:gap-y-2">
                         {spring ? (
                           <>
                             <FieldStack label="Settles">
@@ -916,7 +923,7 @@ export default function Easings({
                         <span className="text-ash">exit{spring && " settling"}</span>
                       </span>
                       <span className="ml-auto hidden min-w-0 items-center gap-1.5 pl-2 sm:flex">
-                        {previewed && <AffectedDot />}
+                        {previewed && <AffectedDot className="max-sm:hidden" />}
                         <span className="text-ash truncate text-right text-[11px]">
                           {used.length ? used.join(", ") : "—"}
                         </span>
