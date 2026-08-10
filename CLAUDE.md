@@ -17,8 +17,11 @@ Second tool in the **Studio Tools** family, after
 [Ramps Studio](../Ramps%20Studio). Public, open source (MIT), and a portfolio
 piece.
 
-**Status: scaffolded, not built.** The shared layer is in place and the page
-shell renders. The generators land after `SPEC.md` is approved.
+**Status: built and live** at https://www.springs.studio. The full tool ships —
+named motions with bezier and spring editors, derived exits, Generate, seven
+preview scenarios, the export panel with fidelity notes, per-token export
+selection, URL state, and the agent surfaces (`api/render`, `/api/tokens`,
+`llms.txt`, JSON-LD). See [`NEXT-UP.md`](NEXT-UP.md) for the rolling log.
 
 ## Stack
 
