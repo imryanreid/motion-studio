@@ -412,3 +412,44 @@ describe("head rewrites cannot splice the document", () => {
     expect(html).not.toContain('content="original"')
   })
 })
+
+// ==============================================
+// P0 — reflected XSS via a warning that quoted its own rejected input
+// ==============================================
+describe("the JSON block cannot be escaped from", () => {
+  const attack = "?e=a1*Nm*b.20.0.0.100*200*r70*40&pu=" + encodeURIComponent("</script>MARKER")
+
+  it("never emits a literal </script inside the payload", async () => {
+    const res = await withShell(SHELL, () => render(new Request(`${ORIGIN}/${attack}`)))
+    const html = await res.text()
+    const block = html.slice(html.indexOf('id="motion-studio-tokens"'))
+    const json = block.slice(0, block.indexOf("</script>"))
+    expect(json.toLowerCase()).not.toContain("</script")
+    expect(json).not.toContain("MARKER</")
+  })
+
+  it("still parses as JSON, with < round-tripping", () => {
+    const { json } = buildAgentPayload(attack, ORIGIN)
+    const encoded = JSON.stringify(json).replace(/</g, "\\u003c")
+    expect(encoded).not.toContain("<")
+    expect(JSON.parse(encoded)).toEqual(json)
+  })
+
+  it("does not quote back a rejected id that isn't id-shaped", () => {
+    const { json } = buildAgentPayload(attack, ORIGIN)
+    const w = (json.warnings as string[]) ?? []
+    expect(w).toHaveLength(1)
+    // It still reports that something was lost — just by count, not by echo.
+    expect(w[0]).toContain("1 motion that isn't in it")
+    expect(w[0]).not.toContain("script")
+    expect(w[0]).not.toContain("<")
+  })
+
+  it("still names ids that are genuinely id-shaped", () => {
+    const { json } = buildAgentPayload(
+      "e=sub*subtle*b.20.0.0.100*140*r70*40&pu=sub.std.std.std.emp.emp.emp",
+      ORIGIN,
+    )
+    expect((json.warnings as string[])[0]).toContain("std")
+  })
+})
