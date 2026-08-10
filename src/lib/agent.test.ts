@@ -389,3 +389,26 @@ describe("curve direction", () => {
     expect(bad.enter.direction).toBe("accelerating")
   })
 })
+
+describe("head rewrites cannot splice the document", () => {
+  it("inserts a $-bearing value literally", () => {
+    // api/render.ts passes replacer *functions*, not replacement strings.
+    // In a string, "$&" expands to the whole match and "$`" to everything
+    // before it — after escapeHtml has run, so escaping cannot stop it. This
+    // pins the distinction so nobody simplifies it back.
+    const evil = "$&$`$'$1"
+    expect("MID".replace(/MID/, () => evil)).toBe(evil)
+    expect("aMIDb".replace(/MID/, evil)).not.toBe(`a${evil}b`)
+  })
+
+  it("still rewrites the head correctly", async () => {
+    const search = encodeState(DEFAULT_STATE)
+    const res = await withShell(SHELL, () => render(new Request(`${ORIGIN}/?${search}`)))
+    const html = await res.text()
+    expect(html).toContain(
+      `<link rel="canonical" href="${ORIGIN}/?${search.replace(/&/g, "&amp;")}" />`,
+    )
+    expect(html).toContain('<meta name="robots" content="noindex, follow" />')
+    expect(html).not.toContain('content="original"')
+  })
+})

@@ -21,6 +21,20 @@
 import { buildAgentPayload, publicOrigin } from "../src/lib/agent.js"
 import { encodeState } from "../src/lib/params.js"
 
+/**
+ * Escapes for an HTML attribute. Always pass its result through a *replacer
+ * function*, never a replacement string.
+ *
+ * `String.replace` expands `$&`, `` $` ``, `$'` and `$1` inside a replacement
+ * string, and that expansion happens after this function runs — so a `$` in an
+ * escaped value could splice a chunk of the surrounding document into an
+ * attribute and break out of it. Escaping cannot prevent it; only avoiding the
+ * string form can. A function's return value is inserted literally.
+ *
+ * Nothing reaching here can contain a `$` today, but that invariant lives in
+ * sanitizeName in src/lib/tokens.ts — far from this file, and easy to widen
+ * without ever looking here.
+ */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -101,13 +115,16 @@ export async function GET(request: Request): Promise<Response> {
     html = html
       .replace(
         /<link rel="canonical" href="[^"]*" \/>/,
-        `<link rel="canonical" href="${escapeHtml(canonical)}" />`,
+        () => `<link rel="canonical" href="${escapeHtml(canonical)}" />`,
       )
       .replace(
         /(<meta\s+name="description"\s+content=")[^"]*(")/s,
-        `$1${escapeHtml(summary)}$2`,
+        (_m, open: string, close: string) => `${open}${escapeHtml(summary)}${close}`,
       )
-      .replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${escapeHtml(canonical)}$2`)
+      .replace(
+        /(<meta property="og:url" content=")[^"]*(")/,
+        (_m, open: string, close: string) => `${open}${escapeHtml(canonical)}${close}`,
+      )
       // Keep parameterized sets out of the search index. Each is self-canonical
       // so it shares correctly, but `?e=` is an unbounded parameter space and
       // letting a crawler wander it would bloat the index of a site with one
@@ -139,7 +156,13 @@ ${escapeHtml(text)}
 </pre>
 </div>`
 
-  html = html.replace("</body>", `${injected}\n</body>`)
+  // A replacer function here too, and this one matters more than the head
+  // rewrites: `injected` carries the whole payload — the DTCG JSON alone
+  // contributes dozens of "$" in $type/$value/$extensions, plus names and free
+  // text. None of it forms an expandable sequence today, but nothing
+  // constrains it the way the URL charset constrains a parameter, so this is
+  // the instance least likely to stay safe by accident.
+  html = html.replace("</body>", () => `${injected}\n</body>`)
 
   return new Response(html, {
     status: 200,

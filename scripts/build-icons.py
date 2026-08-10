@@ -9,10 +9,14 @@ So WebKit draws, Pillow masks.
 Run by hand. The mark only changes when the brand does.
 """
 import subprocess, tempfile, os
+from pathlib import Path
 from PIL import Image, ImageDraw
 
-ROOT = "/Users/ry/Projects/Studio Tools/Motion Studio"
-SVG = f"{ROOT}/public/favicon.svg"
+# Resolved from this file, not hardcoded: the repo is public, so an absolute
+# path publishes the author's username and directory layout, and it only ever
+# worked on one machine.
+ROOT = Path(__file__).resolve().parent.parent
+SVG = ROOT / "public" / "favicon.svg"
 INK = (19, 18, 16)
 RADIUS = 7 / 32          # matches rx="7" in the 32-unit viewBox
 
@@ -23,7 +27,7 @@ RADIUS = 7 / 32          # matches rx="7" in the 32-unit viewBox
 RASTER = 1024
 
 def raster(size: int) -> Image.Image:
-    src = open(SVG).read().replace('width="32" height="32"',
+    src = SVG.read_text().replace('width="32" height="32"',
                                    f'width="{RASTER}" height="{RASTER}"')
     with tempfile.TemporaryDirectory() as tmp:
         p = os.path.join(tmp, "icon.svg")
@@ -56,5 +60,5 @@ for size, name, flatten in [(192, "icon-192.png", False), (180, "apple-touch-ico
     else:
         out = img.convert("RGBA")
         out.putalpha(rounded_alpha(size))
-    out.save(f"{ROOT}/public/{name}")
+    out.save(ROOT / "public" / name)
     print(name, out.size, "corner:", out.getpixel((0, 0)))
