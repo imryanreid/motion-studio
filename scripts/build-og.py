@@ -8,15 +8,23 @@ swatches, here it's easing curves — drawn with the real maths, so the card
 shows curves the tool would actually produce.
 """
 import math
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-F = "/Users/ry/Projects/Studio Tools/Ramps Studio/public/fonts"
-OUT = "/Users/ry/Projects/Studio Tools/Motion Studio/public/og.png"
+# Both resolved from this file rather than hardcoded — a public repo should not
+# publish the author's home directory, and these only worked on one machine.
+#
+# The fonts live upstream in Ramps. That is reached through the family root,
+# the same way scripts/sync-shared.sh does it: repo root, then its parent.
+ROOT = Path(__file__).resolve().parent.parent
+FAMILY_ROOT = ROOT.parent
+F = FAMILY_ROOT / "Ramps Studio" / "public" / "fonts"
+OUT = ROOT / "public" / "og.png"
 W, H, S = 1200, 630, 2          # S = supersample factor, downsampled at the end
 PAPER, INK, ASH, LINE = (253, 253, 252), (22, 21, 15), (107, 106, 99), (230, 229, 223)
 
 def f(name, size):
-    return ImageFont.truetype(f"{F}/{name}", size * S)
+    return ImageFont.truetype(str(F / name), size * S)
 
 def bezier(x1, y1, x2, y2):
     """y at a given x for a cubic-bezier, by bisection on t. Good enough here."""
