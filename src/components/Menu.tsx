@@ -145,8 +145,10 @@ export default function Menu({
             ? // Negative margin cancels the extra height, so a 24px hover
               // target still measures 16 in the label band it has to stay
               // centred in.
-              "hover:bg-ink/[0.08] -my-1 h-6 w-6 rounded"
-            : "border-line bg-paper hover:border-ink/30 h-7 rounded-md border",
+              // 36px of target on a phone, still centred on the 16px label
+              // band by the negative margin.
+              "hover:bg-ink/[0.08] -my-2 h-9 w-9 rounded sm:-my-1 sm:h-6 sm:w-6"
+            : "border-line bg-paper hover:border-ink/30 h-9 rounded-md border sm:h-7",
           !bare && (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-[10px]" : "w-7"),
           triggerClassName,
           open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.06]"),
@@ -316,7 +318,7 @@ export function ChipGroup({
           className={cn(
             // h-7 everywhere: same height as the menu trigger and every other
             // small button, so a row of them shares one rhythm.
-            "inline-flex h-7 items-center rounded-md border px-2 font-mono text-[10px] transition-colors",
+            "inline-flex h-9 items-center rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
             o.id === value
               ? "border-ink bg-ink text-paper"
               : // Same surface as an input: transparent on a tinted panel, an
