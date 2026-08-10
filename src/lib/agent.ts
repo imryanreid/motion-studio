@@ -184,8 +184,13 @@ export function buildAgentPayload(search: string, origin: string): AgentPayload 
     motions,
     purposes,
     /**
-     * Not a token. Children after the first are spaced by
-     * `staggerMs * decay^(index-1)`, so a long list doesn't run away.
+     * Not a token. Child `i` is delayed by `staggerMs * i^STAGGER_DECAY` — a
+     * sub-linear power law, so a long list doesn't take proportionally long.
+     *
+     * This said `staggerMs * decay^(index-1)`, which is a different curve
+     * entirely: that one shrinks each successive delay, this one grows them,
+     * and by index 3 they disagree by about 3.5x. See `exampleStagger` below
+     * for what the implementation actually produces.
      */
     staggerDecay: STAGGER_DECAY,
     exampleStagger: state.entries.length

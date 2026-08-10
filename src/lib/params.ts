@@ -177,8 +177,13 @@ export function decodeState(search: string): Partial<MotionState> {
   // refers to nothing else. Below that guard it was silently dropped from any
   // URL without an `e`, so "?tol=30" — which llms.txt invites, since every
   // parameter is documented as optional — did nothing at all.
+  // Floored at 10 (0.1%). Anything tighter is unreachable — the sampler stops
+  // at 96 points, which lands around 0.065%, so a smaller number just buys the
+  // full budget sweep in pursuit of a target that cannot be hit. Clamped
+  // silently rather than rejected: a malformed link should still degrade to
+  // something sensible.
   const tol = num(p.get("tol"), 1, 2000)
-  if (tol !== undefined) out.tolerance = tol / 10000
+  if (tol !== undefined) out.tolerance = Math.max(tol, 10) / 10000
 
   // Entries first: everything else refers to them, so a link whose entries
   // don't survive validation can't have a coherent primary or purpose map.
@@ -266,14 +271,28 @@ export function decodeWarnings(search: string): string[] {
     else seen.add(e.id)
   }
 
+  // Quote back only what looks like an id, and only a few of them.
+  //
+  // This read `pu` raw and echoed whatever it found. Rejected input is the
+  // least trustworthy thing in the system and this was the one place that
+  // repeated it verbatim — a `pu` of "</script>…" ended up unescaped inside
+  // the JSON script block on production. The count is the useful part of the
+  // message; the ids are a convenience, so anything that isn't plausibly an id
+  // is counted rather than named.
   const pu = p.get("pu")?.split(".") ?? []
-  const missing = [...new Set(pu.filter((id) => id && !seen.has(id)))]
-  if (missing.length) {
+  const unknown = [...new Set(pu.filter((id) => id && !seen.has(id)))]
+  const named = unknown.filter((id) => ID_OK.test(id)).slice(0, 4)
+  const missing = named
+  if (unknown.length) {
+    // Name them when they are nameable, otherwise just say how many.
+    const which = named.length
+      ? ` (${named.join(", ")}${named.length < unknown.length ? ", …" : ""})`
+      : ""
     out.push(
-      `This link's component map points at ${missing.length} motion${missing.length === 1 ? " that isn't" : "s that aren't"} in it (${missing.join(", ")}). ` +
+      `This link's component map points at ${unknown.length} motion${unknown.length === 1 ? " that isn't" : "s that aren't"} in it${which}. ` +
         `Either the link is stale, or repeated "e" parameters were dropped in transit — some fetchers keep only the first. ` +
         `Those components have been repointed at "${[...seen][0]}", so what you are reading is not the set that was shared. ` +
-        `The original had at least ${seen.size + missing.length} motions; this shows ${seen.size}.`,
+        `The original had at least ${seen.size + unknown.length} motions; this shows ${seen.size}.`,
     )
   }
   if (rejected) {

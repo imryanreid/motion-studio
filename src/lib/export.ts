@@ -34,12 +34,32 @@ import {
 } from "./tokens.js"
 
 /** A spring rendered for CSS: sampled to a linear(), with what that cost. */
+/**
+ * Sampling a spring is the expensive thing this module does, and one request
+ * asks for the same one about six times over: twice from `toCss` (directly and
+ * via the agent payload's per-token CSS), once from `toDtcg`, and twice more
+ * from `cssFidelity` while it hunts the worst offender.
+ *
+ * It is a pure function of three values, so the repeats are pure waste. The
+ * cache is bounded and cleared wholesale rather than evicted one at a time —
+ * a serverless instance is reused across requests, and an unbounded map on a
+ * long-lived instance is a slow leak.
+ */
+const springCache = new Map<string, ReturnType<typeof approximateToTolerance>>()
+const SPRING_CACHE_MAX = 240
+
 function springCss(spring: SpringConfig, durationMs: number, tolerance: number) {
-  return approximateToTolerance(
+  const key = `${spring.stiffness}|${spring.damping}|${spring.mass}|${spring.velocity}|${durationMs}|${tolerance}`
+  const hit = springCache.get(key)
+  if (hit) return hit
+  const out = approximateToTolerance(
     (t) => springValue(spring, t * durationMs),
     durationMs,
     tolerance,
   )
+  if (springCache.size >= SPRING_CACHE_MAX) springCache.clear()
+  springCache.set(key, out)
+  return out
 }
 
 function easingCss(easing: Easing, durationMs: number, tolerance: number): string {
