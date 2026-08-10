@@ -238,3 +238,48 @@ export function resolveState(search: string): MotionState {
 export function isDefaultState(s: MotionState): boolean {
   return encodeState(s) === encodeState(DEFAULT_STATE)
 }
+
+/**
+ * What this link lost on the way here.
+ *
+ * A fetcher that collapses repeated query keys leaves one `e=` behind, and the
+ * page then renders a completely coherent smaller system: purposes silently
+ * repointed at the surviving motion, canonical rewritten to match, no gap
+ * anywhere to notice. An agent reviewing that is reviewing something the user
+ * never built.
+ *
+ * The decoder already holds the evidence — `pu` names ids that are no longer
+ * present — and used to throw it away in a ternary. This surfaces it instead.
+ * Note it fires for a genuinely stale link too, which is also worth saying.
+ */
+export function decodeWarnings(search: string): string[] {
+  const p = new URLSearchParams(search)
+  const raw = p.getAll("e")
+  if (!raw.length) return []
+
+  const out: string[] = []
+  const seen = new Set<string>()
+  let rejected = 0
+  for (const r of raw) {
+    const e = decodeEntry(r)
+    if (!e) rejected++
+    else seen.add(e.id)
+  }
+
+  const pu = p.get("pu")?.split(".") ?? []
+  const missing = [...new Set(pu.filter((id) => id && !seen.has(id)))]
+  if (missing.length) {
+    out.push(
+      `This link's component map points at ${missing.length} motion${missing.length === 1 ? "" : "s"} that isn't in it (${missing.join(", ")}). ` +
+        `Either the link is stale, or repeated "e" parameters were dropped in transit — some fetchers keep only the first. ` +
+        `Those components have been repointed at "${[...seen][0]}", so what you are reading is not the set that was shared. ` +
+        `The original had at least ${seen.size + missing.length} motions; this shows ${seen.size}.`,
+    )
+  }
+  if (rejected) {
+    out.push(
+      `${rejected} motion${rejected === 1 ? "" : "s"} in this link could not be decoded and ${rejected === 1 ? "was" : "were"} skipped.`,
+    )
+  }
+  return out
+}

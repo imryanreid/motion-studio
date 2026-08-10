@@ -78,6 +78,15 @@ and each purpose aliases one of them:
 
   motion.<purpose>-enter -> var(--motion-<slug>-enter)
 
+## When a link arrives incomplete
+
+Some fetchers keep only the first of a repeated query key, which would leave one
+`e` and a `pu` pointing at motions that are no longer present. Rather than
+quietly repointing them, the response carries a `warnings` array and the page
+text opens with "This link did not arrive intact", naming the missing ids and
+how many motions the original had. If you see it, re-fetch preserving every
+repeated `e` before drawing any conclusion about the set.
+
 ## Stability
 
 The JSON at /api/tokens carries a `version` integer, currently 1.
@@ -89,12 +98,19 @@ rather than to guess.
 
 ## Rules that matter when applying these
 
+- Entrances decelerate: fast at the start, settling into rest. An entrance that
+  accelerates into its resting place is the most common way a set feels wrong,
+  and neither the durations nor the stagger will reveal it. Every token reports
+  a `direction` of decelerating, accelerating or linear, so this is checkable.
 - Prefer the purpose aliases or the named motions over raw durations.
 - Exits stay faster and flatter than entrances. That asymmetry is deliberate;
   symmetric motion reads as sluggish on the way out.
 - Ship the prefers-reduced-motion block. It is already in the CSS export.
-- A spring has no duration. The `durationMs` on a spring token is a settling
-  estimate, not a fact — copying it onto a CSS transition will not reproduce the
+- A spring has no duration. `durationMs` on a spring token is the window Framer
+  Motion plays, and the CSS `linear()` is sampled across it, so it must not be
+  shortened — but it overstates when the motion is perceptually over. Spring
+  tokens carry `settlesMs` beside it, a 1% threshold, which is the number to
+  compare against a bezier's duration. A settling estimate, not a fact — copying it onto a CSS transition will not reproduce the
   motion. Use the sampled `linear()` in the token's `css` field, or the spring
   parameters with a runtime that does real physics.
 - CSS cannot run spring physics, so springs are sampled into a `linear()`

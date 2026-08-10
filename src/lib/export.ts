@@ -346,9 +346,17 @@ export function dtcgFidelity(s: MotionState): FormatFidelity {
 // ---------- Agent ----------
 
 /** Plain-language rules plus values, written to drop into a CLAUDE.md. */
-export function toAgentMarkdown(s: MotionState, url: string): string {
+export function toAgentMarkdown(s: MotionState, url: string, warnings: string[] = []): string {
   const semantics = exportedSemantics(s)
   const lines: string[] = [
+    ...(warnings.length
+      ? [
+          "> **This link did not arrive intact.**",
+          ...warnings.map((w) => `> ${w}`),
+          "> Everything below describes what survived, which may not be the set that was shared.",
+          "",
+        ]
+      : []),
     "# Motion tokens",
     "",
     `Source: ${url}`,
@@ -384,11 +392,12 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
     "",
     "## Rules",
     "",
-    `1. **Exits are faster and flatter than entrances.** The exit curve is the mirror of the entrance — a spring exit loses its bounce entirely. An entrance introduces something; an exit removes something the user has already finished with, and lingering reads as lag.`,
-    `2. **Reach for a purpose, not a raw duration.** The purpose aliases above say what a motion is for; the durations say only how long it is.`,
-    `3. **Duration should grow with travel distance, sub-linearly.** Roughly \`duration x (travel / 160px)^0.5\`, clamped to 0.6x-1.8x. Apply it to motions that actually travel; a checkbox filling has no distance.`,
-    `4. **Stagger falls off.** Each motion carries its own per-child offset — ${s.entries.map((e) => `${slugs(s.entries)[e.id]} ${e.staggerMs}ms`).join(", ")} — applied as \`offset x index^${STAGGER_DECAY}\`, so a long list doesn't take proportionally long.`,
-    `5. **Always ship the \`prefers-reduced-motion\` block.** It's in the CSS export already. In Framer Motion use \`<MotionConfig reducedMotion="user">\`.`,
+    `1. **Entrances decelerate.** Fast at the start, settling into rest. An entrance that accelerates into its resting place is the most common way a set feels wrong, and neither the durations nor the stagger will tell you it is happening. Every token in the JSON reports a \`direction\` so this is checkable rather than a matter of taste.`,
+    `2. **Exits are faster and flatter than entrances.** The exit curve is the mirror of the entrance — a spring exit loses its bounce entirely. An entrance introduces something; an exit removes something the user has already finished with, and lingering reads as lag.`,
+    `3. **Reach for a purpose, not a raw duration.** The purpose aliases above say what a motion is for; the durations say only how long it is.`,
+    `4. **Duration should grow with travel distance, sub-linearly.** Roughly \`duration x (travel / 160px)^0.5\`, clamped to 0.6x-1.8x. Apply it to motions that actually travel; a checkbox filling has no distance.`,
+    `5. **Stagger falls off.** Each motion carries its own per-child offset — ${s.entries.map((e) => `${slugs(s.entries)[e.id]} ${e.staggerMs}ms`).join(", ")} — applied as \`offset x index^${STAGGER_DECAY}\`, so a long list doesn't take proportionally long.`,
+    `6. **Always ship the \`prefers-reduced-motion\` block.** It's in the CSS export already. In Framer Motion use \`<MotionConfig reducedMotion="user">\`.`,
     "",
     "## A spring has no duration",
     "",
@@ -419,7 +428,33 @@ export function toAgentMarkdown(s: MotionState, url: string): string {
   // to be seeing this text is exactly the one who cannot see them, and nothing
   // here said so. Rebuilding a stylesheet from the table above is work nobody
   // should do by hand.
+  // How to change it. The Source line shows the syntax and never explained it,
+  // so an agent asked to modify a set rather than read one was
+  // reverse-engineering the encoding — and the x100 scaling on mass makes a
+  // reasonable guess silently wrong.
   lines.push(
+    "",
+    "## Changing this set",
+    "",
+    "Every parameter is optional; with none you get the default set.",
+    "",
+    "```",
+    'e    Repeated once per motion, six fields separated by "*":',
+    "       id*name*easing*durationMs*exit*staggerMs",
+    "     easing is one of",
+    "       b.<x1>.<y1>.<x2>.<y2>   cubic-bezier, all four values x100,",
+    "                               so cubic-bezier(0.2,0,0,1) is b.20.0.0.100",
+    "       s.<stiff>.<damp>.<mass>.<velocity>",
+    "                               stiffness and damping as-is; mass and",
+    "                               velocity x100, so mass 1 is written 100",
+    "     exit is r<percent> (a share of the entrance) or a<ms> (absolute)",
+    'pu   One value: the entry id for each purpose in order, joined by "."',
+    `       ${PURPOSE_IDS.join(", ")}`,
+    'xt   Tokens held out of the export: <entryId>*<enter|exit>, "." between',
+    "tol  Spring sampling tolerance, ten-thousandths, 1-2000. Default 100 (1%).",
+    "```",
+    "",
+    `Full contract: ${new URL("/llms.txt", url).toString()}`,
     "",
     "## Getting the code",
     "",

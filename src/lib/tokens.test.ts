@@ -377,9 +377,39 @@ describe("the exit link", () => {
     expect(exitMs({ ...e, exitLinked: true })).toBe(100)
   })
 
-  it("a spring ignores the link entirely — it settles", () => {
+  it("a spring now honours the link, by being built to fit it", () => {
+    // It used to ignore this: the exit was the same spring critically damped,
+    // so exitRatio and exitAbsoluteMs did nothing and the exit could settle
+    // slower than the entrance. Now the exit is stiffened to the budget.
     const s = springEntry(210, 20)
-    expect(exitMs({ ...s, exitLinked: false, exitAbsoluteMs: 5 })).toBeGreaterThan(100)
+    const slow = exitMs({ ...s, exitLinked: true, exitRatio: 0.9 })
+    const fast = exitMs({ ...s, exitLinked: true, exitRatio: 0.4 })
+    expect(fast).toBeLessThan(slow)
+    expect(exitMs({ ...s, exitLinked: false, exitAbsoluteMs: 120 })).toBeLessThan(
+      exitMs({ ...s, exitLinked: false, exitAbsoluteMs: 400 }),
+    )
+  })
+
+  it("never lets a spring exit outlast its entrance", () => {
+    // Rule 1 says exits are faster and flatter. Critical damping alone buys
+    // flatness by spending time, so this is the assertion that keeps the tool
+    // from contradicting the first thing it teaches.
+    for (const preset of SPRING_PRESETS) {
+      const spring = springEntry(preset.value.stiffness, preset.value.damping)
+      // Never longer, at any ratio. This is the anti-contradiction property.
+      for (const exitRatio of [0.4, 0.7, 0.95]) {
+        const e = { ...spring, exitLinked: true, exitRatio }
+        expect(exitMs(e), `${preset.label} at ${exitRatio}`).toBeLessThanOrEqual(enterMs(e))
+      }
+      // Strictly shorter at any ratio a person would actually pick. 0.95 is
+      // excluded on purpose: Framer's settling time lands on a 50ms grid, so
+      // asking for 95% of 700ms rounds back to 700ms. Forcing "<" there would
+      // override the ratio the user set to say "about the same".
+      for (const exitRatio of [0.4, 0.7, 0.8]) {
+        const e = { ...spring, exitLinked: true, exitRatio }
+        expect(exitMs(e), `${preset.label} at ${exitRatio}`).toBeLessThan(enterMs(e))
+      }
+    }
   })
 })
 
