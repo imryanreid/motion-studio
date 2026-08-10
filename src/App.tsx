@@ -135,7 +135,7 @@ export default function App() {
       )}
 
       <div className="mb-12 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Easings
             state={state}
             onChange={setState}
@@ -145,12 +145,17 @@ export default function App() {
           />
         </div>
 
-        <Preview
-          state={state}
-          editingId={selectedId}
-          purpose={purpose}
-          onPurposeChange={setPurpose}
-        />
+        {/* min-w-0 on both columns: a grid item defaults to min-width:auto,
+            so a wide child sets a floor the column cannot go below and the
+            whole document grows past the viewport instead of reflowing. */}
+        <div className="flex min-w-0 flex-col">
+          <Preview
+            state={state}
+            editingId={selectedId}
+            purpose={purpose}
+            onPurposeChange={setPurpose}
+          />
+        </div>
       </div>
 
       <SemanticTable state={state} onChange={setState}>

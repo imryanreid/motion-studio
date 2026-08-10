@@ -107,6 +107,9 @@ const DERIVATIONS: { id: TransformId | "duplicate"; label: string; title: string
   { id: "sharper", label: "Sharper", title: "More attack, or a springier spring" },
 ]
 
+/** The panel's one label treatment, matching FieldStack's band height. */
+const LABEL = "text-ash flex h-4 items-center font-mono text-[10px] tracking-wide uppercase"
+
 const CUSTOM = "custom"
 
 /**
@@ -433,14 +436,17 @@ export default function Easings({
                   sit under it. The overflow lost its bordered box to make that
                   possible — at h-7 it could only ever centre on the fields.
                 */}
-                      <div>
-                        <div className="text-ash flex h-4 items-center gap-3 font-mono text-[10px] tracking-wide uppercase">
-                          <span className={FIELD_TEXT}>Name</span>
-                          <span className="w-44">Components</span>
+                      <div className="relative">
+                        {/*
+                          The overflow sits absolutely at the top right, the
+                          mirror of the chevron on the left, so both stay on the
+                          label line however the fields below reflow.
+                        */}
+                        <div className="flex h-4 items-center">
                           <Menu
                             width="w-44"
                             bare
-                            wrapperClassName="ml-auto"
+                            wrapperClassName="absolute top-0 right-0"
                             label={`Actions for ${e.name}`}
                             groups={[
                               {
@@ -473,14 +479,27 @@ export default function Easings({
                           />
                         </div>
 
-                        <div className="mt-1 flex items-center gap-3">
-                          <TextField
-                            ariaLabel="Motion name"
-                            value={e.name}
-                            maxLength={NAME_MAX}
-                            onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
-                          />
-                          {/*
+                        {/*
+                          Each control carries its own label rather than sharing
+                          one band above both, which is what lets them stack on a
+                          narrow screen — a shared band would leave two labels on
+                          one line and their two fields on another. Geometry is
+                          unchanged on a wide screen: an h-4 label plus gap-1 puts
+                          the control on exactly the line it used to sit on.
+                        */}
+                        <div className="-mt-4 flex flex-wrap items-start gap-x-3 gap-y-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={LABEL}>Name</span>
+                            <TextField
+                              ariaLabel="Motion name"
+                              value={e.name}
+                              maxLength={NAME_MAX}
+                              onChange={(v) => patch(e.id, { name: sanitizeName(v) })}
+                            />
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={LABEL}>Components</span>
+                            {/*
                       A component belongs to exactly one motion, so the two
                       directions are not the same operation and don't get the
                       same interaction.
@@ -495,53 +514,54 @@ export default function Easings({
                       instead of offering a tick you can't untick. The checkbox
                       was promising an operation that doesn't exist.
                     */}
-                          <Menu
-                            label={`Components using ${e.name}`}
-                            triggerLabel={
-                              used.length ? `${used.length} · ${used.join(", ")}` : "None"
-                            }
-                            triggerClassName="w-44 justify-between"
-                            align="left"
-                            width="w-60"
-                            groups={[
-                              {
-                                heading: `Which components use ${e.name}?`,
-                                items: PURPOSE_IDS.map((p) => {
-                                  const owner = entryForPurpose(state, p)
-                                  const mine = owner.id === e.id
-                                  const assign = (entryId: string) =>
-                                    onChange({
-                                      ...state,
-                                      purposeEntry: { ...state.purposeEntry, [p]: entryId },
-                                    })
-                                  return {
-                                    id: p,
-                                    label: p,
-                                    checked: mine,
-                                    note: mine ? undefined : owner.name,
-                                    keepOpen: !mine,
-                                    title: mine
-                                      ? `${p} uses ${e.name} — move it to another motion`
-                                      : `${p} currently uses ${owner.name} — this moves it here`,
-                                    onSelect: () => !mine && assign(e.id),
-                                    submenu: mine
-                                      ? {
-                                          heading: `Move ${p} to…`,
-                                          items: state.entries
-                                            .filter((v) => v.id !== e.id)
-                                            .map((v) => ({
-                                              id: v.id,
-                                              label: v.name,
-                                              title: `${p} will use ${v.name}`,
-                                              onSelect: () => assign(v.id),
-                                            })),
-                                        }
-                                      : undefined,
-                                  }
-                                }),
-                              },
-                            ]}
-                          />
+                            <Menu
+                              label={`Components using ${e.name}`}
+                              triggerLabel={
+                                used.length ? `${used.length} · ${used.join(", ")}` : "None"
+                              }
+                              triggerClassName="w-44 justify-between"
+                              align="left"
+                              width="w-60"
+                              groups={[
+                                {
+                                  heading: `Which components use ${e.name}?`,
+                                  items: PURPOSE_IDS.map((p) => {
+                                    const owner = entryForPurpose(state, p)
+                                    const mine = owner.id === e.id
+                                    const assign = (entryId: string) =>
+                                      onChange({
+                                        ...state,
+                                        purposeEntry: { ...state.purposeEntry, [p]: entryId },
+                                      })
+                                    return {
+                                      id: p,
+                                      label: p,
+                                      checked: mine,
+                                      note: mine ? undefined : owner.name,
+                                      keepOpen: !mine,
+                                      title: mine
+                                        ? `${p} uses ${e.name} — move it to another motion`
+                                        : `${p} currently uses ${owner.name} — this moves it here`,
+                                      onSelect: () => !mine && assign(e.id),
+                                      submenu: mine
+                                        ? {
+                                            heading: `Move ${p} to…`,
+                                            items: state.entries
+                                              .filter((v) => v.id !== e.id)
+                                              .map((v) => ({
+                                                id: v.id,
+                                                label: v.name,
+                                                title: `${p} will use ${v.name}`,
+                                                onSelect: () => assign(v.id),
+                                              })),
+                                          }
+                                        : undefined,
+                                    }
+                                  }),
+                                },
+                              ]}
+                            />
+                          </div>
                           {previewed && <AffectedDot />}
                         </div>
                       </div>
@@ -883,12 +903,19 @@ export default function Easings({
                         {e.name}
                       </span>
                       <TypeBadge kind={e.easing.kind} />
-                      <CurvePlot easing={e.easing} thumb className="w-12 shrink-0" />
-                      <span className="text-ink shrink-0 font-mono text-[11px]">
+                      <CurvePlot
+                        easing={e.easing}
+                        thumb
+                        className="hidden w-12 shrink-0 sm:block"
+                      />
+                      {/* Truncates rather than staying rigid: on a 320px screen a
+                        shrink-0 duration was clipped mid-glyph by the panel's
+                        overflow, which reads as a rendering fault. */}
+                      <span className="text-ink min-w-0 truncate font-mono text-[11px] whitespace-nowrap">
                         {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
                         <span className="text-ash">exit{spring && " settling"}</span>
                       </span>
-                      <span className="ml-auto flex min-w-0 items-center gap-1.5 pl-2">
+                      <span className="ml-auto hidden min-w-0 items-center gap-1.5 pl-2 sm:flex">
                         {previewed && <AffectedDot />}
                         <span className="text-ash truncate text-right text-[11px]">
                           {used.length ? used.join(", ") : "—"}
