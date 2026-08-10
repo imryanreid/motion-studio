@@ -108,7 +108,8 @@ const DERIVATIONS: { id: TransformId | "duplicate"; label: string; title: string
 ]
 
 /** The panel's one label treatment, matching FieldStack's band height. */
-const LABEL = "text-ash flex h-4 items-center font-mono text-[10px] tracking-wide uppercase"
+const LABEL =
+  "text-ash flex h-4 items-center font-mono text-[11px] tracking-wide uppercase sm:text-[10px]"
 
 const CUSTOM = "custom"
 
@@ -906,7 +907,7 @@ export default function Easings({
                       aria-expanded={false}
                       className="hover:bg-ink/[0.05] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
                     >
-                      <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-xs">
+                      <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-sm sm:text-xs">
                         {e.name}
                       </span>
                       <TypeBadge kind={e.easing.kind} />
@@ -918,7 +919,7 @@ export default function Easings({
                       {/* Truncates rather than staying rigid: on a 320px screen a
                         shrink-0 duration was clipped mid-glyph by the panel's
                         overflow, which reads as a rendering fault. */}
-                      <span className="text-ink min-w-0 truncate font-mono text-[11px] whitespace-nowrap">
+                      <span className="text-ink min-w-0 truncate font-mono text-[13px] whitespace-nowrap sm:text-[11px]">
                         {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
                         <span className="text-ash">exit{spring && " settling"}</span>
                       </span>
