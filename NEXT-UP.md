@@ -53,6 +53,35 @@ returned early without an `e`, silently discarding `?tol=`.
 deployments are SSO-protected, so that check has to run against production —
 which is why the launch shipped and was verified in that order.
 
+## Security round 2, and the mobile pass (2026-08-10)
+
+A reflected XSS was live on production and is closed. `decodeWarnings` — added
+the day before to report what a truncated link had lost — re-read `pu` raw and
+echoed it verbatim, and `JSON.stringify` does not escape `<`, so `pu=</script>…`
+ended the script element and everything after it parsed as HTML. Fixed at both
+ends: only `ID_OK`-shaped ids are ever quoted back, and `jsonForScript` escapes
+`<` wherever JSON enters a script block in both repos. **Rejected input is the
+least trustworthy thing in the system, and the warning was the one place
+repeating it.**
+
+`approximateToTolerance` no longer rebuilds its greedy chain 47 times. The
+budgets are nested — worst-error-first means the set for b+1 is the set for b
+plus one index — and the deviation was already being measured by the scan that
+picks the next point. Production's worst repro went 6.11s to ~0.2s. Byte
+identity is asserted against the old sweep across 36 spring cases plus every
+bezier, because the refactor is only safe if it changes nothing.
+
+Mobile: the page no longer spills. A grid item defaults to `min-width:auto`, so
+the widest child set a floor the column could not go below. Beyond that fix,
+two things are worth remembering. `min-w-0` does nothing to an element that is
+not a flex or grid item — that cost two wrong fixes on the switcher before
+`max-w-full` on the button turned out to be the answer. And inputs must be 16px
+or Safari zooms the viewport on focus, which is what forced a whole mobile type
+scale: labels 11, controls 14, inputs 16, all `sm:`-scoped.
+
+Curve dragging is off below `sm` — an 18px target under a fingertip — and chip
+groups collapse to native selects there.
+
 ## Choosing what ships
 
 Each row of the output table has an Export checkbox. `MotionState.excluded`
@@ -223,11 +252,24 @@ Called out rather than quietly dropped:
 
 ## Blockers / open questions
 
-- **"max error 375ms (1.0% of travel)" reads as one quantity stated twice.** It
-  is two: `maxTemporalMs` is a time error, `maxDeviation` a value error, and on
-  a spring's flat tail they move independently — a tighter tolerance can report
-  a larger millisecond figure. Correct, but the phrasing invites misreading, and
-  it now travels in the agent payload as `conversionCost.css`.
+- **vite dev-only advisories in Ramps.** Eleven, all under `.>vite` — seven
+  high, including a `server.fs.deny` bypass that allows arbitrary file read
+  from the dev server. **Nothing reaches the production bundle**, and Motion
+  audits clean. It is lockfile drift, not policy: both declare `vite ^8.0.0`,
+  Motion resolved 8.2.0, Ramps is pinned at 8.0.3. `pnpm update vite` fixes it
+  inside the existing range. Needs Ryan's approval — dependency change.
+- **No Content-Security-Policy beyond `frame-ancestors`.** A real one would
+  have downgraded the reflected XSS from executing to merely ugly. Deferred on
+  purpose: Vite's output plus the inline JSON-LD needs hashes or a nonce, which
+  is design work, not a one-liner.
+- **No real agent has consumed either site end to end.** Every legibility claim
+  is a simulation of what one would do. It is the largest untested assertion in
+  the project and costs one paste of the agent prompt into a fresh session.
+- **Never run `git add -A` in these repos.** Ryan works across concurrent
+  sessions on a shared checkout, and a `Sound` → `Beeps` rename he made in the
+  Ramps working tree was swept into an unrelated mobile PR and shipped to
+  production without appearing in its description. Stage explicit paths.
+
 - **Browser-pane caveat, for agents only.** The in-app browser pane renders
   pages as a *hidden* tab: `requestAnimationFrame` fires zero frames and
   `setTimeout` is clamped to ~1/sec, so nothing animates and any UI behind an
