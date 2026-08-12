@@ -427,7 +427,7 @@ export default function Preview({
             aria-pressed={loop}
             title={loop ? "Looping — click to play once" : "Plays once — click to loop"}
             className={cn(
-              "h-9 rounded-md border px-2 font-mono text-base transition-colors sm:h-7 sm:text-[10px]",
+              "h-9 rounded-md border px-2 font-mono text-sm transition-colors sm:h-7 sm:text-[10px]",
               loop
                 ? "border-ink/30 bg-ink/[0.06] text-ink"
                 : "border-line bg-paper text-ash hover:border-ink/30 hover:text-ink",
