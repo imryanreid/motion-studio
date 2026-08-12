@@ -150,7 +150,7 @@ export default function Menu({
               "hover:bg-ink/[0.08] -my-2 h-9 w-9 rounded sm:-my-1 sm:h-6 sm:w-6"
             : "border-line bg-paper hover:border-ink/30 h-9 rounded-md border sm:h-7",
           !bare &&
-            (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-sm sm:text-[10px]" : "w-7"),
+            (triggerLabel ? "min-w-0 gap-1 px-2 font-mono text-base sm:text-[10px]" : "w-7"),
           triggerClassName,
           open && (bare ? "text-ink" : "border-ink/30 text-ink bg-ink/[0.06]"),
         )}
@@ -320,7 +320,7 @@ export function ChipGroup({
         aria-label={ariaLabel}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="border-line bg-paper text-ink h-9 w-full min-w-0 rounded-md border px-2 font-mono text-sm sm:hidden"
+        className="border-line bg-paper text-ink h-9 w-full min-w-0 rounded-md border px-2 font-mono text-base sm:hidden"
       >
         {value === null && <option value="">Custom</option>}
         {options.map((o) => (
@@ -341,7 +341,7 @@ export function ChipGroup({
             className={cn(
               // h-7 everywhere: same height as the menu trigger and every other
               // small button, so a row of them shares one rhythm.
-              "inline-flex h-9 items-center rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
+              "inline-flex h-9 items-center rounded-md border px-2 font-mono text-base transition-colors sm:h-7 sm:text-[10px]",
               o.id === value
                 ? "border-ink bg-ink text-paper"
                 : // Same surface as an input: transparent on a tinted panel, an
