@@ -33,14 +33,14 @@ the payload and is pure, so the functions import it without React.
 
 **Two things went wrong; both are worth remembering.**
 
-*The renderer served the previous build's shell.* `/index.html` is a stable URL
+_The renderer served the previous build's shell._ `/index.html` is a stable URL
 whose contents change every deploy, so the internal fetch took a CDN hit from
 the last build — and production served current tokens grafted onto a document
 whose asset hash 404'd. Perfectly readable to an agent, completely broken for a
 person. Fixed with `cache: "no-store"` plus a per-deployment query key. Ramps
 had the identical shape and was one deploy from the same failure — PR #3 there.
 
-*llms.txt was wrong, which is worse than absent.* It documented spring mass as a
+_llms.txt was wrong, which is worse than absent._ It documented spring mass as a
 plain number when the codec scales it ×100, and called the tolerance
 thousandths when it is ten-thousandths. An agent would have followed it and
 built a URL decoding to a different spring. There is now a test that parses the
@@ -80,7 +80,31 @@ or Safari zooms the viewport on focus, which is what forced a whole mobile type
 scale: labels 11, controls 14, inputs 16, all `sm:`-scoped.
 
 Curve dragging is off below `sm` — an 18px target under a fingertip — and chip
-groups collapse to native selects there.
+groups collapse to a single trigger there.
+
+## The last two 16px controls (2026-08-12)
+
+`ChipGroup`'s mobile collapse was a native `<select>`, which meant it had to
+render at 16px to keep Safari from zooming — so Shape and Scenario sat a size
+above every control beside them. Measured on production: two elements at 16px
+against 58 at 14. It read as broken because it was.
+
+The fix was already in the file. `Menu` — a plain button — has no zoom rule to
+obey, and the Components picker one row above Shape had been using it at 14px
+the whole time. `ChipGroup` now collapses to that same `Menu` instead of a
+`<select>`. Chips above `sm` are untouched.
+
+**The 16px floor only binds focusable form controls.** Reach for a button and
+the constraint disappears. Worth remembering before the next mobile fallback
+gets written as a `<select>` — the picker wheel is not worth a broken scale.
+
+Also fixed in passing: the popover was pinned at `top-8`, which cleared a 28px
+desktop trigger but overlapped the 36px mobile one by 4px. Now `top-10 sm:top-8`
+for bordered triggers; `bare` keeps `top-8`, since its negative margins bottom
+it out where a 28px box does.
+
+Left alone: the four text inputs, which genuinely must stay 16px, and the export
+modal's format select, which is shared with Ramps.
 
 ## Choosing what ships
 
@@ -127,7 +151,7 @@ promote-someone-else rule on delete.
 
 **Presets are the shape selector, for both types**, with the raw numbers behind
 "Custom". Springs got five presets picked by damping ratio. Which one is
-selected is *derived* by comparing values, never stored — so dragging a handle
+selected is _derived_ by comparing values, never stored — so dragging a handle
 lands on Custom with nothing having to notice, and a hand-edited link shows the
 truth on arrival.
 
@@ -190,8 +214,8 @@ from a hand-edited URL. Pinning the anchor would let the cell labelled `base`
 hold a value the rest of the scale isn't derived from.
 
 **The emphasis.** The "Easing" panel is now "Emphasis", an accordion of three
-rows rather than one curve behind tabs. An emphasis is a curve *and* a duration
-*and* the purposes that reach for it; those were split across two panels and a
+rows rather than one curve behind tabs. An emphasis is a curve _and_ a duration
+_and_ the purposes that reach for it; those were split across two panels and a
 caption, which left the primary object of the tool represented by three tab
 labels. Every row now carries its own shape (thumbnail), its duration step by
 name, and what uses it, whether open or not — comparing three curves is the
@@ -201,7 +225,7 @@ described.
 
 **Pinning is gone as a concept, not as a capability.** You override a step by
 typing a value into it; an authored number is drawn in a box and a generated
-one isn't. The box is on the *number*, never on the cell — that bug came back
+one isn't. The box is on the _number_, never on the cell — that bug came back
 twice, because a box around a region always ends up containing a derived value.
 `↺` releases a step back onto the curve. `DEFAULT_STATE.pins` is now `{}`, so
 the shipped scale is **100 / 140 / 200 / 280 / 390**, purely generated.
@@ -271,7 +295,7 @@ Called out rather than quietly dropped:
   production without appearing in its description. Stage explicit paths.
 
 - **Browser-pane caveat, for agents only.** The in-app browser pane renders
-  pages as a *hidden* tab: `requestAnimationFrame` fires zero frames and
+  pages as a _hidden_ tab: `requestAnimationFrame` fires zero frames and
   `setTimeout` is clamped to ~1/sec, so nothing animates and any UI behind an
   `AnimatePresence mode="wait"` swap (the export modal's chooser → code stage)
   cannot be reached there at all — it presents as a dead click. Verify layout
