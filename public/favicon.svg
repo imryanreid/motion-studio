@@ -1,17 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!--
-    A spring's step response — rise, overshoot, settle — which is the curve the
-    app plots and the reason the domain is springs.studio.
+    A coil spring, drawn literally. This is the fourth attempt at the mark and
+    the first that stopped fighting the geometry.
 
-    Deliberately a sibling of Ramps rather than a contrast to it: the same
-    #131210 plate, the same rx="7" corner, the same 6px inset, and a blue from
-    the same ramp (#8db0ff, its second-lightest step). Only the mark inside
-    differs — stripes there, a curve here. 8.7:1 on the plate, so it survives a
-    16px tab.
+    Every earlier version drew the spring's STEP RESPONSE — the curve the app
+    plots — as two parallel strokes, to give it Ramps' kind of mass. That does
+    not work at this size, and the reason is worth writing down so nobody tries
+    it a fifth time: two strokes stay parallel at a gap d only where the curve's
+    radius of curvature exceeds d, and a spring that rings has a radius near 0.6
+    units at its overshoot peak against a ~2.3-unit gap. The inner stroke folds
+    through itself, which is a visible cusp. Translating straight down instead
+    keeps the shapes identical but loses the gap where the curve is steep, so the
+    strokes merge on the rise; scaling the offset by local slope holds the gap
+    but staggers the two apart; capping at the local radius still kinks. A search
+    over damping, cycles and amplitude found only 0.75-cycle curves — barely a
+    spring at all — clear the constraint.
 
-    The curve is normalised by its 1.372 peak, not by its settle value, or the
-    overshoot — the entire point of the mark — runs off the top edge.
+    A coil has none of that problem: it is ONE stroke, so there is no offset to
+    fold. It is also more literal, which is the point. Ramps is horizontal bars,
+    Beeps is vertical bars, Springs is a coil — three different objects at a
+    glance, sharing the plate and the blue ramp.
+
+    Drawn as an obliquely-viewed helix:
+        x = P*t + A*sin(t),  y = B*cos(t),  depth = sin(t)
+    with P = 0.55, A = 1.6, B = 3.2 over 3 turns, rotated 40 degrees, then
+    scaled to the family's 6-unit inset. Depth is in phase with the x-wobble
+    because that is what an obliquely-viewed helix does: swinging toward +x also
+    swings toward the viewer. The stroke is split on the sign of that depth and
+    the BACK halves are painted first in #2452b0, the FRONT halves over them in
+    #8db0ff — so the loops actually pass behind one another instead of reading
+    as a flat scribble. Both tones are from the same ramp Ramps uses.
+
+    Same point lists as the `motion` figure in the shared ToolMark — change one,
+    change both.
   -->
   <rect width="32" height="32" rx="7" fill="#131210" />
-  <polyline points="7.70,23.30 7.84,23.25 7.98,23.10 8.12,22.86 8.25,22.53 8.39,22.12 8.53,21.65 8.67,21.12 8.81,20.53 8.95,19.90 9.08,19.23 9.22,18.54 9.36,17.82 9.50,17.09 9.64,16.36 9.78,15.63 9.91,14.90 10.05,14.19 10.19,13.50 10.33,12.83 10.47,12.19 10.61,11.59 10.74,11.02 10.88,10.50 11.02,10.01 11.16,9.57 11.30,9.18 11.44,8.83 11.57,8.53 11.71,8.28 11.85,8.07 11.99,7.91 12.13,7.80 12.27,7.73 12.40,7.70 12.54,7.71 12.68,7.76 12.82,7.84 12.96,7.96 13.10,8.10 13.23,8.27 13.37,8.47 13.51,8.68 13.65,8.91 13.79,9.16 13.93,9.42 14.06,9.68 14.20,9.95 14.34,10.23 14.48,10.50 14.62,10.77 14.76,11.04 14.89,11.29 15.03,11.54 15.17,11.78 15.31,12.01 15.45,12.23 15.59,12.43 15.72,12.61 15.86,12.78 16.00,12.93 16.14,13.06 16.28,13.18 16.42,13.27 16.55,13.35 16.69,13.42 16.83,13.46 16.97,13.49 17.11,13.51 17.25,13.51 17.38,13.49 17.52,13.46 17.66,13.42 17.80,13.37 17.94,13.31 18.07,13.24 18.21,13.16 18.35,13.08 18.49,12.98 18.63,12.89 18.77,12.79 18.91,12.69 19.04,12.59 19.18,12.49 19.32,12.39 19.46,12.29 19.60,12.19 19.73,12.10 19.87,12.01 20.01,11.92 20.15,11.84 20.29,11.76 20.43,11.69 20.57,11.63 20.70,11.57 20.84,11.52 20.98,11.48 21.12,11.44 21.26,11.41 21.39,11.38 21.53,11.37 21.67,11.35 21.81,11.35 21.95,11.35 22.09,11.35 22.23,11.36 22.36,11.37 22.50,11.39 22.64,11.41 22.78,11.44 22.92,11.47 23.06,11.50 23.19,11.53 23.33,11.57 23.47,11.60 23.61,11.64 23.75,11.68 23.89,11.72 24.02,11.76 24.16,11.79 24.30,11.83" fill="none" stroke="#8db0ff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="15.97,7.64 15.81,7.56 15.57,7.52 15.29,7.55 14.98,7.64 14.63,7.80 14.26,8.03 13.87,8.32 13.48,8.67 13.08,9.07 12.69,9.53 12.31,10.03 11.95,10.57 11.62,11.13 11.32,11.72 11.07,12.32 10.86,12.93 10.70,13.54 10.59,14.13 10.54,14.71 10.56,15.25 10.63,15.77 10.76,16.24 10.95,16.66 11.20,17.03 11.51,17.34 11.56,17.38" fill="none" stroke="#2452b0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="20.23,11.21 20.07,11.13 19.83,11.09 19.55,11.12 19.24,11.21 18.89,11.37 18.52,11.60 18.13,11.89 17.73,12.24 17.34,12.65 16.94,13.10 16.57,13.60 16.21,14.14 15.88,14.70 15.58,15.29 15.33,15.90 15.12,16.50 14.96,17.11 14.85,17.70 14.80,18.28 14.81,18.83 14.88,19.34 15.02,19.81 15.21,20.23 15.46,20.60 15.77,20.91 15.82,20.95" fill="none" stroke="#2452b0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="24.48,14.79 24.32,14.70 24.09,14.66 23.81,14.69 23.49,14.79 23.15,14.95 22.78,15.17 22.39,15.46 21.99,15.81 21.59,16.22 21.20,16.67 20.82,17.17 20.47,17.71 20.14,18.28 19.84,18.87 19.58,19.47 19.37,20.08 19.21,20.68 19.11,21.28 19.06,21.85 19.07,22.40 19.14,22.91 19.27,23.38 19.47,23.80 19.72,24.17 20.02,24.48" fill="none" stroke="#2452b0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="7.31,13.81 7.61,14.01 8.01,14.19 8.46,14.31 8.95,14.36 9.47,14.34 10.01,14.26 10.56,14.11 11.13,13.90 11.70,13.64 12.26,13.33 12.81,12.97 13.34,12.58 13.84,12.15 14.31,11.71 14.73,11.25 15.11,10.78 15.44,10.32 15.72,9.87 15.94,9.44 16.10,9.03 16.20,8.66 16.23,8.34 16.21,8.06 16.13,7.83 16.00,7.66 15.97,7.64" fill="none" stroke="#8db0ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="11.56,17.38 11.87,17.58 12.27,17.77 12.72,17.88 13.21,17.93 13.72,17.91 14.27,17.83 14.82,17.68 15.39,17.47 15.96,17.21 16.52,16.90 17.07,16.54 17.60,16.15 18.10,15.73 18.56,15.28 18.99,14.82 19.37,14.35 19.70,13.89 19.98,13.44 20.20,13.01 20.35,12.60 20.45,12.24 20.49,11.91 20.47,11.63 20.39,11.40 20.25,11.24 20.23,11.21" fill="none" stroke="#8db0ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="15.82,20.95 16.12,21.16 16.53,21.34 16.98,21.45 17.47,21.50 17.98,21.48 18.52,21.40 19.08,21.25 19.65,21.05 20.22,20.78 20.78,20.47 21.33,20.12 21.86,19.72 22.36,19.30 22.82,18.85 23.25,18.39 23.63,17.93 23.96,17.46 24.23,17.01 24.45,16.58 24.61,16.18 24.71,15.81 24.75,15.48 24.73,15.20 24.65,14.98 24.51,14.81 24.48,14.79" fill="none" stroke="#8db0ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
