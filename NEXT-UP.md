@@ -21,7 +21,43 @@ presets) or a spring (five presets by damping ratio, or raw physics), each with
 a derived exit; Generate builds the three-level set from any one of them; seven
 preview scenarios with component-first assignment; the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes; the
-machine-readable block; per-token export selection; and URL state. 216 tests.
+machine-readable block; per-token export selection; and URL state. 288 tests.
+
+## The mark became a coil (2026-08-13)
+
+The favicon was a spring's step response drawn as two parallel strokes. It is
+now a **literal coil spring**, and the reason is geometric rather than a change
+of taste — worth recording so nobody re-attempts the old shape.
+
+Two strokes stay parallel at a gap `d` only where the curve's radius of
+curvature exceeds `d`. A spring that rings has a radius near **0.6 units** at
+its overshoot peak against a ~2.3-unit gap, so the inner stroke folds back
+through itself and leaves a visible cusp. Every alternative was tried and
+measured: translating straight down keeps the two shapes identical but loses the
+gap exactly where the curve is steep, merging them on the rise; scaling the
+offset by local slope holds the gap but staggers the strokes apart diagonally;
+capping the offset at the local radius still kinks. A search over damping,
+cycles and amplitude found that only 0.75-cycle curves — barely a spring —
+clear the constraint at a Ramps-like gap.
+
+A coil is **one stroke**, so there is no offset to fold, and it is more literal.
+It is an obliquely-viewed helix, `x = P·t + A·sin(t)`, `y = B·cos(t)`,
+`depth = sin(t)`, with P 0.55, A 1.6, B 3.2 over 3 turns at 40°. The stroke is
+split on the sign of that depth and the back halves painted first in `#2452b0`,
+the front halves over them in `#8db0ff` — so the loops pass behind one another
+instead of reading as a flat scribble, which also restores the two-tone weight.
+Full derivation is in the comment on `public/favicon.svg`.
+
+The family now reads as three different objects at a glance: Ramps' horizontal
+bars, Beeps' vertical bars, and this coil. One caveat: a coil carries more
+detail than four bars, so at 16px it reads as distinctive diagonal texture
+rather than resolving into loops.
+
+Also in this pass, via `pnpm sync`: the collapsed switcher shows the current
+tool's mark, the three unbuilt tools became Depths / Texts / SVGs, and the
+`llms.txt` family block is generated from the manifest by
+`src/shared/scripts/build-llms.mjs` on every build. That block had omitted Beeps
+entirely and still used the old names.
 
 ## Agent surfaces (2026-08-09)
 
