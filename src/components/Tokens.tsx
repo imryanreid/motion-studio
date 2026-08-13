@@ -57,7 +57,7 @@ export function SemanticTable({
   return (
     <section className="mb-12">
       <h2 className="font-display mb-1 text-xl font-semibold tracking-tight">Output</h2>
-      <p className="text-ash mb-4 max-w-[62ch] text-xs leading-relaxed">
+      <p className="text-ash mb-4 max-w-[62ch] text-sm leading-relaxed sm:text-xs">
         Every motion ships in both directions. Untick anything you don't want in the export.
       </p>
 
@@ -99,11 +99,14 @@ export function SemanticTable({
                     />
                   </td>
                   <td className="py-2 pr-4">
-                    <CopyText value={`motion.${t.id}`} className="font-mono text-[13px]">
+                    <CopyText
+                      value={`motion.${t.id}`}
+                      className="font-mono text-sm sm:text-[13px]"
+                    >
                       motion.{t.id}
                     </CopyText>
                   </td>
-                  <td className="text-ink py-2 pr-4 font-mono text-xs">
+                  <td className="text-ink py-2 pr-4 font-mono text-sm sm:text-xs">
                     {t.durationMs}ms
                     {t.easing.kind === "spring" && (
                       <span
@@ -115,12 +118,12 @@ export function SemanticTable({
                       </span>
                     )}
                   </td>
-                  <td className={cn("text-ash py-2 pr-4 font-mono text-[11px]")}>
+                  <td className={cn("text-ash py-2 pr-4 font-mono text-sm sm:text-[11px]")}>
                     <CopyText value={describeEasing(t.easing)}>
                       {describeEasing(t.easing)}
                     </CopyText>
                   </td>
-                  <td className="text-ash py-2 text-xs">{used.join(", ") || "—"}</td>
+                  <td className="text-ash py-2 text-sm sm:text-xs">{used.join(", ") || "—"}</td>
                 </tr>
               )
             })}

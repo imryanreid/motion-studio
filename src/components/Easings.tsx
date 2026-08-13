@@ -135,7 +135,7 @@ function TypeBadge({ kind }: { kind: EasingKind }) {
           ? "Spring — physics, with no duration of its own"
           : "Bezier — four control points over a duration"
       }
-      className="bg-ink/[0.08] text-ink flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] font-mono text-[10px] leading-none"
+      className="bg-ink/[0.08] text-ink flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] font-mono text-[11px] leading-none sm:text-[10px]"
     >
       {spring ? "S" : "B"}
     </span>
@@ -396,7 +396,7 @@ export default function Easings({
                   // 11x16 target, and when a row is open it is the only way to
                   // close it again — the summary row that also toggles does
                   // not exist in that state.
-                  "max-sm:-ml-3 max-sm:w-10 max-sm:justify-center",
+                  "max-sm:-ml-4 max-sm:w-10 max-sm:justify-center",
                   open
                     ? "top-3 h-4 max-sm:-mt-3 max-sm:h-10"
                     : "top-2 h-6 max-sm:-mt-2 max-sm:h-10",
@@ -437,7 +437,16 @@ export default function Easings({
                     }}
                     className="overflow-hidden"
                   >
-                    <div className="flex flex-col gap-3 py-3 pr-3 pl-8">
+                    {/*
+                      Three left edges become two rules: chrome sits on the
+                      panel's own padding, and disclosed content is indented
+                      behind the chevron that reveals it. They cannot be one
+                      edge — the chevron needs a 40px target on a phone and has
+                      to live somewhere — and indenting the header to match
+                      would only make this panel's title disagree with
+                      Preview's, which has no chevron at all.
+                    */}
+                    <div className="flex flex-col gap-3 py-3 pr-4 pl-7 sm:pr-3 sm:pl-8">
                       {/*
                   Labels, chevron and the overflow icon share one 16px band, so
                   all three sit on a single centre line; the controls they name
@@ -575,7 +584,7 @@ export default function Easings({
                       </div>
 
                       {slug[e.id] !== baseSlug(e.name) && (
-                        <p className="text-ash font-mono text-[10px]">
+                        <p className="text-ash font-mono text-[11px] sm:text-[10px]">
                           Exports as <span className="text-ink">motion.{slug[e.id]}</span> —
                           another motion already claimed{" "}
                           <span className="text-ink">{baseSlug(e.name)}</span>.
@@ -905,7 +914,7 @@ export default function Easings({
                       type="button"
                       onClick={() => onSelect(e.id)}
                       aria-expanded={false}
-                      className="hover:bg-ink/[0.05] flex h-10 w-full items-center gap-3 py-2 pr-3 pl-8 text-left transition-colors"
+                      className="hover:bg-ink/[0.05] flex h-10 w-full items-center gap-3 py-2 pr-4 pl-7 text-left transition-colors sm:pr-3 sm:pl-8"
                     >
                       <span className="text-ash w-[6.5rem] shrink-0 truncate font-mono text-sm sm:text-xs">
                         {e.name}
@@ -919,7 +928,7 @@ export default function Easings({
                       {/* Truncates rather than staying rigid: on a 320px screen a
                         shrink-0 duration was clipped mid-glyph by the panel's
                         overflow, which reads as a rendering fault. */}
-                      <span className="text-ink min-w-0 truncate font-mono text-[13px] whitespace-nowrap sm:text-[11px]">
+                      <span className="text-ink min-w-0 truncate font-mono text-sm whitespace-nowrap sm:text-[11px]">
                         {enterMs(e)}ms <span className="text-ash">enter</span> / {exitMs(e)}ms{" "}
                         <span className="text-ash">exit{spring && " settling"}</span>
                       </span>

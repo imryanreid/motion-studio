@@ -180,7 +180,12 @@ export default function Menu({
             transition={{ duration: DUR.swap, ease: EASE_PANEL }}
             style={{ transformOrigin: align === "right" ? "top right" : "top left" }}
             className={cn(
-              "border-line bg-paper absolute top-8 z-20 overflow-hidden rounded-lg border shadow-lg",
+              "border-line bg-paper absolute z-20 overflow-hidden rounded-lg border shadow-lg",
+              // Clear the trigger, which is taller on a phone. A bordered
+              // trigger is 36 there and 28 above `sm`; a bare one is 36 either
+              // way but hangs off a 16px label band on negative margins, so it
+              // bottoms out in the same place a 28px box does.
+              bare ? "top-8" : "top-10 sm:top-8",
               width,
               align === "right" ? "right-0" : "left-0",
             )}
@@ -296,11 +301,18 @@ export default function Menu({
 /**
  * A row of mutually exclusive chips. The family's small-selector treatment.
  *
- * Below `sm` it collapses to a native select. Six preset chips and seven
+ * Below `sm` it collapses to a single trigger. Six preset chips and seven
  * component chips were most of the noise on a phone: each row wrapped to two
  * or three lines, and together they made the panel read as a pile of buttons
- * rather than a form. A select is one line, one target, and hands the list to
- * the OS picker.
+ * rather than a form. One line, one target.
+ *
+ * That collapse used to be a native `<select>`, and the picker wheel was worth
+ * having — but Safari zooms the whole viewport when a form control smaller
+ * than 16px takes focus, so the select had to sit at 16 while every control
+ * beside it sat at 14. Two rows of a panel rendering a size larger than the
+ * rest is a visible break, and it was the only thing left doing it. A button
+ * is exempt from that rule entirely, so this uses the same Menu that the
+ * Components picker one row up has always used: 14px, no zoom, one pattern.
  */
 export function ChipGroup({
   ariaLabel,
@@ -316,19 +328,29 @@ export function ChipGroup({
 }) {
   return (
     <>
-      <select
-        aria-label={ariaLabel}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="border-line bg-paper text-ink h-9 w-full min-w-0 rounded-md border px-2 font-mono text-sm sm:hidden"
-      >
-        {value === null && <option value="">Custom</option>}
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <Menu
+        label={ariaLabel}
+        // `null` means the value matches no preset — the chips show nothing
+        // selected, and the collapsed trigger has to say the same thing.
+        triggerLabel={options.find((o) => o.id === value)?.label ?? "Custom"}
+        align="left"
+        wrapperClassName="w-full sm:hidden"
+        triggerClassName="text-ink w-full justify-between"
+        width="w-full"
+        groups={[
+          {
+            // One of these, not several — a tick rather than a box.
+            marker: "check",
+            items: options.map((o) => ({
+              id: o.id,
+              label: o.label,
+              title: o.title,
+              checked: o.id === value,
+              onSelect: () => onChange(o.id),
+            })),
+          },
+        ]}
+      />
       <div role="radiogroup" aria-label={ariaLabel} className="hidden flex-wrap gap-1 sm:flex">
         {options.map((o) => (
           <button
@@ -341,7 +363,7 @@ export function ChipGroup({
             className={cn(
               // h-7 everywhere: same height as the menu trigger and every other
               // small button, so a row of them shares one rhythm.
-              "inline-flex h-9 items-center rounded-md border px-2 font-mono text-[10px] transition-colors sm:h-7",
+              "inline-flex h-9 items-center rounded-md border px-2 font-mono text-sm transition-colors sm:h-7 sm:text-[10px]",
               o.id === value
                 ? "border-ink bg-ink text-paper"
                 : // Same surface as an input: transparent on a tinted panel, an

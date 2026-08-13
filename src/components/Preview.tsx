@@ -409,7 +409,7 @@ export default function Preview({
             />
           </div>
 
-          <span className="text-ash w-14 shrink-0 text-right font-mono text-[13px] tabular-nums sm:text-[10px]">
+          <span className="text-ash w-14 shrink-0 text-right font-mono text-sm tabular-nums sm:text-[10px]">
             {Math.round(elapsed)}ms
           </span>
 
