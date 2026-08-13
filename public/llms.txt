@@ -122,8 +122,10 @@ rather than to guess.
 
 ## Other tools in this family
 
+<!-- FAMILY:START format="list" current="motion" -->
   Ramps   Color scales & semantic tokens  https://www.ramps.studio/
   Beeps   UI sounds & feedback            https://www.beeps.studio/
   Depths  Elevation & shadows             not yet released
   Texts   Type styles & scaling           not yet released
   SVGs    Icon cleanup & alignment        not yet released
+<!-- FAMILY:END -->
