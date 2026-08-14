@@ -333,10 +333,21 @@ export function ChipGroup({
         // `null` means the value matches no preset — the chips show nothing
         // selected, and the collapsed trigger has to say the same thing.
         triggerLabel={options.find((o) => o.id === value)?.label ?? "Custom"}
-        align="left"
+        // Anchored to the trigger's right edge so it grows leftward into the
+        // panel. Shape's trigger is narrow and sits well right of centre, so a
+        // left anchor would push a content-width popover off the screen.
+        align="right"
         wrapperClassName="w-full sm:hidden"
         triggerClassName="text-ink w-full justify-between"
-        width="w-full"
+        // Wide enough for the longest label, never narrower than the trigger.
+        //
+        // This was `w-full`, which pinned the popover to the trigger — and
+        // Shape's trigger is 90px, so `Ease in-out` truncated to about four
+        // characters. `w-max` sizes to the content instead; `min-w-full` keeps
+        // it from looking detached under a full-width trigger like Scenario's.
+        // When the two disagree the minimum wins, which is the behaviour we
+        // want in both directions.
+        width="w-max min-w-full max-w-[16rem]"
         groups={[
           {
             // One of these, not several — a tick rather than a box.

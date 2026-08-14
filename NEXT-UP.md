@@ -152,6 +152,15 @@ it out where a 28px box does.
 Left alone: the four text inputs, which genuinely must stay 16px, and the export
 modal's format select, which is shared with Ramps.
 
+**Follow-up, same day:** that collapse shipped with `width="w-full"`, which
+pinned the popover to its trigger — and Shape's trigger is 90px, so `Ease
+in-out` truncated to about four characters. A `<select>` sizes its own picker
+and a popover does not; carrying the width over from the element being replaced
+was the mistake. Now `w-max min-w-full max-w-[16rem]`, and `align="right"` so a
+content-width panel under a narrow, right-of-centre trigger grows into the panel
+rather than off the screen. When min and max disagree the minimum wins, which is
+what keeps Scenario's full-width trigger matched at 317px.
+
 ## Choosing what ships
 
 Each row of the output table has an Export checkbox. `MotionState.excluded`
