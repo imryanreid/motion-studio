@@ -23,6 +23,16 @@ preview scenarios with component-first assignment; the full export panel (CSS,
 Tailwind, Framer Motion, DTCG, agent markdown) with fidelity notes; the
 machine-readable block; per-token export selection; and URL state. 288 tests.
 
+## A Donate row in the switcher (2026-08-13)
+
+Arrived via `pnpm sync`. `ToolSwitcher` now ends with a Donate row below a rule,
+no mark, opening buymeacoffee.com/tktk in a new tab — this tool keeps its whole
+state in the query string, so a donation page should not replace a set someone
+is part-way through editing. Authored in Ramps Studio like everything else in
+`src/shared/`; nothing to change here.
+
+`tktk` is Ryan's studio name, deliberately tongue-in-cheek. Not a placeholder.
+
 ## The mark became a coil (2026-08-13)
 
 The favicon was a spring's step response drawn as two parallel strokes. It is
