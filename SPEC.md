@@ -70,7 +70,7 @@ two things.
 > **Live within an entry. One-time between entries.**
 
 An exit is always derived from its own entrance, live, because that asymmetry is
-the lesson the tool exists to teach (§3.6). Everything *between* motions — the
+the lesson the tool exists to teach (§3.6). Everything _between_ motions — the
 generated set, "make one like this but slower" — seeds a value once and then
 lets go. No links, no anchor, no multipliers to keep in sync.
 
@@ -81,15 +81,15 @@ longer and feels identical.
 
 ### 3.2 A motion
 
-| Field            | Applies to      | Notes                                             |
-| ---------------- | --------------- | ------------------------------------------------- |
-| `name`           | both            | Yours. Slugified for export, deduplicated.        |
-| `easing`         | both            | A cubic-bezier or a spring.                       |
-| `staggerMs`      | both            | Per-child offset when it enters as a group.       |
-| `durationMs`     | **bezier only** | A spring has none — it settles.                   |
-| `exitLinked`     | **bezier only** | Whether the exit follows the entrance.            |
-| `exitRatio`      | **bezier only** | Share of the entrance, when linked.               |
-| `exitAbsoluteMs` | **bezier only** | Its own duration, when not.                       |
+| Field            | Applies to      | Notes                                       |
+| ---------------- | --------------- | ------------------------------------------- |
+| `name`           | both            | Yours. Slugified for export, deduplicated.  |
+| `easing`         | both            | A cubic-bezier or a spring.                 |
+| `staggerMs`      | both            | Per-child offset when it enters as a group. |
+| `durationMs`     | **bezier only** | A spring has none — it settles.             |
+| `exitLinked`     | **bezier only** | Whether the exit follows the entrance.      |
+| `exitRatio`      | **bezier only** | Share of the entrance, when linked.         |
+| `exitAbsoluteMs` | **bezier only** | Its own duration, when not.                 |
 
 **Duration and exit are bezier-only**, and a spring row simply doesn't render
 them — not greyed, not footnoted. Every control on screen applies to the thing
@@ -131,7 +131,7 @@ would disagree about what "faster" means.
 
 **The shipped default is what Generate produces**: three beziers at 140 / 200 /
 280ms. It used to be a mixed set with a spring, which was worse than merely
-irreproducible — it *promised* Generate would hand you a spring, and pressing it
+irreproducible — it _promised_ Generate would hand you a spring, and pressing it
 once would silently strip the set of its character. A default the tool cannot
 make with its own button is a default it should not ship.
 
@@ -150,18 +150,18 @@ promote-someone-else rule for when you removed the entry holding the flag.
 
 Named transforms, applied in the units each type is actually made of:
 
-|             | bezier                       | spring                                |
-| ----------- | ---------------------------- | ------------------------------------- |
-| **Faster**  | duration ÷ 1.4               | stiffness × 1.96, damping × 1.4       |
-| **Slower**  | duration × 1.4               | stiffness ÷ 1.96, damping ÷ 1.4       |
-| **Softer**  | blend toward a flatter curve | raise ζ — less bounce                 |
-| **Sharper** | blend toward a steeper curve | lower ζ — more bounce                 |
-| **Duplicate** | exact copy                 | exact copy                            |
+|               | bezier                       | spring                          |
+| ------------- | ---------------------------- | ------------------------------- |
+| **Faster**    | duration ÷ 1.4               | stiffness × 1.96, damping × 1.4 |
+| **Slower**    | duration × 1.4               | stiffness ÷ 1.96, damping ÷ 1.4 |
+| **Softer**    | blend toward a flatter curve | raise ζ — less bounce           |
+| **Sharper**   | blend toward a steeper curve | lower ζ — more bounce           |
+| **Duplicate** | exact copy                   | exact copy                      |
 
 The spring column is the whole argument for named transforms. ω₀ = √(k/m), so
 scaling frequency by 1.4 means stiffness by 1.4² — and ζ = c / (2√(km)), so the
 damping has to move by 1.4 alongside it or the character changes. That comes out
-to *the same spring, quicker*, which a raw multiplier could never express.
+to _the same spring, quicker_, which a raw multiplier could never express.
 
 Generated durations land on a 10ms grid. Values you type are left alone.
 
@@ -172,13 +172,13 @@ only appear once you're past them. Springs get presets too, picked by damping
 ratio rather than by stiffness, because ζ = c / (2√(km)) is what actually
 predicts the feel:
 
-| | ζ | |
-| ------ | ---- | ------------------------------- |
-| Gentle | 1.19 | crawls in, no overshoot at all   |
-| Smooth | 1.0  | critical — quickest, no bounce   |
-| Lively | 0.73 | a little overshoot               |
-| Bouncy | 0.4  | clearly bounces                  |
-| Wobbly | 0.27 | several visible oscillations     |
+|        | ζ    |                                |
+| ------ | ---- | ------------------------------ |
+| Gentle | 1.19 | crawls in, no overshoot at all |
+| Smooth | 1.0  | critical — quickest, no bounce |
+| Lively | 0.73 | a little overshoot             |
+| Bouncy | 0.4  | clearly bounces                |
+| Wobbly | 0.27 | several visible oscillations   |
 
 **Which preset is selected is derived from the values, never stored.** A stored
 flag can disagree with the numbers it claims to name: drag a handle and the flag
@@ -190,7 +190,7 @@ single line of code noticing.
 Switching type lands on a named preset rather than an arbitrary config —
 `Lively` for a spring rather than the critically-damped `Smooth`, because a
 critical spring looks almost exactly like a decent bezier and someone switching
-type to find out what a spring *is* would see nothing happen.
+type to find out what a spring _is_ would see nothing happen.
 
 ### 3.6 Exits are derived — the one live relationship
 
@@ -231,7 +231,7 @@ preview now carries only the readout: which motion this scenario plays.
 **Aliases are references, never copies.** In every format that supports
 indirection they emit as references — `var(--motion-emphasized-enter)` in CSS,
 `{motion.emphasized.enter}` in DTCG. In formats that can't alias, they resolve
-to the same literal *and the export states which motion it came from*.
+to the same literal _and the export states which motion it came from_.
 
 This is not fussiness. Ramps has the same hazard in its Figma export, where a
 token aliasing an excluded ramp would produce a dangling variable reference that
@@ -239,7 +239,7 @@ Figma rejects on import. An alias that silently becomes a second copy of a value
 is the same bug wearing different clothes.
 
 **Why this layer stays**, having been challenged: it gives a person and their
-agent a *shared vocabulary*. "Use the drawer motion" is unambiguous to both, in
+agent a _shared vocabulary_. "Use the drawer motion" is unambiguous to both, in
 a way "use standard enter at 200ms" is not — and agents lean on that naming
 heavily.
 
