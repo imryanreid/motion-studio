@@ -7,51 +7,51 @@
 
 ## Root
 
-| File             | What it does                                                                                                                      |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| File             | What it does                                                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `index.html`     | The page shell Vite builds around. Canonical, OG tags and JSON-LD for `www.springs.studio`. `api/render` rewrites parts of this head per URL. |
-| `middleware.ts`  | Sends `/` to `api/render` before the filesystem check, so the homepage isn't served as a static empty shell. |
-| `vite.config.ts` | Build config. React + Tailwind plugins, React deduping, and `base: "./"` so the build also runs opened off disk.                  |
-| `tsconfig.json`  | TypeScript settings. Strict, no emit.                                                                                             |
-| `package.json`   | Dependencies and scripts.                                                                                                         |
-| `.mise.toml`     | Pins the toolchain: Node 22, pnpm 10.                                                                                             |
-| `LICENSE`        | MIT.                                                                                                                              |
+| `middleware.ts`  | Sends `/` to `api/render` before the filesystem check, so the homepage isn't served as a static empty shell.                                  |
+| `vite.config.ts` | Build config. React + Tailwind plugins, React deduping, and `base: "./"` so the build also runs opened off disk.                              |
+| `tsconfig.json`  | TypeScript settings. Strict, no emit.                                                                                                         |
+| `package.json`   | Dependencies and scripts.                                                                                                                     |
+| `.mise.toml`     | Pins the toolchain: Node 22, pnpm 10.                                                                                                         |
+| `LICENSE`        | MIT.                                                                                                                                          |
 
 ## `public/`
 
-| File                   | What it is                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| `favicon.svg`          | A spring's step response — rise, overshoot, settle — in amber on ink.           |
-| `apple-touch-icon.png` | 180px, flattened onto ink so a home screen never shows a transparent corner.    |
-| `icon-192.png`         | 192px, same mark.                                                               |
+| File                   | What it is                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `favicon.svg`          | A spring's step response — rise, overshoot, settle — in amber on ink.                          |
+| `apple-touch-icon.png` | 180px, flattened onto ink so a home screen never shows a transparent corner.                   |
+| `icon-192.png`         | 192px, same mark.                                                                              |
 | `og.png`               | The share card. Static — nothing in it depends on the URL. Rebuild with `scripts/build-og.py`. |
-| `llms.txt`             | The agent contract: every parameter, the token names, the rules that matter.    |
-| `robots.txt`           | Permissive, points at the sitemap.                                              |
-| `sitemap.xml`          | One URL. There is one page.                                                     |
+| `llms.txt`             | The agent contract: every parameter, the token names, the rules that matter.                   |
+| `robots.txt`           | Permissive, points at the sitemap.                                                             |
+| `sitemap.xml`          | One URL. There is one page.                                                                    |
 
 ## `api/` — serverless, agent-facing
 
-| File        | What it is                                                                                            |
-| ----------- | ----------------------------------------------------------------------------------------------------- |
+| File        | What it is                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `render.ts` | `GET /`. Serves index.html with the motion set injected as JSON and as text, so a JavaScript-less fetch returns the tokens. Rewrites the head to self-canonical for a parameterized URL. |
-| `tokens.ts` | `GET /api/tokens`. The same payload as JSON alone, same query contract, CORS-open.                      |
+| `tokens.ts` | `GET /api/tokens`. The same payload as JSON alone, same query contract, CORS-open.                                                                                                       |
 
 ## `scripts/`
 
 | File             | What it does                                                                                                                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `build-og.py`    | Redraws `public/og.png` with Pillow and the Geist TTFs. Run by hand; the card only changes when the copy does. |
+| `build-og.py`    | Redraws `public/og.png` with Pillow and the Geist TTFs. Run by hand; the card only changes when the copy does.                                                                 |
 | `sync-shared.sh` | Pulls `src/shared` from Ramps Studio, which is upstream. `--check` diffs and exits non-zero instead. Wired up as `pnpm sync` and `pnpm sync:check`. Copied, not authored here. |
 
 ## `src/`
 
-| File            | What it does                                                                        |
-| --------------- | ----------------------------------------------------------------------------------- |
+| File            | What it does                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `main.tsx`      | Entry point. Mounts `App`, loads the stylesheet, attaches the Vercel beacons, and removes the injected agent block once React is running. |
-| `lib/agent.ts`  | The agent payload — one motion set as structured JSON and as text. Pure, so `api/` can import it without React. |
-| `App.tsx`       | Motion-specific wiring. A placeholder today — renders the shared shell and a note.  |
-| `index.css`     | Imports the shared tokens. Tool-specific rules go here when the previews need them. |
-| `vite-env.d.ts` | This app's ambient types. Shared code brings its own (`src/shared/env.d.ts`).       |
+| `lib/agent.ts`  | The agent payload — one motion set as structured JSON and as text. Pure, so `api/` can import it without React.                           |
+| `App.tsx`       | Motion-specific wiring. A placeholder today — renders the shared shell and a note.                                                        |
+| `index.css`     | Imports the shared tokens. Tool-specific rules go here when the previews need them.                                                       |
+| `vite-env.d.ts` | This app's ambient types. Shared code brings its own (`src/shared/env.d.ts`).                                                             |
 
 ### `src/shared/` — copied from Ramps Studio, do not edit here
 
