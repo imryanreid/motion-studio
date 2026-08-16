@@ -83,8 +83,11 @@ describe("GET / (api/render)", () => {
     const html = await res.text()
     expect(res.status).toBe(200)
     expect(html).toContain('id="motion-studio-tokens"')
-    // The <pre> is what survives HTML-to-markdown conversion.
-    expect(html).toContain("<pre>")
+    // The <pre> is what survives HTML-to-markdown conversion, and it has to
+    // wrap: unwrapped, a single long payload line lays the document out many
+    // times wider than a phone viewport for as long as the block is present.
+    expect(html).toContain("<pre style=")
+    expect(html).toContain("white-space:pre-wrap")
     expect(html).toContain("motion.subtle.enter")
     expect(html).toContain('<div id="root">')
   })
