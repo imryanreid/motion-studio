@@ -125,7 +125,7 @@ rather than to guess.
 <!-- FAMILY:START format="list" current="motion" -->
   Ramps   Color scales & semantic tokens  https://www.ramps.studio/
   Beeps   UI sounds & feedback            https://www.beeps.studio/
-  Depths  Elevation & shadows             not yet released
+  Depths  Elevation & shadows             https://www.depths.studio/
   Texts   Type styles & scaling           not yet released
   SVGs    Icon cleanup & alignment        not yet released
 <!-- FAMILY:END -->
